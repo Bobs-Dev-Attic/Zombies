@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0d0a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="Escape the horde. A mobile top-down pixel-art zombie shooter." />
+  <title>Zombies: Escape the Horde</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%230b0d0a'/><rect x='4' y='3' width='8' height='9' fill='%2372a83a'/><rect x='5' y='6' width='2' height='2' fill='%23111'/><rect x='9' y='6' width='2' height='2' fill='%23c0392b'/></svg>" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game"></canvas>
+
+    <!-- Touch controls overlay -->
+    <div id="touch-ui" class="hidden">
+      <div id="joystick" class="joystick">
+        <div class="joystick-base"></div>
+        <div class="joystick-knob"></div>
+      </div>
+      <div id="action-cluster">
+        <button id="btn-fire" class="action-btn fire" aria-label="Fire">FIRE</button>
+        <button id="btn-reload" class="action-btn small" aria-label="Reload">⟳</button>
+        <button id="btn-swap" class="action-btn small" aria-label="Swap weapon">↔</button>
+        <button id="btn-interact" class="action-btn small interact" aria-label="Interact">✋</button>
+      </div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+      <div class="hud-top">
+        <div class="bars">
+          <div class="bar-row"><span class="bar-label">HP</span>
+            <div class="bar"><div id="hp-fill" class="bar-fill hp"></div></div>
+          </div>
+          <div class="bar-row"><span class="bar-label">STA</span>
+            <div class="bar"><div id="stamina-fill" class="bar-fill stamina"></div></div>
+          </div>
+        </div>
+        <div class="hud-stats">
+          <div id="wave-label">WAVE 1</div>
+          <div id="score-label">0</div>
+        </div>
+      </div>
+      <div class="hud-bottom">
+        <div id="weapon-box">
+          <div id="weapon-name">Pistol</div>
+          <div id="ammo-count">∞</div>
+        </div>
+        <div id="setting-label">The Streets</div>
+      </div>
+      <div id="toast"></div>
+    </div>
+
+    <!-- Start / Menu screen -->
+    <div id="menu" class="overlay">
+      <div class="menu-card">
+        <h1 class="title">ZOMBIES</h1>
+        <p class="subtitle">Escape the Horde</p>
+        <p class="version">v<span id="menu-version">0.0.0</span></p>
+        <button id="start-btn" class="menu-btn primary">START</button>
+        <div class="menu-links">
+          <button id="how-btn" class="menu-btn ghost">How to Play</button>
+          <button id="changelog-btn" class="menu-btn ghost">Changelog</button>
+        </div>
+        <p class="hint">Best on a phone. Add to Home Screen for fullscreen.</p>
+      </div>
+    </div>
+
+    <!-- How to play -->
+    <div id="how" class="overlay hidden">
+      <div class="menu-card scroll">
+        <h2>How to Play</h2>
+        <ul class="how-list">
+          <li><b>Move</b> — left virtual stick (or WASD / arrows).</li>
+          <li><b>Aim &amp; Shoot</b> — you auto-aim the nearest zombie; hold <b>FIRE</b> (or Space / mouse).</li>
+          <li><b>Sprint</b> — push the stick fully; drains stamina. Low stamina & heavy wounds slow you.</li>
+          <li><b>Reload</b> — ⟳ button (or R).</li>
+          <li><b>Swap weapon</b> — ↔ button (or Q / mouse wheel).</li>
+          <li><b>Interact</b> — ✋ to open/close doors and grab pickups (or E). Walk over items to auto-grab. Shut doors to block the horde.</li>
+          <li><b>Survive</b> the waves, gather weapons, and reach the <b>EXIT</b> to advance the setting.</li>
+        </ul>
+        <button class="menu-btn primary close-overlay" data-target="how">Back</button>
+      </div>
+    </div>
+
+    <!-- Changelog -->
+    <div id="changelog" class="overlay hidden">
+      <div class="menu-card scroll">
+        <h2>Changelog</h2>
+        <div id="changelog-body"><p>Loading…</p></div>
+        <button class="menu-btn primary close-overlay" data-target="changelog">Back</button>
+      </div>
+    </div>
+
+    <!-- Game over -->
+    <div id="gameover" class="overlay hidden">
+      <div class="menu-card">
+        <h2 class="dead">YOU DIED</h2>
+        <p class="stat-line">Score <span id="final-score">0</span></p>
+        <p class="stat-line">Reached Wave <span id="final-wave">1</span></p>
+        <p class="stat-line">Kills <span id="final-kills">0</span></p>
+        <button id="retry-btn" class="menu-btn primary">Try Again</button>
+      </div>
+    </div>
+
+    <div id="version-tag">v<span id="hud-version">0.0.0</span></div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

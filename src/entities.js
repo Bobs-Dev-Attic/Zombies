@@ -1,0 +1,335 @@
+// Game entities: Player, Zombie, Projectile, Particle, Pickup.
+import { clamp, rand, randInt, chance, angleTo, angleLerp, dist, TAU, pick } from "./util.js";
+import { WEAPONS } from "./weapons.js";
+
+// ---------------------------------------------------------------- Player
+export class Player {
+  constructor(x, y, loadout) {
+    this.x = x; this.y = y;
+    this.vx = 0; this.vy = 0;
+    this.r = 6;
+    this.angle = 0;
+    this.maxHealth = 100;
+    this.health = 100;
+    this.maxStamina = 100;
+    this.stamina = 100;
+    this.baseSpeed = 118;
+    this.loadout = loadout;
+    this.cooldown = 0;
+    this.reloading = 0;
+    this.walkFrame = 0;
+    this.hurtFlash = 0;
+    this.muzzle = 0;
+    this.exhausted = false;
+    this.kills = 0;
+    this.invuln = 0;
+  }
+
+  get weapon() { return WEAPONS[this.loadout.current]; }
+
+  // Movement speed accounts for wounds, exhaustion and sprint.
+  speedFactor(sprinting) {
+    let f = 1;
+    const hp = this.health / this.maxHealth;
+    if (hp < 0.25) f *= 0.62;         // badly wounded: limping
+    else if (hp < 0.5) f *= 0.82;     // hurt: slowed
+    if (this.exhausted) f *= 0.6;     // out of stamina
+    if (sprinting && !this.exhausted && this.stamina > 0) f *= 1.5;
+    return f;
+  }
+
+  update(dt, input, world) {
+    if (this.hurtFlash > 0) this.hurtFlash -= dt;
+    if (this.muzzle > 0) this.muzzle -= dt;
+    if (this.invuln > 0) this.invuln -= dt;
+
+    const wantMove = input.moveMag > 0.08;
+    const sprinting = input.moveMag > 0.92 && wantMove;
+
+    // Stamina drain / regen.
+    if (sprinting && !this.exhausted && this.stamina > 0) {
+      this.stamina = clamp(this.stamina - 34 * dt, 0, this.maxStamina);
+      if (this.stamina <= 0) this.exhausted = true;
+    } else if (!wantMove) {
+      this.stamina = clamp(this.stamina + 26 * dt, 0, this.maxStamina);
+    } else {
+      this.stamina = clamp(this.stamina + 12 * dt, 0, this.maxStamina);
+    }
+    if (this.exhausted && this.stamina > 35) this.exhausted = false;
+
+    const spd = this.baseSpeed * this.speedFactor(sprinting) * clamp(input.moveMag / 0.9, 0, 1);
+    const tvx = wantMove ? input.moveX * spd : 0;
+    const tvy = wantMove ? input.moveY * spd : 0;
+    // Smooth acceleration for fluid motion.
+    this.vx += (tvx - this.vx) * clamp(dt * 12, 0, 1);
+    this.vy += (tvy - this.vy) * clamp(dt * 12, 0, 1);
+
+    const nx = this.x + this.vx * dt;
+    const ny = this.y + this.vy * dt;
+    const res = world.collide(nx, ny, this.r);
+    this.x = res.x; this.y = res.y;
+
+    if (wantMove) this.walkFrame += dt * (sprinting ? 16 : 10);
+
+    // Slow health regen when calm and not badly hurt.
+    if (this.health > 0 && this.health < this.maxHealth) {
+      this.health = clamp(this.health + 1.2 * dt, 0, this.maxHealth);
+    }
+
+    if (this.cooldown > 0) this.cooldown -= dt;
+    if (this.reloading > 0) {
+      this.reloading -= dt;
+      if (this.reloading <= 0) this._finishReload();
+    }
+  }
+
+  faceTarget(tx, ty, dt) {
+    const target = angleTo(this.x, this.y, tx, ty);
+    this.angle = angleLerp(this.angle, target, clamp(dt * 14, 0, 1));
+  }
+
+  hurt(amount) {
+    if (this.invuln > 0) return;
+    this.health = clamp(this.health - amount, 0, this.maxHealth);
+    this.hurtFlash = 0.18;
+    this.invuln = 0.35;
+  }
+
+  heal(a) { this.health = clamp(this.health + a, 0, this.maxHealth); }
+
+  canFire() {
+    if (this.cooldown > 0 || this.reloading > 0) return false;
+    const w = this.weapon;
+    if (w.melee) return true;
+    const clip = this.loadout.clip[this.loadout.current] ?? 0;
+    return clip > 0;
+  }
+
+  startReload() {
+    const w = this.weapon;
+    if (w.melee || this.reloading > 0) return false;
+    const type = w.ammoType;
+    const clip = this.loadout.clip[this.loadout.current] ?? 0;
+    if (clip >= w.clip) return false;
+    if ((this.loadout.ammo[type] ?? 0) <= 0) return false;
+    this.reloading = w.reload;
+    return true;
+  }
+
+  _finishReload() {
+    const w = this.weapon;
+    const type = w.ammoType;
+    const clip = this.loadout.clip[this.loadout.current] ?? 0;
+    const need = w.clip - clip;
+    const have = this.loadout.ammo[type] ?? 0;
+    const take = Math.min(need, have);
+    this.loadout.clip[this.loadout.current] = clip + take;
+    this.loadout.ammo[type] = have - take;
+  }
+}
+
+// ---------------------------------------------------------------- Zombies
+export const ZOMBIE_TYPES = {
+  walker:  { hp: 46,  speed: 44, r: 7,  dmg: 9,  pattern: "direct",      knockResist: 0, score: 10, color: "walker",  gore: 1 },
+  runner:  { hp: 30,  speed: 78, r: 6,  dmg: 7,  pattern: "direct",      knockResist: 0.1, score: 16, color: "runner",  gore: 1 },
+  crawler: { hp: 22,  speed: 66, r: 5,  dmg: 6,  pattern: "wanderChase", knockResist: 0.1, score: 14, color: "crawler", gore: 0.7 },
+  brute:   { hp: 180, speed: 30, r: 12, dmg: 22, pattern: "direct",      knockResist: 0.75, score: 40, color: "brute",   gore: 2 },
+  spitter: { hp: 40,  speed: 40, r: 7,  dmg: 5,  pattern: "ranged",      knockResist: 0.2, score: 24, color: "spitter", gore: 1 },
+};
+
+export class Zombie {
+  constructor(x, y, type, hpScale = 1) {
+    const t = ZOMBIE_TYPES[type];
+    this.type = type;
+    this.def = t;
+    this.x = x; this.y = y;
+    this.vx = 0; this.vy = 0;
+    this.r = t.r;
+    this.maxHp = t.hp * hpScale;
+    this.hp = this.maxHp;
+    this.speed = t.speed * rand(0.9, 1.12);
+    this.angle = rand(0, TAU);
+    this.frame = rand(0, TAU);
+    this.hurtFlash = 0;
+    this.state = "idle";
+    this.wanderAngle = rand(0, TAU);
+    this.wanderTimer = rand(0.5, 2);
+    this.attackCd = 0;
+    this.spitCd = rand(1, 3);
+    this.dead = false;
+    this.knock = { x: 0, y: 0 };
+    this.flankSign = chance(0.5) ? 1 : -1;
+  }
+
+  // Heading toward the player: straight line when there's LOS or we're close,
+  // otherwise follow the BFS flow field around walls.
+  _seek(player, world, nav) {
+    const d = dist(this.x, this.y, player.x, player.y);
+    const los = nav ? nav.los(this.x, this.y) : true;
+    if (los || d < 44) {
+      const a = angleTo(this.x, this.y, player.x, player.y);
+      return { hx: Math.cos(a), hy: Math.sin(a), d, los };
+    }
+    const f = nav ? nav.flow(this.x, this.y) : null;
+    if (f && f.seen) return { hx: f.fx, hy: f.fy, d, los };
+    const a = angleTo(this.x, this.y, player.x, player.y);
+    return { hx: Math.cos(a), hy: Math.sin(a), d, los };
+  }
+
+  update(dt, player, world, nav, spawnProjectile) {
+    if (this.hurtFlash > 0) this.hurtFlash -= dt;
+    if (this.attackCd > 0) this.attackCd -= dt;
+    this.frame += dt * (2 + this.speed * 0.05);
+
+    const seek = this._seek(player, world, nav);
+    const d = seek.d;
+    const sees = d < 560;
+    let tvx = 0, tvy = 0;
+
+    switch (this.def.pattern) {
+      case "wanderChase": {
+        if (d < 340) this.state = "chase";
+        if (this.state !== "chase") {
+          this.wanderTimer -= dt;
+          if (this.wanderTimer <= 0) { this.wanderAngle = rand(0, TAU); this.wanderTimer = rand(0.6, 2.2); }
+          tvx = Math.cos(this.wanderAngle) * this.speed * 0.4;
+          tvy = Math.sin(this.wanderAngle) * this.speed * 0.4;
+        } else {
+          tvx = seek.hx * this.speed; tvy = seek.hy * this.speed;
+        }
+        break;
+      }
+      case "ranged": {
+        const a = angleTo(this.x, this.y, player.x, player.y);
+        this.angle = angleLerp(this.angle, a, clamp(dt * 6, 0, 1));
+        const ideal = 180;
+        if (!seek.los || d > ideal + 40) { tvx = seek.hx * this.speed; tvy = seek.hy * this.speed; }
+        else if (d < ideal - 40) { tvx = -Math.cos(a) * this.speed * 0.7; tvy = -Math.sin(a) * this.speed * 0.7; }
+        else { // strafe
+          tvx = Math.cos(a + Math.PI / 2) * this.speed * 0.5 * this.flankSign;
+          tvy = Math.sin(a + Math.PI / 2) * this.speed * 0.5 * this.flankSign;
+        }
+        this.spitCd -= dt;
+        if (sees && seek.los && this.spitCd <= 0 && d < 320) {
+          this.spitCd = rand(2.2, 3.6);
+          spawnProjectile(this.x, this.y, a + rand(-0.06, 0.06), "spit");
+        }
+        break;
+      }
+      default: { // direct
+        tvx = seek.hx * this.speed;
+        tvy = seek.hy * this.speed;
+      }
+    }
+
+    if (this.def.pattern !== "ranged") {
+      const moveA = Math.atan2(tvy, tvx);
+      if (tvx || tvy) this.angle = angleLerp(this.angle, moveA, clamp(dt * 6, 0, 1));
+    }
+
+    // Apply knockback impulse, decaying.
+    tvx += this.knock.x; tvy += this.knock.y;
+    this.knock.x *= Math.pow(0.001, dt);
+    this.knock.y *= Math.pow(0.001, dt);
+
+    const nx = this.x + tvx * dt;
+    const ny = this.y + tvy * dt;
+    const res = world.collide(nx, ny, this.r);
+    this.x = res.x; this.y = res.y;
+
+    // Melee the player on contact.
+    if (d < this.r + player.r + 2 && this.attackCd <= 0) {
+      player.hurt(this.def.dmg);
+      this.attackCd = 0.7;
+      const a = angleTo(this.x, this.y, player.x, player.y);
+      player.vx += Math.cos(a) * 60;
+      player.vy += Math.sin(a) * 60;
+    }
+  }
+
+  applyKnockback(angle, force) {
+    const f = force * (1 - this.def.knockResist);
+    this.knock.x += Math.cos(angle) * f;
+    this.knock.y += Math.sin(angle) * f;
+  }
+
+  damage(amount, angle, force) {
+    this.hp -= amount;
+    this.hurtFlash = 0.08;
+    if (force) this.applyKnockback(angle, force);
+    if (this.hp <= 0) this.dead = true;
+    return this.dead;
+  }
+}
+
+// ---------------------------------------------------------------- Projectiles
+export class Projectile {
+  constructor(x, y, angle, opts) {
+    this.x = x; this.y = y;
+    this.px = x; this.py = y;
+    this.vx = Math.cos(angle) * opts.speed;
+    this.vy = Math.sin(angle) * opts.speed;
+    this.angle = angle;
+    this.damage = opts.damage;
+    this.range = opts.range;
+    this.traveled = 0;
+    this.dead = false;
+    this.hostile = !!opts.hostile;
+    this.explosive = opts.explosive || 0;
+    this.knockback = opts.knockback || 0;
+    this.pierce = opts.pierce || 0;
+    this.hitSet = new Set();
+    this.kind = opts.kind || "bullet";
+    this.r = opts.r || 1.6;
+  }
+
+  update(dt, world) {
+    this.px = this.x; this.py = this.y;
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    const step = Math.hypot(this.vx, this.vy) * dt;
+    this.traveled += step;
+    if (this.traveled >= this.range) this.dead = true;
+    if (world.blocksShot(this.x, this.y)) this.dead = true;
+  }
+}
+
+// ---------------------------------------------------------------- Particles
+export class Particle {
+  constructor(x, y, opts) {
+    this.x = x; this.y = y;
+    this.vx = opts.vx; this.vy = opts.vy;
+    this.life = opts.life; this.maxLife = opts.life;
+    this.color = opts.color;
+    this.size = opts.size || 2;
+    this.gravity = opts.gravity || 0;
+    this.drag = opts.drag ?? 0.9;
+    this.stain = opts.stain || false; // blood that settles on the ground
+    this.dead = false;
+    this.settled = false;
+  }
+  update(dt) {
+    if (this.settled) { this.life -= dt; if (this.life <= 0) this.dead = true; return; }
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    this.vx *= Math.pow(this.drag, dt * 60);
+    this.vy *= Math.pow(this.drag, dt * 60);
+    this.vy += this.gravity * dt;
+    this.life -= dt;
+    if (this.stain && Math.hypot(this.vx, this.vy) < 12) { this.settled = true; this.life = 6; }
+    if (this.life <= 0) this.dead = true;
+  }
+}
+
+// ---------------------------------------------------------------- Pickups
+export class Pickup {
+  constructor(x, y, kind, data) {
+    this.x = x; this.y = y;
+    this.kind = kind;   // 'weapon' | 'ammo' | 'medkit' | 'adrenaline'
+    this.data = data;   // weapon id or ammo {type, amount}
+    this.t = rand(0, TAU);
+    this.dead = false;
+    this.r = 9;
+  }
+  update(dt) { this.t += dt; }
+}
