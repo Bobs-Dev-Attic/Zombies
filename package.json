@@ -1,0 +1,15 @@
+{
+  "name": "zombies-escape",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A mobile top-down pixel-art zombie escape shooter.",
+  "type": "module",
+  "scripts": {
+    "dev": "npx serve .",
+    "start": "npx serve ."
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "playwright-core": "^1.61.1"
+  }
+}
