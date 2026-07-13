@@ -268,25 +268,57 @@ export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts,
   eye(4, -1.5); eye(4, 1.5);
 }
 
-// A dead zombie settled on the ground (permanent decal).
+// Desaturate + darken a hex colour for a "dead" look.
+function deadTint(hex, k) {
+  const n = parseInt(hex.slice(1), 16);
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const gray = (r + g + b) / 3;
+  r = (r * 0.55 + gray * 0.45) * k; g = (g * 0.55 + gray * 0.45) * k; b = (b * 0.55 + gray * 0.45) * k;
+  return `rgb(${r | 0},${g | 0},${b | 0})`;
+}
+
+// A dead zombie settled on the ground (permanent decal), lying face-down.
 export function drawBodyDecal(ctx, x, y, angle, type, r, parts) {
   const pal = ZOMBIE_PAL[type] || ZOMBIE_PAL.walker;
   const s = r / 7;
+  const skin = deadTint(pal.skin, 0.82);
+  const cloth = deadTint(pal.cloth || pal.dark, 0.8);
+  const dark = deadTint(pal.dark, 0.68);
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
-  ctx.fillStyle = "rgba(60,10,10,0.45)"; // blood pool
-  ctx.beginPath(); ctx.ellipse(0, 0, 10 * s, 6.5 * s, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = pal.skin;
-  const limbR = (ang, len, ok) => { if (!ok) return; ctx.save(); ctx.rotate(ang); ctx.fillRect(2, -1.3, len, 2.6); ctx.restore(); };
-  limbR(-0.7, 7 * s, parts.rarm); limbR(0.7, 7 * s, parts.larm);
-  limbR(Math.PI - 0.5, 6 * s, parts.rleg); limbR(Math.PI + 0.5, 6 * s, parts.lleg);
-  ctx.fillStyle = pal.dark;
-  ctx.beginPath(); ctx.ellipse(0, 0, 6.5 * s, 4.2 * s, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = pal.skin;
-  ctx.beginPath(); ctx.arc(5 * s, 0, 2.6 * s, 0, TAU); ctx.fill();
-  ctx.fillStyle = "#7a1010";
-  ctx.fillRect(-1, -1, 2, 2);
+
+  // Layered, irregular blood pool.
+  ctx.fillStyle = "rgba(70,8,10,0.5)";
+  ctx.beginPath(); ctx.ellipse(-1 * s, 0, 11 * s, 7 * s, 0.3, 0, TAU); ctx.fill();
+  ctx.fillStyle = "rgba(40,4,6,0.55)";
+  ctx.beginPath(); ctx.ellipse(2 * s, 1 * s, 6 * s, 4 * s, -0.4, 0, TAU); ctx.fill();
+
+  const limb = (ang, x0, len, wide, col, ok) => {
+    if (!ok) return;
+    ctx.save(); ctx.rotate(ang);
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.ellipse(x0 + len / 2, 0, len / 2 + 0.6, wide, 0, 0, TAU); ctx.fill();
+    ctx.restore();
+  };
+  // Legs trail behind, arms out to the sides — a slumped, face-down sprawl.
+  limb(Math.PI - 0.35, 2 * s, 7 * s, 1.7 * s, cloth, parts.rleg);
+  limb(Math.PI + 0.35, 2 * s, 7 * s, 1.7 * s, cloth, parts.lleg);
+  limb(-1.15, 2.2 * s, 6 * s, 1.5 * s, skin, parts.rarm);
+  limb(1.15, 2.2 * s, 6 * s, 1.5 * s, skin, parts.larm);
+
+  // Torso (tattered shirt) then a hint of exposed back.
+  ctx.fillStyle = cloth;
+  ctx.beginPath(); ctx.ellipse(0, 0, 7 * s, 4.6 * s, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = dark;
+  ctx.beginPath(); ctx.ellipse(-0.5 * s, 0, 4.5 * s, 3 * s, 0, 0, TAU); ctx.fill();
+
+  // Head, face-down, at the front.
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(6 * s, 0, 3 * s, 0, TAU); ctx.fill();
+  ctx.fillStyle = deadTint(pal.dark, 0.5);
+  ctx.beginPath(); ctx.arc(6.4 * s, 0, 1.8 * s, 0, TAU); ctx.fill(); // hair/wound
+
   ctx.restore();
 }
 

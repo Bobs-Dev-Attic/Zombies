@@ -806,9 +806,12 @@ export class Game {
     this._drawGibs(ctx);
     this._drawProjectiles(ctx);
     this._drawParticles(ctx);
+    this._drawFog(ctx, -ox, -oy);
     this._drawBanners(ctx);
     this._drawExitBeacon(ctx);
     ctx.restore();
+
+    this._drawMinimap();
 
     // Low-HP vignette.
     const hp = this.player ? this.player.health / this.player.maxHealth : 1;
@@ -823,6 +826,85 @@ export class Game {
       ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       ctx.restore();
     }
+  }
+
+  // Ray-march from the player to a tile; visible unless a *different* solid
+  // cell blocks the way (so the wall you're facing is lit, but not what's behind it).
+  _tileVisible(cx, cy) {
+    const px = this.player.x, py = this.player.y;
+    const tx = (cx + 0.5) * TILE, ty = (cy + 0.5) * TILE;
+    const dx = tx - px, dy = ty - py;
+    const steps = Math.ceil(Math.hypot(dx, dy) / (TILE * 0.5));
+    for (let i = 1; i < steps; i++) {
+      const t = i / steps, sx = px + dx * t, sy = py + dy * t;
+      if ((Math.floor(sx / TILE) !== cx || Math.floor(sy / TILE) !== cy) && this.world.solidAt(sx, sy)) return false;
+    }
+    return true;
+  }
+
+  // Fog of war: dark unexplored, dim remembered, clear within sight (feathered).
+  _drawFog(ctx, camX, camY) {
+    const w = this.world, R = 6.4;
+    const pcx = this.player.x / TILE, pcy = this.player.y / TILE;
+    const startCX = Math.floor(camX / TILE) - 1, startCY = Math.floor(camY / TILE) - 1;
+    const endCX = startCX + Math.ceil(this.bufW / TILE) + 2, endCY = startCY + Math.ceil(this.bufH / TILE) + 2;
+    for (let cy = startCY; cy <= endCY; cy++) {
+      for (let cx = startCX; cx <= endCX; cx++) {
+        let a;
+        if (!w.inBounds(cx, cy)) a = 0.98;
+        else {
+          const idx = w.idx(cx, cy);
+          const d = Math.hypot(cx + 0.5 - pcx, cy + 0.5 - pcy);
+          if (d <= R && this._tileVisible(cx, cy)) {
+            w.explored[idx] = 1;
+            a = clamp((d - (R - 1.8)) / 1.8, 0, 1) * 0.55; // feathered sight edge
+          } else if (w.explored[idx]) a = 0.68; // remembered
+          else a = 0.98;                        // never seen
+        }
+        if (a > 0.02) { ctx.fillStyle = `rgba(4,5,8,${a.toFixed(3)})`; ctx.fillRect(cx * TILE, cy * TILE, TILE + 1, TILE + 1); }
+      }
+    }
+  }
+
+  _drawMinimap() {
+    if (!this.minimapCtx) {
+      const el = document.getElementById("minimap");
+      if (!el) return;
+      this.minimapEl = el; this.minimapCtx = el.getContext("2d");
+    }
+    // Throttle to keep it cheap.
+    this.minimapT = (this.minimapT || 0) + 1;
+    if (this.minimapT % 4 !== 0 && this._miniDrew) return;
+    this._miniDrew = true;
+    const w = this.world, mc = this.minimapCtx, S = this.minimapEl.width;
+    const scale = S / Math.max(w.cols, w.rows);
+    const oxm = (S - w.cols * scale) / 2, oym = (S - w.rows * scale) / 2;
+    mc.clearRect(0, 0, S, S);
+    mc.fillStyle = "rgba(6,9,10,0.55)"; mc.fillRect(0, 0, S, S);
+    for (let cy = 0; cy < w.rows; cy++) {
+      for (let cx = 0; cx < w.cols; cx++) {
+        if (!w.explored[w.idx(cx, cy)]) continue;
+        const t = w.tileAt(cx, cy);
+        mc.fillStyle = (t === T.WALL || t === T.PROP) ? "#3c4636" : (t === T.EXIT ? "#39d353" : "#6f7d5e");
+        mc.fillRect(oxm + cx * scale, oym + cy * scale, scale + 0.6, scale + 0.6);
+      }
+    }
+    // Exit marker (if discovered) pulsing.
+    const ex = Math.floor(w.exit.x / TILE), ey = Math.floor(w.exit.y / TILE);
+    if (w.explored[w.idx(ex, ey)]) { mc.fillStyle = "#8dffa0"; mc.fillRect(oxm + ex * scale - 0.5, oym + ey * scale - 0.5, scale + 1.5, scale + 1.5); }
+    // Zombies currently in sight.
+    mc.fillStyle = "#e0483a";
+    for (const z of this.zombies) {
+      const zcx = Math.floor(z.x / TILE), zcy = Math.floor(z.y / TILE);
+      if (w.inBounds(zcx, zcy) && Math.hypot(z.x - this.player.x, z.y - this.player.y) < TILE * 6.4 && this._tileVisible(zcx, zcy)) {
+        mc.fillRect(oxm + z.x / TILE * scale - 0.8, oym + z.y / TILE * scale - 0.8, 1.8, 1.8);
+      }
+    }
+    // Player.
+    mc.fillStyle = "#ffffff";
+    mc.fillRect(oxm + this.player.x / TILE * scale - 1, oym + this.player.y / TILE * scale - 1, 2.4, 2.4);
+    mc.fillStyle = "#72a83a";
+    mc.fillRect(oxm + this.player.x / TILE * scale - 0.6, oym + this.player.y / TILE * scale - 0.6, 1.6, 1.6);
   }
 
   _drawWorld(ctx, camX, camY) {
@@ -926,16 +1008,24 @@ export class Game {
   }
 
   _drawCorpses(ctx) {
+    // Cross-fade the standing zombie out while the body decal fades/settles in.
     for (const c of this.corpses) {
       if (c.t >= c.dur) continue; // banner may outlive the body
-      const k = c.t / c.dur; // 0..1 collapse
+      const k = clamp(c.t / c.dur, 0, 1);
+      // Falling zombie (first half): topple + fade.
+      if (k < 0.6) {
+        ctx.save();
+        ctx.globalAlpha = clamp(1 - k / 0.6, 0, 1);
+        ctx.translate(c.x, c.y); ctx.scale(1, 1 - k * 0.5); ctx.translate(-c.x, -c.y);
+        drawZombie(ctx, c.x, c.y, c.angle, 0, c.type, c.r, false, c.parts, true, 1, 0, 0, 0);
+        ctx.restore();
+      }
+      // Body decal fades in and settles to full size.
       ctx.save();
-      ctx.globalAlpha = clamp(1 - k * 0.85, 0, 1);
-      // Sink & squash as it falls.
-      ctx.translate(c.x, c.y);
-      ctx.scale(1, 1 - k * 0.55);
-      ctx.translate(-c.x, -c.y);
-      drawZombie(ctx, c.x, c.y, c.angle, 0, c.type, c.r, false, c.parts, true, 1, 0, 0, 0);
+      ctx.globalAlpha = clamp(k * 1.4, 0, 1);
+      const grow = 0.82 + 0.18 * k;
+      ctx.translate(c.x, c.y); ctx.scale(grow, grow); ctx.translate(-c.x, -c.y);
+      drawBodyDecal(ctx, c.x, c.y, c.angle, c.type, c.r, c.parts);
       ctx.restore();
     }
     ctx.globalAlpha = 1;

@@ -7,6 +7,12 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] — 2026-07-13
+### Fog & Map
+- **Fog of war** — the map is now hidden except within the player's line of sight. Explored areas stay dimly "remembered", and unseen areas are dark. Uses per-tile raycast visibility that lights the walls you're facing but not what's behind them.
+- **Mini-map** — a corner overlay showing the layout you've explored, the exit (once found), zombies currently in sight, and your position.
+- **Improved corpses** — the dead now settle into proper face-down bodies in layered, irregular blood pools (desaturated "dead" tint), cross-fading from the fall so they no longer look like blobs.
+
 ## [0.6.1] — 2026-07-13
 ### Back to the Original
 - Reverted the player to the original procedural hand-drawn character (by preference). The sprite-sheet rendering path and loader were removed; the committed `src/assets/player.png` is left in the repo unused in case it's wanted again.
@@ -91,6 +97,7 @@ project uses [Semantic Versioning](https://semver.org/).
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.7.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.7.0
 [0.6.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.6.1
 [0.6.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.6.0
 [0.5.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.5.0
