@@ -12,7 +12,12 @@ export const WEAPONS = {
   bat: {
     name: "Bat", kind: "melee_bat", melee: true, damage: 52,
     fireRate: 1.9, range: 30, arc: 1.35, knockback: 120, ammoType: null,
-    sever: 0.28, hs: 0.14, sound: "thud",
+    sever: 0.28, hs: 0.14, doorMul: 1.6, sound: "thud",
+  },
+  axe: {
+    name: "Axe", kind: "melee_axe", melee: true, damage: 46,
+    fireRate: 1.7, range: 30, arc: 1.15, knockback: 130, ammoType: null,
+    sever: 0.34, hs: 0.16, doorMul: 3.2, sound: "chop",
   },
   pistol: {
     name: "Pistol", kind: "pistol", damage: 26, fireRate: 4.5, pellets: 1,
@@ -42,13 +47,14 @@ export const WEAPONS = {
 };
 
 // Order used when swapping weapons.
-export const WEAPON_ORDER = ["knife", "bat", "pistol", "smg", "shotgun", "rifle", "bazooka"];
+export const WEAPON_ORDER = ["knife", "bat", "axe", "pistol", "smg", "shotgun", "rifle", "bazooka"];
 
 export function newLoadout() {
   return {
     owned: { knife: true, pistol: true },
     clip: { pistol: WEAPONS.pistol.clip },
     ammo: { shells: 0, rounds: 48, rockets: 0 },
+    keys: 0,
     current: "pistol",
   };
 }

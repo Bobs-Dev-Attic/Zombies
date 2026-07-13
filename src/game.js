@@ -48,7 +48,10 @@ export class Game {
 
   start(settingIndex = 0) {
     this.settingIndex = settingIndex;
-    this.world = new World(settingIndex);
+    this.floorLevel = 0;
+    this.floorCache = {};
+    this.floorCooldown = 0;
+    this.world = new World(settingIndex, 0);
     this.player = new Player(this.world.spawnPoint.x, this.world.spawnPoint.y, newLoadout());
     this.zombies = [];
     this.projectiles = [];
@@ -85,7 +88,10 @@ export class Game {
     const kills = this.player.kills;
     const wave = this.wave;
     this.settingIndex = next;
-    this.world = new World(next);
+    this.floorLevel = 0;
+    this.floorCache = {};
+    this.floorCooldown = 0;
+    this.world = new World(next, 0);
     const hp = this.player.health, sta = this.player.stamina;
     this.player = new Player(this.world.spawnPoint.x, this.world.spawnPoint.y, loadout);
     this.player.health = hp; this.player.stamina = sta;
@@ -101,6 +107,8 @@ export class Game {
   }
 
   _seedLevelLoot() {
+    // The house hand-places its loot (key, axe, room rewards) via world.loot.
+    if (this.world.loot) { this._seedHouseLoot(); return; }
     // Scatter weapon crates, ammo, and medkits across the map.
     const weaponPool = ["bat", "shotgun", "smg", "rifle", "bazooka"];
     const crates = randInt(3, 5);
@@ -119,6 +127,56 @@ export class Game {
       const p = this.world.randomFloor();
       this.pickups.push(new Pickup(p.x, p.y, chance(0.7) ? "medkit" : "adrenaline"));
     }
+  }
+
+  // House floors carry a curated loot list (key/axe/room rewards).
+  _seedHouseLoot() {
+    for (const it of this.world.loot) {
+      this.pickups.push(new Pickup((it.cx + 0.5) * TILE, (it.cy + 0.5) * TILE, it.kind, it.data));
+    }
+  }
+
+  // Ascend / descend the staircase. Each floor keeps its own world, decals and
+  // loot cached so it looks the same when you come back.
+  _changeFloor(target) {
+    // Stash the current floor's persistent state.
+    this.floorCache[this.floorLevel] = {
+      world: this.world, bodies: this.bodies, limbs: this.limbs, stains: this.stains,
+      pickups: this.pickups, corpses: this.corpses, gibs: this.gibs,
+    };
+    this.floorLevel = target;
+    const cached = this.floorCache[target];
+    if (cached) {
+      this.world = cached.world;
+      this.bodies = cached.bodies; this.limbs = cached.limbs; this.stains = cached.stains;
+      this.pickups = cached.pickups; this.corpses = cached.corpses; this.gibs = cached.gibs;
+    } else {
+      this.world = new World(this.settingIndex, target);
+      this.bodies = []; this.limbs = []; this.stains = []; this.pickups = []; this.corpses = []; this.gibs = [];
+      this._seedLevelLoot();
+    }
+    // Land next to the destination staircase; the horde and shots don't follow.
+    this.player.x = this.world.landing.x; this.player.y = this.world.landing.y;
+    this.zombies = []; this.projectiles = []; this.particles = [];
+    this.cam.x = this.player.x; this.cam.y = this.player.y;
+    this.flow = null; this.flowTimer = 0; // rebuild the flow field for the new grid
+    this.floorCooldown = 1.2; // don't bounce straight back onto the stairs
+    this.hooks.onSetting?.(this.world.setting.name);
+    this._announce(target === 1 ? "Upstairs" : "Ground Floor", target === 1 ? "bedrooms & bath" : "living room");
+  }
+
+  // Wood-chip debris when a door is chopped/shot; a bigger burst when it breaks.
+  _splinter(x, y, big) {
+    const n = big ? 14 : 5;
+    for (let i = 0; i < n; i++) {
+      const a = rand(0, TAU), s = rand(30, big ? 170 : 90);
+      this.particles.push(new Particle(x, y, {
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.3, 0.8),
+        color: pick(["#8a6a44", "#6b4a28", "#5a4632", "#a0824e"]), size: randInt(2, 4), drag: 0.84,
+      }));
+    }
+    this.shake += big ? 5 : 2;
+    if (big) this.hooks.vibrate?.(25);
   }
 
   // ------------------------------------------------------- Waves
@@ -266,8 +324,18 @@ export class Game {
       }
     }
 
-    // Reached exit?
-    if (dist(this.player.x, this.player.y, this.world.exit.x, this.world.exit.y) < 20) {
+    // Stairs move the player between the house's floors (ground <-> upstairs).
+    this.floorCooldown = Math.max(0, this.floorCooldown - dt);
+    if (this.world.isHouse && this.floorCooldown <= 0 && this.world.stairsCells.length) {
+      const pcx = Math.floor(this.player.x / TILE), pcy = Math.floor(this.player.y / TILE);
+      if (this.world.stairsCells.some((s) => s.cx === pcx && s.cy === pcy)) {
+        this._changeFloor(this.floorLevel === 0 ? 1 : 0);
+      }
+    }
+
+    // Reached exit? On upper floors the "exit" is the staircase (handled above),
+    // so only the ground floor's front door advances to the next setting.
+    if (this.floorLevel === 0 && dist(this.player.x, this.player.y, this.world.exit.x, this.world.exit.y) < 20) {
       this.advanceSetting();
     }
 
@@ -413,10 +481,15 @@ export class Game {
         hit = true;
       }
     }
-    // Melee also smashes furniture in front of the player.
-    const fx = p.x + Math.cos(p.angle) * (range * 0.6), fy = p.y + Math.sin(p.angle) * (range * 0.6);
+    // Melee also smashes furniture / doors in front of the player (axe excels at doors).
+    const fx = p.x + Math.cos(p.angle) * (range * 0.7), fy = p.y + Math.sin(p.angle) * (range * 0.7);
     const f = this.world.furnitureAt(fx, fy);
     if (f) { this._damageFurniture(f, w.damage, p.angle, w.knockback); hit = true; }
+    const door = this.world.doorAt(Math.floor(fx / TILE), Math.floor(fy / TILE));
+    if (door && !door.broken && (door.locked || !door.open)) {
+      const broke = this.world.hitDoor(door, w.damage * (w.doorMul || 1));
+      this._splinter(fx, fy, broke); hit = true;
+    }
     this.shake += hit ? 3 : 1;
     if (hit) this.hooks.vibrate?.(20);
   }
@@ -454,10 +527,15 @@ export class Game {
       }
       if (proj.dead && proj.explosive) this._explode(proj.x, proj.y, proj);
       else if (proj.dead && !proj.hostile && proj.kind === "bullet") {
-        // Shatter a window the bullet stopped at; otherwise a spark.
+        // Shatter a window / chew through a door the bullet stopped at; otherwise a spark.
         const cx = Math.floor(proj.x / TILE), cy = Math.floor(proj.y / TILE);
-        if (this.world.tileAt(cx, cy) === T.WINDOW) { this.world.breakWindow(cx, cy); this._glass(proj.x, proj.y); }
-        else this._spark(proj.x, proj.y);
+        const tile = this.world.tileAt(cx, cy);
+        if (tile === T.WINDOW) { this.world.breakWindow(cx, cy); this._glass(proj.x, proj.y); }
+        else if (tile === T.DOOR) {
+          const d = this.world.doorAt(cx, cy);
+          const broke = this.world.hitDoor(d, proj.damage);
+          this._splinter(proj.x, proj.y, broke);
+        } else this._spark(proj.x, proj.y);
       }
     }
   }
@@ -754,12 +832,25 @@ export class Game {
   }
 
   _interact() {
-    // Prefer opening a door; otherwise grab the nearest pickup within reach.
-    if (this.world.tryOpenDoorNear(this.player.x, this.player.y)) { this._announce("Door"); return; }
+    // Doors first: unlock locked ones with a key, otherwise open/close.
+    const d = this.world.doorNear(this.player.x, this.player.y);
+    if (d && !d.broken) {
+      if (d.locked) {
+        if ((this.player.loadout.keys || 0) > 0) {
+          this.player.loadout.keys--; d.locked = false; d.open = true;
+          this._announce("Unlocked", "used a key");
+        } else {
+          this._announce("Locked", "find a key, or break it down");
+        }
+      } else {
+        d.open = !d.open;
+      }
+      return;
+    }
     let best = null, bd = 26 * 26;
     for (const pk of this.pickups) {
-      const d = dist2(pk.x, pk.y, this.player.x, this.player.y);
-      if (d < bd) { bd = d; best = pk; }
+      const dd = dist2(pk.x, pk.y, this.player.x, this.player.y);
+      if (dd < bd) { bd = dd; best = pk; }
     }
     if (best) this._grab(best);
   }
@@ -791,6 +882,8 @@ export class Game {
         p.heal(45); this._announce("+45 HP", "medkit"); break;
       case "adrenaline":
         p.stamina = p.maxStamina; p.exhausted = false; p.invuln = 3; this._announce("Adrenaline!", "boosted"); break;
+      case "key":
+        l.keys = (l.keys || 0) + 1; this._announce("Key", "keys: " + l.keys); break;
     }
     this.hooks.vibrate?.(15);
     pk.dead = true;
@@ -984,12 +1077,39 @@ export class Game {
           }
           if (t === T.DOOR) {
             const d = w.doorAt(cx, cy);
-            const openAmt = d ? d.openT : 0;
-            ctx.fillStyle = "#6b4a28";
-            const slide = Math.round(openAmt * (TILE - 6));
-            ctx.fillRect(x + 3, y + 3, TILE - 6 - slide, TILE - 6);
-            ctx.fillStyle = "#8a6238";
-            ctx.fillRect(x + 3, y + 3, TILE - 6 - slide, 3);
+            if (d && d.broken) {
+              // Smashed open: splintered stubs left clinging to the frame.
+              ctx.fillStyle = "#4a3320";
+              ctx.fillRect(x + 3, y + 3, 3, TILE - 6);
+              ctx.fillRect(x + TILE - 6, y + 3, 3, TILE - 6);
+              ctx.fillStyle = "#2a1d10";
+              ctx.fillRect(x + 6, y + 5, 2, 6); ctx.fillRect(x + TILE - 9, y + TILE - 12, 2, 7);
+            } else {
+              const openAmt = d ? d.openT : 0;
+              const slide = Math.round(openAmt * (TILE - 6));
+              const w0 = TILE - 6 - slide;
+              ctx.fillStyle = "#6b4a28";
+              ctx.fillRect(x + 3, y + 3, w0, TILE - 6);
+              ctx.fillStyle = "#8a6238";
+              ctx.fillRect(x + 3, y + 3, w0, 3);
+              if (d && d.locked && w0 > 6) {
+                // Brass lock plate on the leading edge.
+                ctx.fillStyle = "#d9b64a";
+                ctx.fillRect(x + 3 + w0 - 6, y + TILE / 2 - 3, 4, 6);
+                ctx.fillStyle = "#7a5a12";
+                ctx.fillRect(x + 3 + w0 - 5, y + TILE / 2, 2, 1);
+              }
+              // Cracks deepen as the door is beaten down.
+              if (d && d.hp < d.maxHp && w0 > 5) {
+                const frac = 1 - d.hp / d.maxHp;
+                ctx.strokeStyle = `rgba(20,12,6,${(0.3 + frac * 0.5).toFixed(2)})`;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x + 5, y + 5); ctx.lineTo(x + 3 + w0 * 0.6, y + TILE * 0.5); ctx.lineTo(x + 6, y + TILE - 6);
+                if (frac > 0.5) { ctx.moveTo(x + 3 + w0 * 0.5, y + 6); ctx.lineTo(x + 3 + w0 - 3, y + TILE - 8); }
+                ctx.stroke();
+              }
+            }
           }
           if (t === T.EXIT) {
             // Doorway to the outside — daylight spills across the threshold.

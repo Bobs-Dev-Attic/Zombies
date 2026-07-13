@@ -1,7 +1,19 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.8.0";
+export const VERSION = "0.9.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.9.0",
+    date: "2026-07-13",
+    title: "Keys, Axes & Upstairs",
+    changes: [
+      "Locked doors — some doors are shut tight. Open them with a key you find, chop through with the new axe, or shoot them off their hinges with enough bullets.",
+      "New axe — a heavy melee tool that excels at battering down doors (and takes zombies apart nicely too). Find it in the kitchen.",
+      "Doors now show a brass lock, crack apart as you beat on them, and leave a splintered gap when they break.",
+      "Working staircase — climb the stairs to load the upper floor (two bedrooms, a bathroom and a landing) and head back down again.",
+      "Each floor keeps its own layout, loot, blood and bodies, so it looks just as you left it when you return.",
+    ],
+  },
   {
     version: "0.8.0",
     date: "2026-07-13",

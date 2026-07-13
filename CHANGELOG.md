@@ -7,6 +7,16 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] — 2026-07-13
+### Keys, Axes & Upstairs (Phases 2b + 2c of the house overhaul)
+- **Locked doors** — some interior doors start locked. Open a locked door three ways: **use a key** (found in the living room), **chop it down with the new axe**, or **shoot it open** with enough rounds. Locked doors block both you and the horde's pathing until breached (though zombies still climb in the windows).
+- **New axe weapon** — a heavy two-hit melee tool with a big **door-breaking bonus** (`doorMul`), plus solid limb-severing against zombies. It's waiting on the kitchen counter; the bat also gained a smaller door bonus.
+- **Door feedback** — doors now render a **brass lock plate** when locked, grow **cracks** as their HP drops under fire/chops, and leave a **splintered gap** with wood-chip debris FX when they break.
+- **Functional staircase** — step onto the stairs to **load the upper floor** (two bedrooms, a bathroom and a landing) and step onto the down-stairs to return. A short cooldown stops you bouncing straight back.
+- **Per-floor persistence** — each floor caches its own world, loot, blood stains, bodies and severed limbs, so a floor looks exactly as you left it when you come back. The upper floor has its own loot (medkit, rifle, ammo, adrenaline); the ground floor's front door still leads out to the next setting.
+
+_Next: 2d the outdoor neighborhood (other houses, backyards, parks, stores)._
+
 ## [0.8.0] — 2026-07-13
 ### Welcome Home (Phase 2a of the house overhaul)
 - **New "The House" setting** you start inside: a hand-shaped ground floor with a **living room → kitchen → dining room**, each with its own floor colour and themed furniture (couch/coffee table, kitchen counters, dining table + chairs), plus a **staircase** and a **front door** to the yard.
@@ -106,6 +116,7 @@ _Next: 2b locked doors + key/axe, 2c functional stairs to upper floors, 2d the o
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.9.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.9.0
 [0.8.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.8.0
 [0.7.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.7.0
 [0.6.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.6.1
