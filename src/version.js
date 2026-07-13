@@ -1,7 +1,17 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.3.2";
+export const VERSION = "0.3.3";
 
 export const CHANGELOG = [
+  {
+    version: "0.3.3",
+    date: "2026-07-13",
+    title: "No More Floating",
+    changes: [
+      "Reworked the walk/run so the player no longer glides like a ghost.",
+      "Feet now plant on the ground and scissor fore/aft while the body bounces against a fixed shadow.",
+      "Added a side-to-side walking sway and chunkier boots; strides get bigger and bouncier when sprinting.",
+    ],
+  },
   {
     version: "0.3.2",
     date: "2026-07-13",

@@ -34,42 +34,64 @@ function limb2(ctx, x0, y0, x1, y1, w, color) {
   }
 }
 
-// Draw the player. The whole figure is rendered in a context rotated to
-// `angle`, so the body, feet and weapon all point where the player faces.
+// Draw a rotated rectangle centred at world (wx,wy).
+function rrect(ctx, wx, wy, ang, w, h, color) {
+  ctx.save();
+  ctx.translate(wx, wy);
+  ctx.rotate(ang);
+  ctx.fillStyle = color;
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.restore();
+}
+
+// Draw the player. Feet are planted on the ground and scissor fore/aft while
+// the upper body bounces above them (against a fixed shadow) — so it reads as
+// walking/running, not floating. Body & weapon rotate to face `angle`.
 // action = { recoil, swingT, swingDur, melee, moving, run }
 export function drawPlayer(ctx, cx, cy, angle, frame, hurtFlash, weaponKind, palette, action) {
   action = action || {};
   const skin = hurtFlash ? "#ff6b5e" : palette.skin;
+  const c = Math.cos(angle), s = Math.sin(angle);
+  const moving = !!action.moving, run = !!action.run;
 
-  // Ground shadow (world-aligned).
+  // Gait timing.
+  const strideAmp = run ? 8.5 : 6.5;
+  const stride = moving ? Math.sin(frame) * strideAmp : 0;      // feet swing fore/aft
+  const bounce = moving ? Math.abs(Math.sin(frame)) * (run ? 3.8 : 2.6) : 0; // body bob
+  const rock = moving ? Math.sin(frame) * (run ? 0.12 : 0.08) : 0;           // side-to-side sway
+
+  // Ground point at local (ox forward, oy sideways) — feet live here (no bob).
+  const gpt = (ox, oy) => [cx + c * ox - s * oy, cy + s * ox + c * oy];
+  // Bobbed point — hips/body live here.
+  const bpt = (ox, oy) => [cx + c * ox - s * oy, cy - bounce + s * ox + c * oy];
+
+  // --- Shadow (planted; shrinks slightly as the body lifts so the bounce reads).
   ctx.fillStyle = "rgba(0,0,0,0.32)";
   ctx.beginPath();
-  ctx.ellipse(cx, cy + 6, 7, 3.4, 0, 0, TAU);
+  ctx.ellipse(cx, cy + 6, 7 - bounce * 0.25, 3.4 - bounce * 0.15, 0, 0, TAU);
   ctx.fill();
 
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(angle); // +x now points where the player faces
-  const R = (ox, oy, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(ox - w / 2, oy - h / 2, w, h); };
-
-  // --- Legs & feet: an alternating step cycle. Feet stride forward/back along
-  // the facing axis and lift, so it reads as real walking; bigger & faster when running.
-  const moving = !!action.moving, run = !!action.run;
-  const amp = run ? 4.8 : 3.0;
-  const step = moving ? Math.sin(frame) * amp : 0;
-  const lift = moving ? Math.max(0, Math.cos(frame)) : 0;
-  const leg = (ph, oy, liftPhase) => {
-    R(ph * 0.45, oy, 3, 4, palette.pants);                  // upper leg
-    R(ph, oy, 4, 3 + liftPhase * 1.4, "#20242a");           // foot/shoe (lengthens as it lifts forward)
+  // --- Legs & feet: hips (bobbed) down to planted, scissoring boots. The lead
+  // foot swings out past the torso so the stride is clearly visible from above.
+  const drawLeg = (footFwd, side) => {
+    const hip = bpt(-2, side * 2.2);
+    const foot = gpt(footFwd, side * 2.8);
+    limb2(ctx, hip[0], hip[1], foot[0], foot[1], 3.5, palette.pants);
+    rrect(ctx, foot[0], foot[1], angle, 6, 3.5, "#161a14"); // chunky boot, points forward
   };
-  leg(step, -2.6, step > 0 ? lift : 0);
-  leg(-step, 2.6, step < 0 ? lift : 0);
+  drawLeg(stride, -1);
+  drawLeg(-stride, 1);
 
-  // --- Torso
+  // --- Upper body (bobbed & rocked), rotated to face `angle`.
+  ctx.save();
+  ctx.translate(cx, cy - bounce);
+  ctx.rotate(angle + rock);
+  const R = (ox, oy, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(ox - w / 2, oy - h / 2, w, h); };
+
   R(0, 0, 9, 9, palette.shirt);
   R(-2.5, 0, 3, 9, palette.vest); // vest/pack toward the back
 
-  // --- Weapon pose (recoil on guns, arc sweep on melee)
+  // Weapon pose (recoil on guns, arc sweep on melee).
   const melee = !!action.melee;
   let sweep = 0, handFwd = 8;
   if (melee) {
