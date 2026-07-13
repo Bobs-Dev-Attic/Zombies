@@ -147,9 +147,9 @@ export class Game {
     // Weighted type table that shifts toward tougher foes over time.
     const w = this.wave;
     const table = [["walker", 5]];
+    table.push(["prone", w >= 2 ? 4 : 2]); // draggers from the very first wave
     if (w >= 2) table.push(["runner", 3]);
-    if (w >= 3) table.push(["crawler", 2]);
-    if (w >= 3) table.push(["prone", 2]);
+    if (w >= 2) table.push(["crawler", 3]);
     if (w >= 4) table.push(["spitter", 2]);
     if (w >= 5) table.push(["brute", 1 + Math.floor(w / 6)]);
     const total = table.reduce((s, t) => s + t[1], 0);
@@ -752,7 +752,7 @@ export class Game {
   _drawZombiesBehind(ctx) {
     // Sort by y for pseudo-depth.
     const sorted = this.zombies.slice().sort((a, b) => a.y - b.y);
-    for (const z of sorted) drawZombie(ctx, z.x, z.y, z.angle, z.frame, z.type, z.r, z.hurtFlash > 0, z.parts, z.prone);
+    for (const z of sorted) drawZombie(ctx, z.x, z.y, z.angle, z.frame, z.type, z.r, z.hurtFlash > 0, z.parts, z.prone, z.strideAmp);
   }
 
   _drawPlayer(ctx) {
