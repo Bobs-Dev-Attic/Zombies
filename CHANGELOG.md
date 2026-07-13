@@ -7,6 +7,10 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.3.3] — 2026-07-13
+### No More Floating
+- Reworked the walk/run animation so the player no longer glides like a ghost. The feet now plant on the ground and scissor fore/aft while the upper body bounces against a **fixed** shadow (the changing gap sells the step), with a side-to-side sway and chunkier boots. Strides get bigger and bouncier when sprinting.
+
 ## [0.3.2] — 2026-07-13
 ### Boots on the Ground
 - Fixed weapon rotation: held weapons were drawn as flat, axis-aligned sprites whose position rotated but whose shape didn't — so they always looked stuck at ~90°. The player is now rendered as a fully rotating figure, so the body **and** weapon point wherever the player faces (verified across all 8 directions).
@@ -59,6 +63,7 @@ project uses [Semantic Versioning](https://semver.org/).
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.3.3]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.3.3
 [0.3.2]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.3.2
 [0.3.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.3.0
