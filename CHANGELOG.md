@@ -7,6 +7,12 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] — 2026-07-13
+### Manual Aiming
+- Removed auto-aim — the player now controls the direction they shoot and swing.
+- Weapons fire / swing in the direction the player is facing.
+- Facing follows movement (stick / WASD) and holds when the player stops; on desktop, the mouse aims independently of movement.
+
 ## [0.1.1] — 2026-07-13
 ### Installable & Deployed
 - Live on Vercel with automatic deploys on every merge to `main`.
@@ -28,5 +34,6 @@ project uses [Semantic Versioning](https://semver.org/).
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.2.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.2.0
 [0.1.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.1.0

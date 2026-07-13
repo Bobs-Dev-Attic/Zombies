@@ -1,5 +1,5 @@
 // Core game: loop, camera, rendering, waves, combat resolution and HUD.
-import { clamp, rand, randInt, chance, pick, angleTo, dist, dist2, TAU } from "./util.js";
+import { clamp, rand, randInt, chance, pick, angleTo, angleLerp, dist, dist2, TAU } from "./util.js";
 import { Input } from "./input.js";
 import { World, TILE, T, SETTINGS } from "./world.js";
 import { Player, Zombie, Projectile, Particle, Pickup, ZOMBIE_TYPES } from "./entities.js";
@@ -174,10 +174,16 @@ export class Game {
     inp.sampleKeyboard();
     const actions = inp.consume();
 
-    // Aim at nearest zombie (auto-aim assist); fall back to move direction.
-    const target = this._nearestZombie(this.player.x, this.player.y, 440);
-    if (target) this.player.faceTarget(target.x, target.y, dt);
-    else if (inp.moveMag > 0.1) this.player.angle = Math.atan2(inp.moveY, inp.moveX);
+    // Player-controlled aiming: face the mouse (desktop) or the direction of
+    // movement (touch / keyboard). Facing holds when idle so you can stop and
+    // keep firing the same way. No auto-aim — you shoot where you face.
+    let desired = this.player.angle;
+    if (inp.hasMouse && !inp.usingTouch) {
+      desired = Math.atan2(inp.mouseY - window.innerHeight / 2, inp.mouseX - window.innerWidth / 2);
+    } else if (inp.moveMag > 0.12) {
+      desired = Math.atan2(inp.moveY, inp.moveX);
+    }
+    this.player.angle = angleLerp(this.player.angle, desired, clamp(dt * 18, 0, 1));
 
     this.player.update(dt, inp, this.world);
     this.world.update(dt);

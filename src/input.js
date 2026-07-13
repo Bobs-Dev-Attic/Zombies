@@ -14,6 +14,10 @@ export class Input {
     this.reloadQueued = false;
     this.swapQueued = false;
     this.usingTouch = false;
+    // Mouse aim (desktop). hasMouse becomes true once the pointer moves.
+    this.mouseX = 0;
+    this.mouseY = 0;
+    this.hasMouse = false;
 
     this.keys = new Set();
     this._joyId = null;
@@ -47,6 +51,12 @@ export class Input {
   _bindMouse() {
     this.canvas.addEventListener("mousedown", (e) => { if (e.button === 0) this.firing = true; });
     window.addEventListener("mouseup", (e) => { if (e.button === 0 && !this.usingTouch) this.firing = false; });
+    window.addEventListener("mousemove", (e) => {
+      this.mouseX = e.clientX;
+      this.mouseY = e.clientY;
+      this.hasMouse = true;
+      this.usingTouch = false; // switching to mouse control
+    });
     this.canvas.addEventListener("wheel", () => { this.swapQueued = true; }, { passive: true });
     this.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
   }

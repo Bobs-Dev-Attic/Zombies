@@ -1,7 +1,18 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.1.1";
+export const VERSION = "0.2.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.2.0",
+    date: "2026-07-13",
+    title: "Manual Aiming",
+    changes: [
+      "Removed auto-aim — you now control the direction you shoot and swing.",
+      "Your weapon fires or swings in the direction you're facing.",
+      "You face the way you move (stick / WASD); your aim holds when you stop.",
+      "Desktop: point with the mouse to aim independently of movement.",
+    ],
+  },
   {
     version: "0.1.1",
     date: "2026-07-13",
