@@ -7,6 +7,15 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] — 2026-07-13
+### Pounce & Splatter
+- **Headshots** — every hit has a weapon-scaled chance to instantly kill; a floating **HEADSHOT** banner pops above the zombie, brain matter sprays, and the body drops.
+- **Death animation** — killed zombies now collapse/fall with a squash-and-fade instead of vanishing.
+- **Leaping zombies** — a new leaper type (and runners) pounce at the player in airborne jumps that arc over the ground.
+- **Dynamic shadows** — shadows now shift and stretch in the direction of movement for the player and zombies, and separate from the body during a leap or walk bounce.
+- **Knife attacks** — three variants: a one-handed swing, a one-handed stab, and a two-handed lunge (with a forward dash).
+- **Gun feedback** — animated muzzle flash with smoke, plus tumbling brass shell casings ejected on each shot.
+
 ## [0.3.3] — 2026-07-13
 ### No More Floating
 - Reworked the walk/run animation so the player no longer glides like a ghost. The feet now plant on the ground and scissor fore/aft while the upper body bounces against a **fixed** shadow (the changing gap sells the step), with a side-to-side sway and chunkier boots. Strides get bigger and bouncier when sprinting.
@@ -63,6 +72,7 @@ project uses [Semantic Versioning](https://semver.org/).
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.4.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.4.0
 [0.3.3]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.3.3
 [0.3.2]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.3.2
 [0.3.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.3.1

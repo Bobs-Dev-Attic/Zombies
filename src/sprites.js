@@ -34,6 +34,23 @@ function limb2(ctx, x0, y0, x1, y1, w, color) {
   }
 }
 
+// Dynamic ground shadow: shifts & stretches along movement, shrinks/fades as
+// the body lifts (walk bounce or a leap). lift is 0..1.
+function drawShadow(ctx, cx, footY, vx, vy, rx, ry, lift) {
+  lift = Math.max(0, Math.min(1, lift || 0));
+  const sp = Math.hypot(vx || 0, vy || 0);
+  const dir = sp > 1 ? Math.atan2(vy, vx) : 0;
+  const stretch = Math.min(sp / 90, 0.6);          // elongate in the move direction
+  const ox = sp > 1 ? (vx / sp) * (1.5 + stretch * 3) : 0;
+  const k = 1 - lift * 0.55;                        // shrink as it lifts
+  ctx.save();
+  ctx.fillStyle = `rgba(0,0,0,${(0.34 * k).toFixed(3)})`;
+  ctx.beginPath();
+  ctx.ellipse(cx + ox, footY, rx * (1 + stretch) * k, ry * k, dir, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+}
+
 // Draw a rotated rectangle centred at world (wx,wy).
 function rrect(ctx, wx, wy, ang, w, h, color) {
   ctx.save();
@@ -65,11 +82,8 @@ export function drawPlayer(ctx, cx, cy, angle, frame, hurtFlash, weaponKind, pal
   // Bobbed point — hips/body live here.
   const bpt = (ox, oy) => [cx + c * ox - s * oy, cy - bounce + s * ox + c * oy];
 
-  // --- Shadow (planted; shrinks slightly as the body lifts so the bounce reads).
-  ctx.fillStyle = "rgba(0,0,0,0.32)";
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + 6, 7 - bounce * 0.25, 3.4 - bounce * 0.15, 0, 0, TAU);
-  ctx.fill();
+  // --- Shadow (planted; shifts with movement, shrinks as the body bounces).
+  drawShadow(ctx, cx, cy + 6, action.vx || 0, action.vy || 0, 7, 3.4, bounce / 4.2);
 
   // --- Legs & feet: hips (bobbed) down to planted, scissoring boots. The lead
   // foot swings out past the torso so the stride is clearly visible from above.
@@ -91,23 +105,39 @@ export function drawPlayer(ctx, cx, cy, angle, frame, hurtFlash, weaponKind, pal
   R(0, 0, 9, 9, palette.shirt);
   R(-2.5, 0, 3, 9, palette.vest); // vest/pack toward the back
 
-  // Weapon pose (recoil on guns, arc sweep on melee).
+  // Weapon pose. Guns recoil; the knife has three attacks (one-handed swing,
+  // one-handed stab, two-handed lunge); other melee is a two-handed swing.
   const melee = !!action.melee;
-  let sweep = 0, handFwd = 8;
+  const isKnife = weaponKind === "melee_knife";
+  const variant = action.variant || "swing";
+  const prog = melee && action.swingT > 0 ? 1 - action.swingT / (action.swingDur || 0.22) : -1;
+  const active = prog >= 0;
+  let sweep = 0, handFwd = 8, oneHanded = false;
   if (melee) {
-    if (action.swingT > 0) {
-      const prog = 1 - action.swingT / (action.swingDur || 0.22);
-      sweep = 1.05 - prog * 2.1;
-      handFwd = 8 + Math.sin(prog * Math.PI) * 5;
-    } else { sweep = 0; handFwd = 8; }
+    if (isKnife && variant === "stab") {
+      oneHanded = true;
+      handFwd = 8 + (active ? Math.sin(prog * Math.PI) * 7 : 0);   // straight thrust
+    } else if (isKnife && variant === "lunge") {
+      oneHanded = false;
+      handFwd = 8 + (active ? Math.sin(prog * Math.PI) * 9 : 0);   // two-handed lunge thrust
+    } else {
+      oneHanded = isKnife;                                         // one-handed knife swing / two-handed bat
+      sweep = active ? 1.05 - prog * 2.1 : 0;
+      handFwd = 8 + (active ? Math.sin(prog * Math.PI) * 5 : 0);
+    }
   } else {
     handFwd = 8 - (action.recoil || 0) * 3.5;
   }
   const gx = Math.cos(sweep) * handFwd, gy = Math.sin(sweep) * handFwd;
 
-  // Arms reach from shoulders to the grip (two-handed hold).
-  limb2(ctx, 1, -3.2, gx, gy, 3, skin);
-  limb2(ctx, 1, 3.2, gx, gy, 3, skin);
+  // Arms: one or two hands to the grip.
+  if (oneHanded) {
+    limb2(ctx, 1, 2.2, gx, gy, 3, skin);   // weapon hand
+    limb2(ctx, 1, -3, 3, -4.5, 3, skin);   // off hand tucked at the side
+  } else {
+    limb2(ctx, 1, -3.2, gx, gy, 3, skin);
+    limb2(ctx, 1, 3.2, gx, gy, 3, skin);
+  }
 
   // Weapon at the grip, aligned to facing (plus any melee sweep).
   ctx.save();
@@ -138,18 +168,24 @@ function drawWeaponLocal(ctx, kind) {
   }
 }
 
-// Muzzle flash at the barrel tip.
-export function drawMuzzle(ctx, cx, cy, angle, size) {
+// Animated muzzle flash at the barrel tip. intensity 0..1 fades it out.
+export function drawMuzzle(ctx, cx, cy, angle, size, intensity) {
+  intensity = intensity == null ? 1 : Math.max(0, Math.min(1, intensity));
   const cos = Math.cos(angle), sin = Math.sin(angle);
   const tx = cx + 15 * cos, ty = cy + 15 * sin;
+  const sz = size * (0.55 + intensity * 0.65);
+  ctx.save();
+  ctx.translate(tx, ty);
+  ctx.rotate(angle);
+  ctx.fillStyle = `rgba(255,150,40,${(0.5 * intensity).toFixed(3)})`;
+  ctx.beginPath(); ctx.arc(0, 0, sz * 2.3, 0, TAU); ctx.fill();      // glow
+  ctx.fillStyle = "#ffd27a";
+  ctx.beginPath(); ctx.moveTo(sz * 3.4, 0); ctx.lineTo(0, -sz * 1.2); ctx.lineTo(0, sz * 1.2); ctx.closePath(); ctx.fill(); // flame
   ctx.fillStyle = "#ffe9a8";
-  ctx.beginPath();
-  ctx.arc(tx, ty, size, 0, TAU);
-  ctx.fill();
-  ctx.fillStyle = "rgba(255,180,60,0.6)";
-  ctx.beginPath();
-  ctx.arc(tx, ty, size * 1.8, 0, TAU);
-  ctx.fill();
+  ctx.fillRect(-sz * 0.6, -sz * 0.45, sz * 2.6, sz * 0.9);           // side spikes
+  ctx.fillStyle = "#fff6d8";
+  ctx.beginPath(); ctx.arc(sz * 0.5, 0, sz, 0, TAU); ctx.fill();     // hot core
+  ctx.restore();
 }
 
 const ZOMBIE_PAL = {
@@ -162,17 +198,19 @@ const ZOMBIE_PAL = {
 const STUMP = "#7a1414";
 
 // Draw a zombie. parts = {larm,rarm,lleg,rleg} (1 attached / 0 severed); prone = dragging.
-export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts, prone, strideAmp) {
+export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts, prone, strideAmp, jumpH, vx, vy) {
   parts = parts || { larm: 1, rarm: 1, lleg: 1, rleg: 1 };
   strideAmp = strideAmp || 1;
+  jumpH = jumpH || 0;
   const pal = ZOMBIE_PAL[type] || ZOMBIE_PAL.walker;
   const cos = Math.cos(angle), sin = Math.sin(angle);
   const perpX = -sin, perpY = cos;
   const skin = hurtFlash ? "#ffffff" : pal.skin;
   const s = r / 7; // 7 == base radius
+  const cyB = cy - jumpH; // body lifts when leaping; shadow stays on the ground
   // Upper body sways side-to-side for a shambling gait; feet stay planted.
   const lean = Math.sin(frame * 1.5) * (prone ? 1.4 : 0.9) * strideAmp * s;
-  const bx = cx + perpX * lean, by = cy + perpY * lean;
+  const bx = cx + perpX * lean, by = cyB + perpY * lean;
   const B = (ox, oy, w, h, c) => px(ctx, bx, by, ox * s, oy * s, Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s)), cos, sin, c);
   const eye = (ox, oy) => px(ctx, bx, by, ox * s, oy * s, Math.max(1, Math.round(1.4 * s)), Math.max(1, Math.round(1.4 * s)), cos, sin, "#b81e1e");
 
@@ -192,11 +230,8 @@ export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts,
     ctx.fillRect(Math.round(hx - 1), Math.round(hy - 1), Math.max(2, Math.round(2 * s)), Math.max(2, Math.round(2 * s)));
   };
 
-  // Shadow (at the feet)
-  ctx.fillStyle = "rgba(0,0,0,0.3)";
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + (prone ? 3 : 6) * s, (prone ? 8 : 7) * s, 3.0 * s, 0, 0, TAU);
-  ctx.fill();
+  // Dynamic shadow: shifts/stretches with movement, shrinks as it leaps.
+  drawShadow(ctx, cx, cy + (prone ? 3 : 6) * s, vx || 0, vy || 0, (prone ? 8 : 7) * s, 3.0 * s, jumpH / 11);
 
   if (prone) {
     // Legless, flat, dragging body pulling forward with both arms.
@@ -214,7 +249,7 @@ export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts,
   }
 
   // Legs (shuffle bob, planted at the feet); severed legs become stumps and it limps.
-  const L = (ox, oy, w, h, c) => px(ctx, cx, cy, ox * s, oy * s, Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s)), cos, sin, c);
+  const L = (ox, oy, w, h, c) => px(ctx, cx, cyB, ox * s, oy * s, Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s)), cos, sin, c);
   const legBob = Math.sin(frame * 1.5) * 1.7 * strideAmp;
   L(-1 + legBob * 0.35, 3, parts.rleg ? 3 : 2, parts.rleg ? 4 : 2, parts.rleg ? pal.cloth : STUMP);
   L(-1 - legBob * 0.35, -3, parts.lleg ? 3 : 2, parts.lleg ? 4 : 2, parts.lleg ? pal.cloth : STUMP);

@@ -1,7 +1,20 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.3.3";
+export const VERSION = "0.4.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.4.0",
+    date: "2026-07-13",
+    title: "Pounce & Splatter",
+    changes: [
+      "Headshots! Every hit has a chance to instantly drop a zombie — a HEADSHOT banner pops, brains fly, and the body falls.",
+      "Zombies now fall down with a collapse animation when killed.",
+      "New leaper zombies (and runners) pounce at you with airborne jumps.",
+      "Dynamic shadows that shift and stretch as the player and zombies move, and separate under a leap.",
+      "Knife has three attacks now: a one-handed swing, a one-handed stab, and a two-handed lunge.",
+      "Guns eject tumbling brass shells and throw a bigger animated muzzle flash with smoke.",
+    ],
+  },
   {
     version: "0.3.3",
     date: "2026-07-13",

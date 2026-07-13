@@ -54,6 +54,7 @@ export class Game {
     this.particles = [];
     this.pickups = [];
     this.stains = [];
+    this.corpses = [];
     this.score = 0;
     this.wave = 0;
     this.waveActive = false;
@@ -85,7 +86,7 @@ export class Game {
     this.player = new Player(this.world.spawnPoint.x, this.world.spawnPoint.y, loadout);
     this.player.health = hp; this.player.stamina = sta;
     this.player.kills = kills;
-    this.zombies = []; this.projectiles = []; this.particles = []; this.pickups = []; this.stains = [];
+    this.zombies = []; this.projectiles = []; this.particles = []; this.pickups = []; this.stains = []; this.corpses = [];
     this.score = score; this.wave = wave;
     this.waveActive = false; this.spawnQueue = 0; this.betweenWaves = 2; this.exitReady = false;
     this.cam.x = this.player.x; this.cam.y = this.player.y;
@@ -150,6 +151,7 @@ export class Game {
     table.push(["prone", w >= 2 ? 4 : 2]); // draggers from the very first wave
     if (w >= 2) table.push(["runner", 3]);
     if (w >= 2) table.push(["crawler", 3]);
+    if (w >= 3) table.push(["leaper", 2]); // pouncers
     if (w >= 4) table.push(["spitter", 2]);
     if (w >= 5) table.push(["brute", 1 + Math.floor(w / 6)]);
     const total = table.reduce((s, t) => s + t[1], 0);
@@ -212,12 +214,14 @@ export class Game {
     for (const p of this.particles) p.update(dt);
     for (const s of this.stains) s.life -= dt * 0.15;
     for (const pk of this.pickups) pk.update(dt);
+    for (const c of this.corpses) { c.t += dt; if (c.bannerT > 0) c.bannerT -= dt; }
 
     // Cull dead.
     this._reapZombies();
     this.projectiles = this.projectiles.filter((p) => !p.dead);
     this.particles = this.particles.filter((p) => !p.dead);
     this.pickups = this.pickups.filter((p) => !p.dead);
+    this.corpses = this.corpses.filter((c) => c.t < c.dur || c.bannerT > 0);
     if (this.stains.length > 220) this.stains.splice(0, this.stains.length - 220);
     this.stains = this.stains.filter((s) => s.life > 0);
 
@@ -349,9 +353,11 @@ export class Game {
     }
     p.cooldown = 1 / w.fireRate;
     p.muzzle = 0.06;
-    p.triggerRecoil(w); // kick the arms/weapon (gun recoil or melee swing)
+    // The knife has three attacks; other melee just swings.
+    const variant = (w.melee && w.kind === "melee_knife") ? pick(["swing", "stab", "lunge"]) : "swing";
+    p.triggerRecoil(w, variant); // kick the arms/weapon (gun recoil or melee attack)
 
-    if (w.melee) { this._meleeSwing(w); return; }
+    if (w.melee) { this._meleeSwing(w, variant); return; }
 
     p.loadout.clip[p.loadout.current]--;
     const pellets = w.pellets || 1;
@@ -360,26 +366,32 @@ export class Game {
       const proj = new Projectile(p.x + Math.cos(p.angle) * 12, p.y + Math.sin(p.angle) * 12, a, {
         speed: w.speed, damage: w.damage, range: w.range, knockback: w.knockback,
         pierce: w.pierce || 0, explosive: w.explosive || 0, kind: w.explosive ? "rocket" : "bullet",
-        sever: w.sever || 0, r: w.explosive ? 3 : 1.6,
+        sever: w.sever || 0, hs: w.hs || 0, r: w.explosive ? 3 : 1.6,
       });
       this.projectiles.push(proj);
     }
-    // Feedback: casing, shake.
+    // Feedback: muzzle smoke, casing, shake.
     this.shake += w.explosive ? 8 : w.pellets > 1 ? 4 : 2;
     this._ejectCasing(p);
+    this._muzzleSmoke(p);
     if (w.explosive || w.pellets > 1) this.hooks.vibrate?.(30);
   }
 
-  _meleeSwing(w) {
+  _meleeSwing(w, variant) {
     const p = this.player;
+    // Stab/lunge reach a little further and narrower; swing is a wide arc.
+    const thrust = variant === "lunge" ? 12 : variant === "stab" ? 8 : 0;
+    const arc = variant === "swing" ? w.arc : w.arc * 0.55;
+    const range = w.range + thrust;
     let hit = false;
     for (const z of this.zombies) {
       const d = dist(p.x, p.y, z.x, z.y);
-      if (d > w.range + z.r) continue;
+      if (d > range + z.r) continue;
       const a = angleTo(p.x, p.y, z.x, z.y);
       let da = Math.abs(((a - p.angle + Math.PI) % TAU) - Math.PI);
-      if (da <= w.arc / 2) {
-        this._damageZombie(z, w.damage, p.angle, w.knockback, w.sever || 0);
+      if (da <= arc / 2) {
+        const dmg = w.damage * (variant === "lunge" ? 1.3 : 1);
+        this._damageZombie(z, dmg, p.angle, w.knockback, w.sever || 0, w.hs || 0);
         this._blood(z.x, z.y, p.angle, 6);
         hit = true;
       }
@@ -406,7 +418,7 @@ export class Game {
         if (this._segHitsCircle(proj.px, proj.py, proj.x, proj.y, z.x, z.y, z.r + proj.r)) {
           proj.hitSet.add(z);
           if (proj.explosive) { this._explode(z.x, z.y, proj); proj.dead = true; break; }
-          this._damageZombie(z, proj.damage, proj.angle, proj.knockback, proj.sever || 0);
+          this._damageZombie(z, proj.damage, proj.angle, proj.knockback, proj.sever || 0, proj.hs || 0);
           this._blood(z.x, z.y, proj.angle, 5);
           if (proj.pierce > 0) proj.pierce--;
           else { proj.dead = true; break; }
@@ -484,10 +496,16 @@ export class Game {
     const pr = w.collide(p.x, p.y, p.r); p.x = pr.x; p.y = pr.y;
   }
 
-  _damageZombie(z, dmg, angle, force, sever = 0) {
+  _damageZombie(z, dmg, angle, force, sever = 0, hs = 0) {
+    // Chance for an instant headshot kill (not from explosions).
+    if (!z.dead && hs > 0 && Math.random() < hs) {
+      z.hp = 0; z.dead = true;
+      this._killZombie(z, angle, true);
+      return;
+    }
     const res = z.damage(dmg, angle, force, sever);
     if (res.severed) this._severFX(z, res.severed, angle);
-    if (res.dead) this._killZombie(z, angle);
+    if (res.dead) this._killZombie(z, angle, false);
   }
 
   // A limb tears off: fling a gore chunk, spray blood, leave a stain.
@@ -506,11 +524,18 @@ export class Game {
     if (z.prone) this._announce("Legless!");
   }
 
-  _killZombie(z, angle) {
-    this.score += z.def.score;
+  _killZombie(z, angle, headshot = false) {
+    this.score += z.def.score + (headshot ? 15 : 0);
     this.player.kills++;
-    // Gore burst.
+    // Gore burst (plus brains + a HEADSHOT banner on a headshot).
     this._gore(z.x, z.y, angle, z.def.gore);
+    if (headshot) this._brains(z.x, z.y, angle);
+    // The body falls down: hand it to the corpse list for a collapse animation.
+    this.corpses.push({
+      x: z.x, y: z.y, angle: z.angle, type: z.type, r: z.r,
+      parts: z.parts, prone: z.prone, t: 0, dur: 0.5,
+      headshot, bannerT: headshot ? 1.3 : 0,
+    });
     // Chance to drop loot.
     if (chance(0.14)) {
       const roll = rand(0, 1);
@@ -519,6 +544,22 @@ export class Game {
       else this.pickups.push(new Pickup(z.x, z.y, "ammo", { type: pick(["rounds", "shells"]), amount: randInt(8, 20) }));
     }
     z.dead = true;
+  }
+
+  // Brain matter burst for a headshot.
+  _brains(x, y, angle) {
+    for (let i = 0; i < 16; i++) {
+      const a = angle + rand(-1.3, 1.3), s = rand(60, 190);
+      this.particles.push(new Particle(x, y - 6, {
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s - 40, life: rand(0.6, 1.4),
+        color: pick(["#d98c9c", "#c07088", "#e6c2c8", "#a01818", "#7a1010"]),
+        size: randInt(2, 4), drag: 0.84, gravity: 210, stain: true,
+      }));
+    }
+    this.stains.push({ x, y, r: rand(5, 9), life: rand(10, 16), color: "#5a1020" });
+    this.shake += 5;
+    this.hooks.vibrate?.(45);
+    this._announce("HEADSHOT!");
   }
 
   _reapZombies() {
@@ -577,8 +618,26 @@ export class Game {
   }
 
   _ejectCasing(p) {
-    const a = p.angle + Math.PI / 2 + rand(-0.3, 0.3);
-    this.particles.push(new Particle(p.x, p.y, { vx: Math.cos(a) * 60, vy: Math.sin(a) * 60, life: 0.5, color: "#c9a227", size: 1, drag: 0.8 }));
+    // Brass tumbles out of the ejection port (to the player's right), arcs and lands.
+    const a = p.angle + Math.PI / 2 + rand(-0.25, 0.25);
+    const s = rand(80, 130);
+    const bx = p.x + Math.cos(p.angle) * 6, by = p.y + Math.sin(p.angle) * 6;
+    this.particles.push(new Particle(bx, by, {
+      vx: Math.cos(a) * s, vy: Math.sin(a) * s - 40, life: 0.7,
+      color: "#e0b83a", size: 3, drag: 0.9, gravity: 260, kind: "casing",
+      spin: rand(-24, 24), angle: p.angle,
+    }));
+  }
+
+  _muzzleSmoke(p) {
+    const tx = p.x + Math.cos(p.angle) * 15, ty = p.y + Math.sin(p.angle) * 15;
+    for (let i = 0; i < 2; i++) {
+      const a = p.angle + rand(-0.5, 0.5);
+      this.particles.push(new Particle(tx, ty, {
+        vx: Math.cos(a) * rand(10, 40), vy: Math.sin(a) * rand(10, 40) - 10, life: rand(0.25, 0.5),
+        color: pick(["rgba(180,180,180,0.5)", "rgba(140,140,140,0.4)"]), size: randInt(2, 3), drag: 0.82,
+      }));
+    }
   }
 
   // ------------------------------------------------------- Pickups & doors
@@ -658,11 +717,13 @@ export class Game {
     ctx.translate(ox, oy);
     this._drawWorld(ctx, -ox, -oy);
     this._drawStains(ctx);
+    this._drawCorpses(ctx);
     this._drawPickups(ctx);
     this._drawZombiesBehind(ctx);
     this._drawPlayer(ctx);
     this._drawProjectiles(ctx);
     this._drawParticles(ctx);
+    this._drawBanners(ctx);
     this._drawExitBeacon(ctx);
     ctx.restore();
 
@@ -749,17 +810,54 @@ export class Game {
     for (const pk of this.pickups) drawPickup(ctx, pk.x, pk.y, pk.kind === "weapon" ? "weapon" : pk.kind, pk.t);
   }
 
+  _drawCorpses(ctx) {
+    for (const c of this.corpses) {
+      if (c.t >= c.dur) continue; // banner may outlive the body
+      const k = c.t / c.dur; // 0..1 collapse
+      ctx.save();
+      ctx.globalAlpha = clamp(1 - k * 0.85, 0, 1);
+      // Sink & squash as it falls.
+      ctx.translate(c.x, c.y);
+      ctx.scale(1, 1 - k * 0.55);
+      ctx.translate(-c.x, -c.y);
+      drawZombie(ctx, c.x, c.y, c.angle, 0, c.type, c.r, false, c.parts, true, 1, 0, 0, 0);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  _drawBanners(ctx) {
+    for (const c of this.corpses) {
+      if (!c.headshot || c.bannerT <= 0) continue;
+      const p = clamp(1 - c.bannerT / 1.3, 0, 1);
+      const rise = p * 12;
+      const alpha = c.bannerT > 0.3 ? 1 : clamp(c.bannerT / 0.3, 0, 1);
+      const y = c.y - 16 - rise;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.font = "bold 7px 'Courier New', monospace";
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#000";
+      ctx.fillText("HEADSHOT", c.x + 0.6, y + 0.6);
+      ctx.fillStyle = "#ff5a3c";
+      ctx.fillText("HEADSHOT", c.x, y);
+      ctx.textAlign = "left";
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+
   _drawZombiesBehind(ctx) {
     // Sort by y for pseudo-depth.
     const sorted = this.zombies.slice().sort((a, b) => a.y - b.y);
-    for (const z of sorted) drawZombie(ctx, z.x, z.y, z.angle, z.frame, z.type, z.r, z.hurtFlash > 0, z.parts, z.prone, z.strideAmp);
+    for (const z of sorted) drawZombie(ctx, z.x, z.y, z.angle, z.frame, z.type, z.r, z.hurtFlash > 0, z.parts, z.prone, z.strideAmp, z.jumpH, z.vx, z.vy);
   }
 
   _drawPlayer(ctx) {
     const p = this.player;
-    const action = { recoil: p.recoil, swingT: p.swingT, swingDur: p.swingDur, melee: p.weapon.melee, moving: p.moving, run: p.running };
+    const action = { recoil: p.recoil, swingT: p.swingT, swingDur: p.swingDur, melee: p.weapon.melee, variant: p.meleeVariant, moving: p.moving, run: p.running, vx: p.vx, vy: p.vy };
     drawPlayer(ctx, p.x, p.y, p.angle, p.walkFrame, p.hurtFlash > 0, p.weapon.kind, PLAYER_PAL, action);
-    if (p.muzzle > 0 && !p.weapon.melee) drawMuzzle(ctx, p.x, p.y, p.angle, p.weapon.explosive ? 5 : 3);
+    if (p.muzzle > 0 && !p.weapon.melee) drawMuzzle(ctx, p.x, p.y, p.angle, p.weapon.explosive ? 5 : 3, p.muzzle / 0.06);
     if (p.invuln > 0 && Math.floor(p.invuln * 12) % 2 === 0) {
       ctx.strokeStyle = "rgba(224,184,58,0.7)";
       ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, TAU); ctx.stroke();
@@ -789,6 +887,18 @@ export class Game {
   _drawParticles(ctx) {
     for (const p of this.particles) {
       ctx.globalAlpha = p.settled ? clamp(p.life / 6, 0, 0.9) : clamp(p.life / p.maxLife, 0, 1);
+      if (p.kind === "casing") {
+        // Tumbling brass shell.
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.angle);
+        ctx.fillStyle = "#e0b83a";
+        ctx.fillRect(-2, -1, 4, 2);
+        ctx.fillStyle = "#8a6a1a";
+        ctx.fillRect(-2, -1, 1.2, 2);
+        ctx.restore();
+        continue;
+      }
       ctx.fillStyle = p.color;
       ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
     }
