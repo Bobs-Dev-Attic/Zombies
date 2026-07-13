@@ -29,11 +29,20 @@ export class Player {
     this.recoil = 0;
     this.swingT = 0;
     this.swingDur = 0.22;
+    this.meleeVariant = "swing"; // swing | stab | lunge (knife)
+    this.lungeT = 0;             // forward-dash timer for the two-handed lunge
   }
 
-  triggerRecoil(w) {
-    if (w.melee) { this.swingT = this.swingDur; }
-    else { this.recoil = 1; }
+  triggerRecoil(w, variant) {
+    if (w.melee) {
+      this.meleeVariant = variant || "swing";
+      // A stab/lunge is a quick thrust; a swing is a wider arc.
+      this.swingDur = this.meleeVariant === "swing" ? 0.24 : 0.18;
+      this.swingT = this.swingDur;
+      if (this.meleeVariant === "lunge") this.lungeT = 0.16;
+    } else {
+      this.recoil = 1;
+    }
   }
 
   get weapon() { return WEAPONS[this.loadout.current]; }
@@ -55,6 +64,11 @@ export class Player {
     if (this.invuln > 0) this.invuln -= dt;
     if (this.recoil > 0) this.recoil = Math.max(0, this.recoil - dt * 7);
     if (this.swingT > 0) this.swingT = Math.max(0, this.swingT - dt);
+    if (this.lungeT > 0) {
+      this.lungeT = Math.max(0, this.lungeT - dt);
+      this.vx += Math.cos(this.angle) * 340 * dt; // forward thrust of the two-handed lunge
+      this.vy += Math.sin(this.angle) * 340 * dt;
+    }
 
     const wantMove = input.moveMag > 0.08;
     const sprinting = input.moveMag > 0.92 && wantMove;
@@ -149,10 +163,12 @@ export class Player {
 // shamble = how much they weave off a straight line; lurch = gait stop/start pulse.
 export const ZOMBIE_TYPES = {
   walker:  { hp: 46,  speed: 30, r: 7,  dmg: 9,  pattern: "direct",      knockResist: 0, score: 10, color: "walker",  gore: 1,   shamble: 0.5,  lurch: 0.38 },
-  runner:  { hp: 30,  speed: 56, r: 6,  dmg: 7,  pattern: "direct",      knockResist: 0.1, score: 16, color: "runner",  gore: 1,   shamble: 0.2,  lurch: 0.15 },
+  runner:  { hp: 30,  speed: 56, r: 6,  dmg: 7,  pattern: "direct",      knockResist: 0.1, score: 16, color: "runner",  gore: 1,   shamble: 0.2,  lurch: 0.15, leap: true },
   crawler: { hp: 22,  speed: 44, r: 5,  dmg: 6,  pattern: "wanderChase", knockResist: 0.1, score: 14, color: "crawler", gore: 0.7, shamble: 0.42, lurch: 0.32 },
   brute:   { hp: 180, speed: 22, r: 12, dmg: 22, pattern: "direct",      knockResist: 0.75, score: 40, color: "brute",   gore: 2,   shamble: 0.26, lurch: 0.42 },
   spitter: { hp: 40,  speed: 30, r: 7,  dmg: 5,  pattern: "ranged",      knockResist: 0.2, score: 24, color: "spitter", gore: 1,   shamble: 0.2,  lurch: 0.18 },
+  // Leaper: a wiry zombie that pounces at the player in long jumps.
+  leaper:  { hp: 34,  speed: 48, r: 6,  dmg: 12, pattern: "direct",      knockResist: 0.1, score: 26, color: "runner",  gore: 0.9, shamble: 0.28, lurch: 0.2, leap: true, leapEager: true },
   // Prone crawler: drags itself along the ground with no legs. High base speed
   // so the legless drag still lunges, but slower and more erratic than a walker.
   prone:   { hp: 30,  speed: 118, r: 6, dmg: 10, pattern: "wanderChase", knockResist: 0.15, score: 20, color: "crawler", gore: 0.9, shamble: 0.46, lurch: 0.4, bornProne: true },
@@ -202,6 +218,28 @@ export class Zombie {
     this.dmgMul = 1;
     this.prone = false;
     this._recomputeParts();
+
+    // Leap / pounce ability.
+    this.canLeap = !!t.leap && !t.bornProne;
+    this.leaping = false;
+    this.leapT = 0; this.leapDur = 0.5; this.leapHeight = 0;
+    this.jumpH = 0;
+    this.leapVX = 0; this.leapVY = 0;
+    this.leapCd = rand(t.leapEager ? 1.2 : 2.5, t.leapEager ? 3 : 5);
+  }
+
+  _startLeap(player) {
+    const d = dist(this.x, this.y, player.x, player.y);
+    const a = angleTo(this.x, this.y, player.x, player.y);
+    this.leaping = true;
+    this.leapDur = 0.5;
+    this.leapT = 0.5;
+    this.leapHeight = 11;
+    this.angle = a;
+    const reach = Math.min(d + 12, 230);
+    const sp = reach / this.leapDur;
+    this.leapVX = Math.cos(a) * sp;
+    this.leapVY = Math.sin(a) * sp;
   }
 
   // Recompute mobility & damage from remaining limbs. No legs => prone crawl.
@@ -256,6 +294,31 @@ export class Zombie {
     if (this.hurtFlash > 0) this.hurtFlash -= dt;
     if (this.attackCd > 0) this.attackCd -= dt;
     this.gaitT += dt;
+
+    // Mid-leap: fly along the pounce arc, land, and (maybe) maul the player.
+    if (this.leaping) {
+      this.leapT -= dt;
+      const prog = 1 - this.leapT / this.leapDur;
+      this.jumpH = Math.sin(clamp(prog, 0, 1) * Math.PI) * this.leapHeight;
+      this.frame += dt * 8;
+      const nx = this.x + this.leapVX * dt, ny = this.y + this.leapVY * dt;
+      const res = world.collide(nx, ny, this.r);
+      this.x = res.x; this.y = res.y;
+      this.vx = this.leapVX; this.vy = this.leapVY;
+      if (this.leapT <= 0) {
+        this.leaping = false; this.jumpH = 0;
+        this.leapCd = rand(this.def.leapEager ? 1.4 : 2.6, this.def.leapEager ? 3.2 : 5.5);
+        if (dist(this.x, this.y, player.x, player.y) < this.r + player.r + 10 && this.attackCd <= 0) {
+          player.hurt(this.def.dmg * 1.5 * this.dmgMul);
+          this.attackCd = 0.6;
+          const a = angleTo(this.x, this.y, player.x, player.y);
+          player.vx += Math.cos(a) * 120; player.vy += Math.sin(a) * 120;
+        }
+      }
+      return;
+    }
+    if (this.canLeap) this.leapCd -= dt;
+
     this.frame += dt * (2 + this.speed * this.speedMul * 0.05) * this.strideRate;
 
     const seek = this._seek(player, world, nav);
@@ -263,6 +326,13 @@ export class Zombie {
     const sees = d < 560;
     const spd = this.speed * this.speedMul; // wounds/dismemberment slow movement
     let tvx = 0, tvy = 0;
+
+    // Pounce when in range with a clear line to the player.
+    if (this.canLeap && this.leapCd <= 0 && seek.los && d > 55 && d < 240) {
+      this._startLeap(player);
+      this.vx = this.leapVX; this.vy = this.leapVY;
+      return;
+    }
 
     switch (this.def.pattern) {
       case "wanderChase": {
@@ -310,6 +380,7 @@ export class Zombie {
     tvx += this.knock.x; tvy += this.knock.y;
     this.knock.x *= Math.pow(0.001, dt);
     this.knock.y *= Math.pow(0.001, dt);
+    this.vx = tvx; this.vy = tvy; // remembered for the dynamic shadow
 
     const nx = this.x + tvx * dt;
     const ny = this.y + tvy * dt;
@@ -366,6 +437,7 @@ export class Projectile {
     this.knockback = opts.knockback || 0;
     this.pierce = opts.pierce || 0;
     this.sever = opts.sever || 0;
+    this.hs = opts.hs || 0;
     this.hitSet = new Set();
     this.kind = opts.kind || "bullet";
     this.r = opts.r || 1.6;
@@ -393,6 +465,9 @@ export class Particle {
     this.gravity = opts.gravity || 0;
     this.drag = opts.drag ?? 0.9;
     this.stain = opts.stain || false; // blood that settles on the ground
+    this.kind = opts.kind || "bit";   // 'bit' | 'casing'
+    this.spin = opts.spin || 0;
+    this.angle = opts.angle || 0;
     this.dead = false;
     this.settled = false;
   }
@@ -403,6 +478,7 @@ export class Particle {
     this.vx *= Math.pow(this.drag, dt * 60);
     this.vy *= Math.pow(this.drag, dt * 60);
     this.vy += this.gravity * dt;
+    this.angle += this.spin * dt;
     this.life -= dt;
     if (this.stain && Math.hypot(this.vx, this.vy) < 12) { this.settled = true; this.life = 6; }
     if (this.life <= 0) this.dead = true;
