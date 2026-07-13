@@ -5,6 +5,7 @@ import { World, TILE, T, SETTINGS, ROOM_FLOOR } from "./world.js";
 import { Player, Zombie, Projectile, Particle, Pickup, ZOMBIE_TYPES } from "./entities.js";
 import { WEAPONS, WEAPON_ORDER, newLoadout } from "./weapons.js";
 import { drawPlayer, drawZombie, drawPickup, drawMuzzle, drawFurniture, drawBodyDecal, drawGroundLimb } from "./sprites.js";
+import { DeathBlood } from "./deathblood.js";
 
 const PLAYER_PAL = { skin: "#d9a066", hair: "#3a2a1a", shirt: "#3b5a8c", vest: "#2c3e52", pants: "#2a2a33" };
 const ZOMBIE_LIMB = { walker: "#72a83a", runner: "#8fb84a", crawler: "#a0c15a", brute: "#5c7a2e", spitter: "#9ab84a", leaper: "#8fb84a", prone: "#a0c15a" };
@@ -48,6 +49,8 @@ export class Game {
 
   start(settingIndex = 0) {
     this.settingIndex = settingIndex;
+    if (this.blood) { this.blood.destroy(); this.blood = null; }
+    this.death = null;
     this.floorLevel = 0;
     this.floorCache = {};
     this.floorCooldown = 0;
@@ -236,6 +239,7 @@ export class Game {
   }
 
   _update(dt) {
+    if (this.death) { this._updateDeath(dt); return; }
     const inp = this.input;
     inp.sampleKeyboard();
     const actions = inp.consume();
@@ -890,8 +894,42 @@ export class Game {
   }
 
   _gameOver() {
-    this.running = false;
-    this.hooks.onGameOver?.({ score: this.score, wave: this.wave, kills: this.player.kills });
+    if (this.death) return;
+    // Don't cut to the game-over screen — bleed out. The world keeps running
+    // while a sheet of blood floods the screen over the next minute; the YOU
+    // DIED card fades in a beat later so the blood drips over it.
+    this.player.deadPose = true;
+    this.death = { t: 0, dur: 60, dialogShown: false };
+    this.blood = new DeathBlood(this.death.dur);
+    this.shake += 6;
+    this.hooks.vibrate?.([80, 50, 160]);
+  }
+
+  // The bleed-out: the scene lingers (zombies feed over the corpse) while the
+  // blood overlay floods the screen; the game-over card appears partway in.
+  _updateDeath(dt) {
+    const d = this.death;
+    d.t += dt;
+    const nav = this._nav || { flow: () => ({ seen: 0, fx: 0, fy: 0 }), los: () => false };
+    for (const z of this.zombies) z.update(dt, this.player, this.world, nav, () => {});
+    this._resolveCollisions();
+    for (const p of this.particles) p.update(dt);
+    for (const s of this.stains) s.life -= dt * 0.15;
+    this._updateGibs(dt);
+    this.particles = this.particles.filter((p) => !p.dead);
+    this.stains = this.stains.filter((s) => s.life > 0);
+    if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 40);
+
+    this.blood.update(dt);
+
+    // Reveal the YOU DIED card a moment in, then let blood interact with it.
+    if (!d.dialogShown && d.t > 1.6) {
+      d.dialogShown = true;
+      this.hooks.onGameOver?.({ score: this.score, wave: this.wave, kills: this.player.kills });
+      this.blood.attachDialog();
+    }
+    // A minute in, the screen is drowned — stop the loop (card & blood remain).
+    if (d.t >= d.dur) this.running = false;
   }
 
   _announce(a, b) { this.hooks.onToast?.(a, b); }
@@ -1223,6 +1261,16 @@ export class Game {
 
   _drawPlayer(ctx) {
     const p = this.player;
+    if (p.deadPose) {
+      // Collapsed on the floor: tip the figure over and let it lie still.
+      ctx.save();
+      ctx.globalAlpha = 0.92;
+      ctx.translate(p.x, p.y + 2); ctx.rotate(1.45); ctx.translate(-p.x, -p.y);
+      drawPlayer(ctx, p.x, p.y, p.angle, 0, false, p.weapon.kind, PLAYER_PAL,
+        { recoil: 0, swingT: 0, swingDur: 1, melee: false, variant: "swing", moving: false, run: false, vx: 0, vy: 0 });
+      ctx.restore();
+      return;
+    }
     const action = { recoil: p.recoil, swingT: p.swingT, swingDur: p.swingDur, melee: p.weapon.melee, variant: p.meleeVariant, moving: p.moving, run: p.running, vx: p.vx, vy: p.vy };
     drawPlayer(ctx, p.x, p.y, p.angle, p.walkFrame, p.hurtFlash > 0, p.weapon.kind, PLAYER_PAL, action);
     if (p.muzzle > 0 && !p.weapon.melee) drawMuzzle(ctx, p.x, p.y, p.angle, p.weapon.explosive ? 5 : 3, p.muzzle / 0.06);

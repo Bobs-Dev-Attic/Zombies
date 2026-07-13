@@ -1,7 +1,18 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.9.0";
+export const VERSION = "0.10.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.10.0",
+    date: "2026-07-13",
+    title: "Bleed Out",
+    changes: [
+      "Death is no longer an instant cut — when you fall, the scene lingers for about a minute as the zombies close in over your body.",
+      "A sheet of blood bleeds down from the top of the screen like a live fluid: a ragged, dripping front with surface tension, fast rivulets and detached droplets.",
+      "Blood also pools up from the bottom with a wavy surface, until the whole screen is drowned in red.",
+      "The YOU DIED card fades in through the flood — blood pools on its top edge and drips off its bottom while the card stays readable.",
+    ],
+  },
   {
     version: "0.9.0",
     date: "2026-07-13",
