@@ -7,6 +7,14 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] — 2026-07-13
+### Bleed Out
+- **Drawn-out death** — dying no longer cuts straight to the game-over screen. The world keeps running for about **60 seconds** as you bleed out (zombies keep shambling over your fallen body).
+- **Fluid blood overlay** — a sheet of blood **bleeds down from the top of the screen** as a live fluid: a ragged, dripping front with **surface tension** between columns, random **rivulet surges**, a wet specular sheen, and **detached droplets** that fall ahead of the front and splash.
+- **Rising pool** — blood also **fills up from the bottom** with an animated wavy surface, until the top curtain and the rising pool converge and the whole screen is drowned in red.
+- **YOU DIED card interaction** — the card fades in a beat after death; the flood keeps it a **clear, readable window** (Try Again still works), with blood **pooling on its top edge** and **dripping off its bottom edge**.
+- New always-present click-through `#blood` overlay canvas (`z-index` above the menus) drives the effect; it's cleared and torn down on retry.
+
 ## [0.9.0] — 2026-07-13
 ### Keys, Axes & Upstairs (Phases 2b + 2c of the house overhaul)
 - **Locked doors** — some interior doors start locked. Open a locked door three ways: **use a key** (found in the living room), **chop it down with the new axe**, or **shoot it open** with enough rounds. Locked doors block both you and the horde's pathing until breached (though zombies still climb in the windows).
@@ -116,6 +124,7 @@ _Next: 2b locked doors + key/axe, 2c functional stairs to upper floors, 2d the o
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.10.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.10.0
 [0.9.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.9.0
 [0.8.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.8.0
 [0.7.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.7.0

@@ -265,6 +265,17 @@ h2.dead { color: var(--accent-2); font-size: 34px; text-shadow: 2px 2px 0 #000; 
   #minimap { width: 116px; height: 116px; }
 }
 
+/* Blood overlay sits above the overlays so it drips over the YOU DIED card. */
+#blood {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  z-index: 40;
+}
+
 #version-tag {
   position: absolute;
   right: 6px;
