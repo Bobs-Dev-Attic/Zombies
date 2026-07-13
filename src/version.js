@@ -1,7 +1,17 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.6.1";
+export const VERSION = "0.7.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.7.0",
+    date: "2026-07-13",
+    title: "Fog & Map",
+    changes: [
+      "Fog of war — you only see what's in line of sight; explored areas stay dimly remembered and the unknown is dark.",
+      "Mini-map in the corner showing the layout you've explored, the exit, nearby zombies and you.",
+      "Nicer corpses — the dead now lie in blood pools as proper bodies instead of the old blobs.",
+    ],
+  },
   {
     version: "0.6.1",
     date: "2026-07-13",

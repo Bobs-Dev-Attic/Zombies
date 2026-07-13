@@ -18,6 +18,7 @@ export class World {
     this.cols = randInt(40, 52);
     this.rows = randInt(40, 52);
     this.grid = new Uint8Array(this.cols * this.rows);
+    this.explored = new Uint8Array(this.cols * this.rows); // fog-of-war memory
     this.doors = []; // {cx, cy, open, openT}
     this.props = []; // decorative, non-blocking-ish
     this.furniture = []; // smashable / knock-over objects

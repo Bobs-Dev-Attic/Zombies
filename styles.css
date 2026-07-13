@@ -248,6 +248,23 @@ h2.dead { color: var(--accent-2); font-size: 34px; text-shadow: 2px 2px 0 #000; 
 #changelog-body li { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 2px 0; }
 #changelog-body .cl-date { color: var(--accent); font-size: 11px; }
 
+#minimap {
+  position: absolute;
+  top: max(46px, calc(env(safe-area-inset-top) + 40px));
+  right: max(10px, env(safe-area-inset-right));
+  width: 88px;
+  height: 88px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 4px;
+  background: rgba(6, 9, 10, 0.5);
+  image-rendering: pixelated;
+  pointer-events: none;
+  z-index: 16;
+}
+@media (min-width: 900px) {
+  #minimap { width: 116px; height: 116px; }
+}
+
 #version-tag {
   position: absolute;
   right: 6px;
