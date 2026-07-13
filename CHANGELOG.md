@@ -7,6 +7,13 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] — 2026-07-13
+### Sprite Sheets
+- The player is now rendered from a hand-illustrated **sprite sheet** (`src/assets/player.png`) instead of procedural pixel shapes.
+- A small sprite-sheet loader slices the sheet's measured frames; the player's facing snaps to **up/down/left/right** and the row is chosen by state — **IDLE / WALK / RUN / REACH** (reaching while firing or meleeing).
+- Death plays the **3-frame DYING** sequence before the game-over screen.
+- The weapon is still drawn on top so it aims freely, and the previous procedural character remains as an **automatic fallback** if the image fails to load.
+
 ## [0.5.0] — 2026-07-13
 ### The Aftermath
 - **Bodies persist** — killed zombies settle into permanent decals on the ground (capped) instead of fading, so the dead pile up like the blood.
@@ -80,6 +87,7 @@ project uses [Semantic Versioning](https://semver.org/).
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.6.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.6.0
 [0.5.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.4.0
 [0.3.3]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.3.3

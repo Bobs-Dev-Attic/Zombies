@@ -153,6 +153,39 @@ export function drawPlayer(ctx, cx, cy, angle, frame, hurtFlash, weaponKind, pal
   ctx.restore();
 }
 
+// Player sprite-sheet atlas (frame rects measured from src/assets/player.png).
+// Columns are UP / DOWN / LEFT / RIGHT.
+export const PLAYER_ATLAS = {
+  IDLE:  { up: [408, 74, 92, 109], down: [621, 73, 90, 110], left: [834, 73, 89, 112], right: [1048, 74, 82, 111] },
+  WALK:  { up: [407, 217, 94, 106], down: [616, 215, 99, 110], left: [835, 217, 104, 104], right: [1045, 218, 108, 100] },
+  RUN:   { up: [403, 358, 104, 98], down: [613, 358, 107, 97], left: [829, 359, 120, 90], right: [1039, 360, 125, 88] },
+  REACH: { up: [399, 485, 114, 96], down: [607, 485, 120, 95], left: [823, 486, 137, 87], right: [1031, 486, 143, 89] },
+  DIE: [
+    { up: [398, 677, 109, 90], down: [589, 677, 142, 92], left: [801, 678, 154, 87], right: [1006, 680, 161, 84] },
+    { up: [393, 801, 138, 64], down: [602, 799, 144, 64], left: [805, 799, 152, 69], right: [1011, 800, 153, 66] },
+    { up: [379, 904, 152, 76], down: [587, 902, 157, 74], left: [795, 904, 163, 71], right: [1007, 904, 170, 73] },
+  ],
+};
+
+// Snap an aim angle to one of the four sheet facings.
+export function facing4(angle) {
+  const a = ((angle % TAU) + TAU) % TAU; // 0..2π, 0 = right
+  if (a < Math.PI / 4 || a >= (7 * Math.PI) / 4) return "right";
+  if (a < (3 * Math.PI) / 4) return "down";
+  if (a < (5 * Math.PI) / 4) return "left";
+  return "up";
+}
+
+// Weapon overlaid on the sprite: drawn at a forward offset along the aim angle.
+export function drawWeaponOverlay(ctx, x, y, aimAngle, recoil, kind) {
+  const fwd = 9 - (recoil || 0) * 3.5;
+  ctx.save();
+  ctx.translate(x + Math.cos(aimAngle) * fwd, y + Math.sin(aimAngle) * fwd);
+  ctx.rotate(aimAngle);
+  drawWeaponLocal(ctx, kind);
+  ctx.restore();
+}
+
 // Weapon drawn from the grip (0,0) extending along +x (forward).
 function drawWeaponLocal(ctx, kind) {
   const R = (ox, oy, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(ox, oy - h / 2, w, h); };
