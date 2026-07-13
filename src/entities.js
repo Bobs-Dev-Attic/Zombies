@@ -324,7 +324,10 @@ export class Zombie {
     const seek = this._seek(player, world, nav);
     const d = seek.d;
     const sees = d < 560;
-    const spd = this.speed * this.speedMul; // wounds/dismemberment slow movement
+    // The more wounded (low HP) it is, the slower it moves — on top of dismemberment.
+    const hpFrac = clamp(this.hp / this.maxHp, 0, 1);
+    this.woundMul = 0.55 + 0.45 * hpFrac;
+    const spd = this.speed * this.speedMul * this.woundMul;
     let tvx = 0, tvy = 0;
 
     // Pounce when in range with a clear line to the player.
@@ -387,9 +390,9 @@ export class Zombie {
     const res = world.collide(nx, ny, this.r);
     this.x = res.x; this.y = res.y;
 
-    // Melee the player on contact. Fewer arms => weaker hits (dmgMul).
+    // Melee the player on contact. Fewer arms & heavier wounds => weaker hits.
     if (d < this.r + player.r + 2 && this.attackCd <= 0) {
-      player.hurt(this.def.dmg * this.dmgMul);
+      player.hurt(this.def.dmg * this.dmgMul * (0.55 + 0.45 * hpFrac));
       this.attackCd = 0.7;
       const a = angleTo(this.x, this.y, player.x, player.y);
       player.vx += Math.cos(a) * 60;

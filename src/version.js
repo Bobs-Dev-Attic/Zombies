@@ -1,7 +1,19 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.4.0";
+export const VERSION = "0.5.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.5.0",
+    date: "2026-07-13",
+    title: "The Aftermath",
+    changes: [
+      "Bodies now stay where they fall — the dead pile up on the ground like the blood.",
+      "Severed limbs fly off and come to rest on the floor.",
+      "Furniture everywhere — crates, tables, chairs, barrels, shelves and couches you can shoot, smash, blow up or knock over (brutes barge right through).",
+      "The exit is now a lit doorway to the outside with an EXIT sign.",
+      "Damage now continuously slows a zombie and weakens its attacks as its health drops (on top of dismemberment).",
+    ],
+  },
   {
     version: "0.4.0",
     date: "2026-07-13",

@@ -7,6 +7,14 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] — 2026-07-13
+### The Aftermath
+- **Bodies persist** — killed zombies settle into permanent decals on the ground (capped) instead of fading, so the dead pile up like the blood.
+- **Severed limbs land and stay** — a sliced-off arm or leg flies off with a tumble and comes to rest on the floor as a lasting decal.
+- **Destructible furniture** — crates, tables, chairs, barrels, shelves and couches populate rooms; they block movement and shots, take damage from bullets/melee/explosions, and break into planks or tip over. Brutes and leapers smash through them.
+- **Outside doorway** — the level exit is now rendered as a lit doorway to the outside with daylight and an EXIT sign.
+- **Continuous wound scaling** — beyond dismemberment, a zombie's remaining health now scales its move speed and the damage it deals, so a badly hurt zombie is visibly slower and weaker.
+
 ## [0.4.0] — 2026-07-13
 ### Pounce & Splatter
 - **Headshots** — every hit has a weapon-scaled chance to instantly kill; a floating **HEADSHOT** banner pops above the zombie, brain matter sprays, and the body drops.
@@ -72,6 +80,7 @@ project uses [Semantic Versioning](https://semver.org/).
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.5.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.4.0
 [0.3.3]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.3.3
 [0.3.2]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.3.2
