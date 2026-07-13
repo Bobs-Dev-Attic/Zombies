@@ -140,15 +140,16 @@ export class Player {
 }
 
 // ---------------------------------------------------------------- Zombies
+// shamble = how much they weave off a straight line; lurch = gait stop/start pulse.
 export const ZOMBIE_TYPES = {
-  walker:  { hp: 46,  speed: 44, r: 7,  dmg: 9,  pattern: "direct",      knockResist: 0, score: 10, color: "walker",  gore: 1 },
-  runner:  { hp: 30,  speed: 78, r: 6,  dmg: 7,  pattern: "direct",      knockResist: 0.1, score: 16, color: "runner",  gore: 1 },
-  crawler: { hp: 22,  speed: 66, r: 5,  dmg: 6,  pattern: "wanderChase", knockResist: 0.1, score: 14, color: "crawler", gore: 0.7 },
-  brute:   { hp: 180, speed: 30, r: 12, dmg: 22, pattern: "direct",      knockResist: 0.75, score: 40, color: "brute",   gore: 2 },
-  spitter: { hp: 40,  speed: 40, r: 7,  dmg: 5,  pattern: "ranged",      knockResist: 0.2, score: 24, color: "spitter", gore: 1 },
+  walker:  { hp: 46,  speed: 30, r: 7,  dmg: 9,  pattern: "direct",      knockResist: 0, score: 10, color: "walker",  gore: 1,   shamble: 0.5,  lurch: 0.38 },
+  runner:  { hp: 30,  speed: 56, r: 6,  dmg: 7,  pattern: "direct",      knockResist: 0.1, score: 16, color: "runner",  gore: 1,   shamble: 0.2,  lurch: 0.15 },
+  crawler: { hp: 22,  speed: 44, r: 5,  dmg: 6,  pattern: "wanderChase", knockResist: 0.1, score: 14, color: "crawler", gore: 0.7, shamble: 0.42, lurch: 0.32 },
+  brute:   { hp: 180, speed: 22, r: 12, dmg: 22, pattern: "direct",      knockResist: 0.75, score: 40, color: "brute",   gore: 2,   shamble: 0.26, lurch: 0.42 },
+  spitter: { hp: 40,  speed: 30, r: 7,  dmg: 5,  pattern: "ranged",      knockResist: 0.2, score: 24, color: "spitter", gore: 1,   shamble: 0.2,  lurch: 0.18 },
   // Prone crawler: drags itself along the ground with no legs. High base speed
-  // so the legless drag still lunges at a menacing pace.
-  prone:   { hp: 30,  speed: 140, r: 6, dmg: 10, pattern: "wanderChase", knockResist: 0.15, score: 20, color: "crawler", gore: 0.9, bornProne: true },
+  // so the legless drag still lunges, but slower and more erratic than a walker.
+  prone:   { hp: 30,  speed: 118, r: 6, dmg: 10, pattern: "wanderChase", knockResist: 0.15, score: 20, color: "crawler", gore: 0.9, shamble: 0.46, lurch: 0.4, bornProne: true },
 };
 
 export class Zombie {
@@ -174,6 +175,19 @@ export class Zombie {
     this.knock = { x: 0, y: 0 };
     this.flankSign = chance(0.5) ? 1 : -1;
     this.mass = t.r; // heavier things shove lighter ones in collisions
+
+    // Per-zombie gait so they shamble on differing strides and paths, not lines.
+    const shamble = t.shamble ?? 0.3, lurch = t.lurch ?? 0.25;
+    this.shambleAmp = shamble * rand(0.7, 1.3);
+    this.shambleFreq = rand(1.3, 3.1);
+    this.shamblePhase = rand(0, TAU);
+    this.curveBias = rand(-0.13, 0.13) * (shamble / 0.4); // lean their whole approach to one side
+    this.lurchDepth = lurch * rand(0.7, 1.2);
+    this.lurchRate = rand(0.7, 1.7);
+    this.lurchPhase = rand(0, TAU);
+    this.gaitT = rand(0, 6);
+    this.strideRate = rand(0.8, 1.35); // animation stride speed
+    this.strideAmp = rand(0.7, 1.4);   // animation stride size
 
     // Dismemberment: each limb is attached (1) or severed (0).
     this.parts = { larm: 1, rarm: 1, lleg: 1, rleg: 1 };
@@ -222,10 +236,21 @@ export class Zombie {
     return { hx: Math.cos(a), hy: Math.sin(a), d, los };
   }
 
+  // Weave a heading into a shambling gait: perpendicular sway + a constant
+  // curve bias, with a stop/start lurch pulse on the speed.
+  _applyShamble(hx, hy, spd) {
+    const lurch = 1 - this.lurchDepth * (0.5 + 0.5 * Math.sin(this.gaitT * this.lurchRate + this.lurchPhase));
+    const sway = Math.sin(this.gaitT * this.shambleFreq + this.shamblePhase) * this.shambleAmp + this.curveBias;
+    const px = -hy, py = hx; // perpendicular to heading
+    const s = spd * lurch;
+    return { tvx: (hx + px * sway) * s, tvy: (hy + py * sway) * s };
+  }
+
   update(dt, player, world, nav, spawnProjectile) {
     if (this.hurtFlash > 0) this.hurtFlash -= dt;
     if (this.attackCd > 0) this.attackCd -= dt;
-    this.frame += dt * (2 + this.speed * 0.05);
+    this.gaitT += dt;
+    this.frame += dt * (2 + this.speed * this.speedMul * 0.05) * this.strideRate;
 
     const seek = this._seek(player, world, nav);
     const d = seek.d;
@@ -242,7 +267,8 @@ export class Zombie {
           tvx = Math.cos(this.wanderAngle) * spd * 0.4;
           tvy = Math.sin(this.wanderAngle) * spd * 0.4;
         } else {
-          tvx = seek.hx * spd; tvy = seek.hy * spd;
+          const sh = this._applyShamble(seek.hx, seek.hy, spd);
+          tvx = sh.tvx; tvy = sh.tvy;
         }
         break;
       }
@@ -263,9 +289,9 @@ export class Zombie {
         }
         break;
       }
-      default: { // direct
-        tvx = seek.hx * spd;
-        tvy = seek.hy * spd;
+      default: { // direct — but shamble it so it isn't a straight beeline
+        const sh = this._applyShamble(seek.hx, seek.hy, spd);
+        tvx = sh.tvx; tvy = sh.tvy;
       }
     }
 

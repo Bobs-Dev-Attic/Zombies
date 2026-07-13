@@ -7,6 +7,13 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.3.1] — 2026-07-13
+### The Shamble
+- Held weapons now rotate to point exactly where the player faces (fixed the melee weapon resting off to the side).
+- Zombies are slower and **shamble** — a per-zombie perpendicular sway, a constant curve bias, and a stop/start lurch pulse make them weave and stagger toward you instead of marching in straight lines.
+- Each zombie has its own gait: differing stride speed, arm sway and a side-to-side body lean.
+- More prone crawlers dragging themselves along the ground, now appearing from the first wave.
+
 ## [0.3.0] — 2026-07-13
 ### Guts & Grabbing
 - **Body collision** — zombies no longer occupy the same space as each other or the player; they push apart, jostle, and swarm (mass-weighted so brutes barge through).
@@ -47,6 +54,7 @@ project uses [Semantic Versioning](https://semver.org/).
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.3.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.3.0
 [0.2.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.2.0

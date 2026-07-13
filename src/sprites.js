@@ -50,10 +50,10 @@ export function drawPlayer(ctx, cx, cy, angle, frame, hurtFlash, weaponKind, pal
   if (melee) {
     if (action.swingT > 0) {
       const prog = 1 - action.swingT / (action.swingDur || 0.22); // 0..1 across the swing
-      sweep = 1.0 - prog * 2.0;                                    // slash from +1 to -1 rad
+      sweep = 1.05 - prog * 2.1;                                   // slash across, centred on facing
       handFwd = 8 + Math.sin(prog * Math.PI) * 5;                  // lunge outward mid-swing
     } else {
-      sweep = 0.55; handFwd = 7;                                   // rest: held out to the side
+      sweep = 0; handFwd = 8;                                      // rest: aligned with where you face
     }
   } else {
     recoilBack = (action.recoil || 0) * 3.5;
@@ -116,33 +116,37 @@ const ZOMBIE_PAL = {
 const STUMP = "#7a1414";
 
 // Draw a zombie. parts = {larm,rarm,lleg,rleg} (1 attached / 0 severed); prone = dragging.
-export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts, prone) {
+export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts, prone, strideAmp) {
   parts = parts || { larm: 1, rarm: 1, lleg: 1, rleg: 1 };
+  strideAmp = strideAmp || 1;
   const pal = ZOMBIE_PAL[type] || ZOMBIE_PAL.walker;
   const cos = Math.cos(angle), sin = Math.sin(angle);
   const perpX = -sin, perpY = cos;
   const skin = hurtFlash ? "#ffffff" : pal.skin;
   const s = r / 7; // 7 == base radius
-  const B = (ox, oy, w, h, c) => px(ctx, cx, cy, ox * s, oy * s, Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s)), cos, sin, c);
-  const eye = (ox, oy) => px(ctx, cx, cy, ox * s, oy * s, Math.max(1, Math.round(1.4 * s)), Math.max(1, Math.round(1.4 * s)), cos, sin, "#b81e1e");
+  // Upper body sways side-to-side for a shambling gait; feet stay planted.
+  const lean = Math.sin(frame * 1.5) * (prone ? 1.4 : 0.9) * strideAmp * s;
+  const bx = cx + perpX * lean, by = cy + perpY * lean;
+  const B = (ox, oy, w, h, c) => px(ctx, bx, by, ox * s, oy * s, Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s)), cos, sin, c);
+  const eye = (ox, oy) => px(ctx, bx, by, ox * s, oy * s, Math.max(1, Math.round(1.4 * s)), Math.max(1, Math.round(1.4 * s)), cos, sin, "#b81e1e");
 
   // A reaching, clawing arm (or a stump if severed).
   const reachArm = (side, longReach) => {
     const ok = side < 0 ? parts.larm : parts.rarm;
     const shoulderSide = 3 * s * side;
-    const sx = cx + cos * (1.5 * s) + perpX * shoulderSide;
-    const sy = cy + sin * (1.5 * s) + perpY * shoulderSide;
+    const sx = bx + cos * (1.5 * s) + perpX * shoulderSide;
+    const sy = by + sin * (1.5 * s) + perpY * shoulderSide;
     if (!ok) { ctx.fillStyle = STUMP; ctx.fillRect(Math.round(sx - 1), Math.round(sy - 1), Math.max(2, Math.round(2 * s)), Math.max(2, Math.round(2 * s))); return; }
-    const sway = Math.sin(frame * 3 + (side < 0 ? 0 : Math.PI)) * 0.22;
+    const sway = Math.sin(frame * 3 * strideAmp + (side < 0 ? 0 : Math.PI)) * 0.24;
     const armA = angle + side * 0.3 + sway;
     const reach = (longReach ? r * 2.3 : r * 1.7) + Math.sin(frame * 2 + (side < 0 ? 0 : 1.5)) * (r * 0.28);
-    const hx = cx + Math.cos(armA) * reach, hy = cy + Math.sin(armA) * reach;
+    const hx = bx + Math.cos(armA) * reach, hy = by + Math.sin(armA) * reach;
     limb(ctx, sx, sy, hx, hy, Math.max(2, Math.round(2.2 * s)), skin);
     ctx.fillStyle = pal.dark; // clawed hand
     ctx.fillRect(Math.round(hx - 1), Math.round(hy - 1), Math.max(2, Math.round(2 * s)), Math.max(2, Math.round(2 * s)));
   };
 
-  // Shadow
+  // Shadow (at the feet)
   ctx.fillStyle = "rgba(0,0,0,0.3)";
   ctx.beginPath();
   ctx.ellipse(cx, cy + (prone ? 3 : 6) * s, (prone ? 8 : 7) * s, 3.0 * s, 0, 0, TAU);
@@ -163,10 +167,11 @@ export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts,
     return;
   }
 
-  // Legs (shuffle bob); severed legs become bloody stumps and it limps.
-  const legBob = Math.sin(frame * 1.5) * 1.6;
-  B(-1 + legBob * 0.3, 3, parts.rleg ? 3 : 2, parts.rleg ? 4 : 2, parts.rleg ? pal.cloth : STUMP);
-  B(-1 - legBob * 0.3, -3, parts.lleg ? 3 : 2, parts.lleg ? 4 : 2, parts.lleg ? pal.cloth : STUMP);
+  // Legs (shuffle bob, planted at the feet); severed legs become stumps and it limps.
+  const L = (ox, oy, w, h, c) => px(ctx, cx, cy, ox * s, oy * s, Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s)), cos, sin, c);
+  const legBob = Math.sin(frame * 1.5) * 1.7 * strideAmp;
+  L(-1 + legBob * 0.35, 3, parts.rleg ? 3 : 2, parts.rleg ? 4 : 2, parts.rleg ? pal.cloth : STUMP);
+  L(-1 - legBob * 0.35, -3, parts.lleg ? 3 : 2, parts.lleg ? 4 : 2, parts.lleg ? pal.cloth : STUMP);
 
   // Reaching arms behind the torso so claws read out front.
   reachArm(-1, false);

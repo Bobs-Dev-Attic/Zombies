@@ -1,7 +1,18 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.3.0";
+export const VERSION = "0.3.1";
 
 export const CHANGELOG = [
+  {
+    version: "0.3.1",
+    date: "2026-07-13",
+    title: "The Shamble",
+    changes: [
+      "Held weapons now point exactly where the player is facing.",
+      "Zombies are slower and shamble — weaving, curving and lurching in their own stride instead of marching in straight lines.",
+      "Each zombie has its own gait: differing stride speed, sway and body lean.",
+      "More crawlers dragging themselves along the ground, from the very first wave.",
+    ],
+  },
   {
     version: "0.3.0",
     date: "2026-07-13",
