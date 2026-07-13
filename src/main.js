@@ -91,8 +91,5 @@ document.addEventListener("visibilitychange", () => {
 document.addEventListener("gesturestart", (e) => e.preventDefault());
 document.addEventListener("touchmove", (e) => { if (e.target === canvas) e.preventDefault(); }, { passive: false });
 
-// Expose for debugging in the console.
-window.__game = game;
-
 // Show the menu at boot.
 show("menu");

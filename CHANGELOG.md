@@ -7,6 +7,12 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] — 2026-07-13
+### Installable & Deployed
+- Live on Vercel with automatic deploys on every merge to `main`.
+- Added a PWA web-app manifest (`manifest.webmanifest`) + `icon.svg` so the game installs to the home screen and launches fullscreen.
+- Cleaned up the production build (removed the console debug hook).
+
 ## [0.1.0] — 2026-07-12
 ### First Playable
 - Top-down zombie escape: the player stays centred as the world scrolls.
@@ -22,4 +28,5 @@ project uses [Semantic Versioning](https://semver.org/).
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.1.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.1.0

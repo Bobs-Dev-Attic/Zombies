@@ -1,7 +1,17 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.1.0";
+export const VERSION = "0.1.1";
 
 export const CHANGELOG = [
+  {
+    version: "0.1.1",
+    date: "2026-07-13",
+    title: "Installable & Deployed",
+    changes: [
+      "Live on Vercel with automatic deploys on every merge to main.",
+      "Added a PWA web-app manifest + icon so the game installs to the home screen and launches fullscreen.",
+      "Cleaned up the production build (removed the console debug hook).",
+    ],
+  },
   {
     version: "0.1.0",
     date: "2026-07-12",
