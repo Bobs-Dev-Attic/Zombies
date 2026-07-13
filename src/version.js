@@ -1,7 +1,15 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.6.0";
+export const VERSION = "0.6.1";
 
 export const CHANGELOG = [
+  {
+    version: "0.6.1",
+    date: "2026-07-13",
+    title: "Back to the Original",
+    changes: [
+      "Reverted the player to the original hand-drawn procedural character (per preference) — the sprite-sheet rendering was removed.",
+    ],
+  },
   {
     version: "0.6.0",
     date: "2026-07-13",
