@@ -1,7 +1,7 @@
 // Core game: loop, camera, rendering, waves, combat resolution and HUD.
 import { clamp, rand, randInt, chance, pick, angleTo, angleLerp, dist, dist2, TAU } from "./util.js";
 import { Input } from "./input.js";
-import { World, TILE, T, SETTINGS } from "./world.js";
+import { World, TILE, T, SETTINGS, ROOM_FLOOR } from "./world.js";
 import { Player, Zombie, Projectile, Particle, Pickup, ZOMBIE_TYPES } from "./entities.js";
 import { WEAPONS, WEAPON_ORDER, newLoadout } from "./weapons.js";
 import { drawPlayer, drawZombie, drawPickup, drawMuzzle, drawFurniture, drawBodyDecal, drawGroundLimb } from "./sprites.js";
@@ -222,6 +222,7 @@ export class Game {
     for (const c of this.corpses) { c.t += dt; if (c.bannerT > 0) c.bannerT -= dt; }
     this._updateGibs(dt);
     this._brutesSmashFurniture(dt);
+    this._breakWindowsUnderZombies();
 
     // A corpse that finished falling settles into a permanent body decal.
     for (const c of this.corpses) {
@@ -452,7 +453,12 @@ export class Game {
         if (f) { this._damageFurniture(f, proj.damage, proj.angle, proj.knockback); if (proj.pierce > 0) proj.pierce--; else proj.dead = true; }
       }
       if (proj.dead && proj.explosive) this._explode(proj.x, proj.y, proj);
-      else if (proj.dead && !proj.hostile && proj.kind === "bullet") this._spark(proj.x, proj.y);
+      else if (proj.dead && !proj.hostile && proj.kind === "bullet") {
+        // Shatter a window the bullet stopped at; otherwise a spark.
+        const cx = Math.floor(proj.x / TILE), cy = Math.floor(proj.y / TILE);
+        if (this.world.tileAt(cx, cy) === T.WINDOW) { this.world.breakWindow(cx, cy); this._glass(proj.x, proj.y); }
+        else this._spark(proj.x, proj.y);
+      }
     }
   }
 
@@ -524,7 +530,7 @@ export class Game {
       }
     }
     // Keep everyone out of walls after the shove.
-    for (const z of zs) { const r = w.collide(z.x, z.y, z.r); z.x = r.x; z.y = r.y; }
+    for (const z of zs) { const r = w.collide(z.x, z.y, z.r, true); z.x = r.x; z.y = r.y; }
     const pr = w.collide(p.x, p.y, p.r); p.x = pr.x; p.y = pr.y;
   }
 
@@ -592,6 +598,26 @@ export class Game {
     }
     this.shake += destroyed ? 4 : 1;
     if (destroyed) this.hooks.vibrate?.(20);
+  }
+
+  // Zombies climbing through a window smash the glass into an open gap.
+  _breakWindowsUnderZombies() {
+    if (!this.world.isHouse) return;
+    for (const z of this.zombies) {
+      const cx = Math.floor(z.x / TILE), cy = Math.floor(z.y / TILE);
+      if (this.world.tileAt(cx, cy) === T.WINDOW && this.world.breakWindow(cx, cy)) this._glass(z.x, z.y);
+    }
+  }
+
+  _glass(x, y) {
+    for (let i = 0; i < 10; i++) {
+      const a = rand(0, TAU), s = rand(30, 110);
+      this.particles.push(new Particle(x, y, {
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.25, 0.6),
+        color: pick(["#bcd8e0", "#9fc4cf", "#e0f0f4", "#8aa8b0"]), size: randInt(1, 2), drag: 0.85,
+      }));
+    }
+    this.shake += 2;
   }
 
   // Brutes barge through furniture, smashing anything they lean on.
@@ -885,7 +911,7 @@ export class Game {
       for (let cx = 0; cx < w.cols; cx++) {
         if (!w.explored[w.idx(cx, cy)]) continue;
         const t = w.tileAt(cx, cy);
-        mc.fillStyle = (t === T.WALL || t === T.PROP) ? "#3c4636" : (t === T.EXIT ? "#39d353" : "#6f7d5e");
+        mc.fillStyle = (t === T.WALL || t === T.PROP) ? "#3c4636" : t === T.WINDOW ? "#7fb0c0" : t === T.EXIT ? "#39d353" : t === T.STAIRS ? "#8a6d40" : "#6f7d5e";
         mc.fillRect(oxm + cx * scale, oym + cy * scale, scale + 0.6, scale + 0.6);
       }
     }
@@ -929,10 +955,27 @@ export class Game {
             ctx.fillStyle = "rgba(0,0,0,0.28)";
             ctx.fillRect(x, y + TILE - 4, TILE, 4);
           }
+        } else if (t === T.WINDOW) {
+          // Wall with a glass pane the horde can smash through.
+          ctx.fillStyle = set.wall; ctx.fillRect(x, y, TILE, TILE);
+          ctx.fillStyle = set.wallTop; ctx.fillRect(x, y, TILE, 6);
+          ctx.fillStyle = "rgba(150,205,220,0.5)"; ctx.fillRect(x + 5, y + 8, TILE - 10, TILE - 15);
+          ctx.strokeStyle = "#241a12"; ctx.lineWidth = 1.5;
+          ctx.strokeRect(x + 5, y + 8, TILE - 10, TILE - 15);
+          ctx.beginPath(); ctx.moveTo(x + TILE / 2, y + 8); ctx.lineTo(x + TILE / 2, y + TILE - 7); ctx.stroke();
+          ctx.lineWidth = 1;
         } else {
-          // floor with a subtle checker
-          ctx.fillStyle = ((cx + cy) & 1) ? set.floor : set.floor2;
+          // floor with a subtle checker (room-tinted in the house)
+          let fc0 = set.floor, fc1 = set.floor2;
+          if (w.isHouse) { const rp = ROOM_FLOOR[w.floorTint[w.idx(cx, cy)]] || ROOM_FLOOR[0]; fc0 = rp[0]; fc1 = rp[1]; }
+          ctx.fillStyle = ((cx + cy) & 1) ? fc0 : fc1;
           ctx.fillRect(x, y, TILE, TILE);
+          if (t === T.STAIRS) {
+            ctx.fillStyle = "#5f4a2c"; ctx.fillRect(x + 2, y + 1, TILE - 4, TILE - 2);
+            ctx.fillStyle = "#3f2f1a";
+            for (let st = 0; st < 4; st++) ctx.fillRect(x + 2, y + 2 + st * 7, TILE - 4, 2.5);
+            ctx.fillStyle = "rgba(255,255,255,0.06)"; ctx.fillRect(x + 2, y + 1, TILE - 4, 3);
+          }
           if (t === T.PROP) {
             ctx.fillStyle = set.accent;
             ctx.fillRect(x + 5, y + 5, TILE - 10, TILE - 10);

@@ -1,7 +1,18 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.7.0";
+export const VERSION = "0.8.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.8.0",
+    date: "2026-07-13",
+    title: "Welcome Home",
+    changes: [
+      "New House setting — a real home you start inside: a living room attached to a kitchen and dining room, each with its own floor and furniture.",
+      "Windows and doors line the house; zombies break in through the windows (you can't climb through, but you can shoot the glass out) and pour in through doors.",
+      "Zombies now emerge from the other rooms and the yard outside, not just off-screen.",
+      "A staircase in the living room (leads upstairs — coming soon) and a front door out to the yard and the way out.",
+    ],
+  },
   {
     version: "0.7.0",
     date: "2026-07-13",

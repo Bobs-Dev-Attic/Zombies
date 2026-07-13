@@ -302,7 +302,7 @@ export class Zombie {
       this.jumpH = Math.sin(clamp(prog, 0, 1) * Math.PI) * this.leapHeight;
       this.frame += dt * 8;
       const nx = this.x + this.leapVX * dt, ny = this.y + this.leapVY * dt;
-      const res = world.collide(nx, ny, this.r);
+      const res = world.collide(nx, ny, this.r, true);
       this.x = res.x; this.y = res.y;
       this.vx = this.leapVX; this.vy = this.leapVY;
       if (this.leapT <= 0) {
@@ -387,7 +387,7 @@ export class Zombie {
 
     const nx = this.x + tvx * dt;
     const ny = this.y + tvy * dt;
-    const res = world.collide(nx, ny, this.r);
+    const res = world.collide(nx, ny, this.r, true); // climb through windows
     this.x = res.x; this.y = res.y;
 
     // Melee the player on contact. Fewer arms & heavier wounds => weaker hits.
