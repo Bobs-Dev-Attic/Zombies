@@ -1,7 +1,20 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.2.1";
+export const VERSION = "0.3.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.3.0",
+    date: "2026-07-13",
+    title: "Guts & Grabbing",
+    changes: [
+      "Bodies now collide — zombies can't stack on each other or stand on you; they jostle and swarm.",
+      "Zombies reach out with animated, clawing arms.",
+      "The player has animated arms that recoil when firing and swing when meleeing.",
+      "Dismemberment: shoot or smash off limbs. Lost legs cripple speed (and drop them prone); lost arms weaken their hits.",
+      "New prone crawlers that drag themselves along the ground.",
+      "Heavier weapons (rifle, shotgun, bazooka, bat) tear limbs off more readily.",
+    ],
+  },
   {
     version: "0.2.1",
     date: "2026-07-13",

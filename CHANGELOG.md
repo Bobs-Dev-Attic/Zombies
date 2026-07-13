@@ -7,6 +7,15 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] — 2026-07-13
+### Guts & Grabbing
+- **Body collision** — zombies no longer occupy the same space as each other or the player; they push apart, jostle, and swarm (mass-weighted so brutes barge through).
+- **Reaching zombie arms** — animated, clawing arms that sway as they lurch toward you.
+- **Animated player arms** — arms recoil when firing a gun and sweep through an arc when swinging a melee weapon.
+- **Dismemberment** — zombies lose limbs as they take damage. Lost legs cut speed and eventually drop them into a prone crawl; lost arms reduce the damage they deal. Severed limbs fling gore and leave stumps.
+- **Prone crawlers** — a new zombie type that drags itself along the ground.
+- Heavier weapons (rifle, shotgun, bazooka, bat) are far likelier to tear limbs off.
+
 ## [0.2.1] — 2026-07-13
 ### Fresh Updates
 - Fixed asset caching (`vercel.json`) so new versions are picked up immediately after each deploy — returning players no longer run stale game code for up to an hour.
@@ -38,6 +47,7 @@ project uses [Semantic Versioning](https://semver.org/).
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.3.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.3.0
 [0.2.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.2.0
 [0.1.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.1.1
