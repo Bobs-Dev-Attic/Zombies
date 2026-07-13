@@ -149,6 +149,7 @@ export class Game {
     const table = [["walker", 5]];
     if (w >= 2) table.push(["runner", 3]);
     if (w >= 3) table.push(["crawler", 2]);
+    if (w >= 3) table.push(["prone", 2]);
     if (w >= 4) table.push(["spitter", 2]);
     if (w >= 5) table.push(["brute", 1 + Math.floor(w / 6)]);
     const total = table.reduce((s, t) => s + t[1], 0);
@@ -206,6 +207,7 @@ export class Game {
 
     // Entities.
     for (const z of this.zombies) z.update(dt, this.player, this.world, nav, (x, y, a, kind) => this._spawnHostile(x, y, a, kind));
+    this._resolveCollisions(); // no two bodies share the same space
     this._updateProjectiles(dt);
     for (const p of this.particles) p.update(dt);
     for (const s of this.stains) s.life -= dt * 0.15;
@@ -347,6 +349,7 @@ export class Game {
     }
     p.cooldown = 1 / w.fireRate;
     p.muzzle = 0.06;
+    p.triggerRecoil(w); // kick the arms/weapon (gun recoil or melee swing)
 
     if (w.melee) { this._meleeSwing(w); return; }
 
@@ -357,7 +360,7 @@ export class Game {
       const proj = new Projectile(p.x + Math.cos(p.angle) * 12, p.y + Math.sin(p.angle) * 12, a, {
         speed: w.speed, damage: w.damage, range: w.range, knockback: w.knockback,
         pierce: w.pierce || 0, explosive: w.explosive || 0, kind: w.explosive ? "rocket" : "bullet",
-        r: w.explosive ? 3 : 1.6,
+        sever: w.sever || 0, r: w.explosive ? 3 : 1.6,
       });
       this.projectiles.push(proj);
     }
@@ -376,7 +379,7 @@ export class Game {
       const a = angleTo(p.x, p.y, z.x, z.y);
       let da = Math.abs(((a - p.angle + Math.PI) % TAU) - Math.PI);
       if (da <= w.arc / 2) {
-        this._damageZombie(z, w.damage, p.angle, w.knockback);
+        this._damageZombie(z, w.damage, p.angle, w.knockback, w.sever || 0);
         this._blood(z.x, z.y, p.angle, 6);
         hit = true;
       }
@@ -403,7 +406,7 @@ export class Game {
         if (this._segHitsCircle(proj.px, proj.py, proj.x, proj.y, z.x, z.y, z.r + proj.r)) {
           proj.hitSet.add(z);
           if (proj.explosive) { this._explode(z.x, z.y, proj); proj.dead = true; break; }
-          this._damageZombie(z, proj.damage, proj.angle, proj.knockback);
+          this._damageZombie(z, proj.damage, proj.angle, proj.knockback, proj.sever || 0);
           this._blood(z.x, z.y, proj.angle, 5);
           if (proj.pierce > 0) proj.pierce--;
           else { proj.dead = true; break; }
@@ -421,7 +424,7 @@ export class Game {
       if (d < radius + z.r) {
         const falloff = clamp(1 - d / (radius + z.r), 0.2, 1);
         const a = angleTo(x, y, z.x, z.y);
-        this._damageZombie(z, proj.damage * falloff, a, 220 * falloff);
+        this._damageZombie(z, proj.damage * falloff, a, 220 * falloff, 0.6 * falloff);
         this._blood(z.x, z.y, a, 8);
       }
     }
@@ -440,10 +443,67 @@ export class Game {
     this.hooks.vibrate?.(60);
   }
 
-  _damageZombie(z, dmg, angle, force) {
-    if (z.damage(dmg, angle, force)) {
-      this._killZombie(z, angle);
+  // Separate overlapping bodies: zombie-vs-zombie and zombie-vs-player.
+  // Heavier bodies (higher mass) get pushed less. Runs a couple of iterations.
+  _resolveCollisions() {
+    const zs = this.zombies, p = this.player, w = this.world;
+    for (let iter = 0; iter < 2; iter++) {
+      for (let i = 0; i < zs.length; i++) {
+        const a = zs[i];
+        for (let j = i + 1; j < zs.length; j++) {
+          const b = zs[j];
+          let dx = b.x - a.x, dy = b.y - a.y;
+          const rr = a.r + b.r;
+          let d2 = dx * dx + dy * dy;
+          if (d2 >= rr * rr) continue;
+          if (d2 < 0.0001) { dx = rand(-1, 1); dy = rand(-1, 1); d2 = dx * dx + dy * dy; }
+          const d = Math.sqrt(d2);
+          const overlap = rr - d;
+          const nx = dx / d, ny = dy / d;
+          const total = a.mass + b.mass;
+          const aPush = overlap * (b.mass / total);
+          const bPush = overlap * (a.mass / total);
+          a.x -= nx * aPush; a.y -= ny * aPush;
+          b.x += nx * bPush; b.y += ny * bPush;
+        }
+        // Zombie vs player: shove the zombie out, nudge the player a little.
+        let dx = a.x - p.x, dy = a.y - p.y;
+        const rr = a.r + p.r;
+        let d2 = dx * dx + dy * dy;
+        if (d2 < rr * rr) {
+          if (d2 < 0.0001) { dx = rand(-1, 1); dy = 1; d2 = dx * dx + dy * dy; }
+          const d = Math.sqrt(d2);
+          const overlap = rr - d, nx = dx / d, ny = dy / d;
+          a.x += nx * overlap * 0.8; a.y += ny * overlap * 0.8;
+          p.x -= nx * overlap * 0.2; p.y -= ny * overlap * 0.2;
+        }
+      }
     }
+    // Keep everyone out of walls after the shove.
+    for (const z of zs) { const r = w.collide(z.x, z.y, z.r); z.x = r.x; z.y = r.y; }
+    const pr = w.collide(p.x, p.y, p.r); p.x = pr.x; p.y = pr.y;
+  }
+
+  _damageZombie(z, dmg, angle, force, sever = 0) {
+    const res = z.damage(dmg, angle, force, sever);
+    if (res.severed) this._severFX(z, res.severed, angle);
+    if (res.dead) this._killZombie(z, angle);
+  }
+
+  // A limb tears off: fling a gore chunk, spray blood, leave a stain.
+  _severFX(z, part, angle) {
+    const pal = { larm: "#7a8f3a", rarm: "#7a8f3a", lleg: "#6a7a34", rleg: "#6a7a34" }[part] || "#7a8f3a";
+    this._blood(z.x, z.y, angle, 6);
+    for (let i = 0; i < 4; i++) {
+      const a = angle + rand(-1, 1), s = rand(50, 150);
+      this.particles.push(new Particle(z.x, z.y, {
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.7, 1.5),
+        color: pick([pal, "#a01818", "#7a1010"]), size: randInt(3, 5), drag: 0.85, stain: true,
+      }));
+    }
+    this.stains.push({ x: z.x + rand(-4, 4), y: z.y + rand(-4, 4), r: rand(3, 6), life: rand(8, 14), color: "#4a0c0c" });
+    this.shake += 2;
+    if (z.prone) this._announce("Legless!");
   }
 
   _killZombie(z, angle) {
@@ -692,12 +752,13 @@ export class Game {
   _drawZombiesBehind(ctx) {
     // Sort by y for pseudo-depth.
     const sorted = this.zombies.slice().sort((a, b) => a.y - b.y);
-    for (const z of sorted) drawZombie(ctx, z.x, z.y, z.angle, z.frame, z.type, z.r, z.hurtFlash > 0);
+    for (const z of sorted) drawZombie(ctx, z.x, z.y, z.angle, z.frame, z.type, z.r, z.hurtFlash > 0, z.parts, z.prone);
   }
 
   _drawPlayer(ctx) {
     const p = this.player;
-    drawPlayer(ctx, p.x, p.y, p.angle, p.walkFrame, p.hurtFlash > 0, p.weapon.kind, PLAYER_PAL);
+    const action = { recoil: p.recoil, swingT: p.swingT, swingDur: p.swingDur, melee: p.weapon.melee };
+    drawPlayer(ctx, p.x, p.y, p.angle, p.walkFrame, p.hurtFlash > 0, p.weapon.kind, PLAYER_PAL, action);
     if (p.muzzle > 0 && !p.weapon.melee) drawMuzzle(ctx, p.x, p.y, p.angle, p.weapon.explosive ? 5 : 3);
     if (p.invuln > 0 && Math.floor(p.invuln * 12) % 2 === 0) {
       ctx.strokeStyle = "rgba(224,184,58,0.7)";

@@ -23,6 +23,15 @@ export class Player {
     this.exhausted = false;
     this.kills = 0;
     this.invuln = 0;
+    // Arm animation: recoil (0..1 decaying) for guns; swing timer for melee.
+    this.recoil = 0;
+    this.swingT = 0;
+    this.swingDur = 0.22;
+  }
+
+  triggerRecoil(w) {
+    if (w.melee) { this.swingT = this.swingDur; }
+    else { this.recoil = 1; }
   }
 
   get weapon() { return WEAPONS[this.loadout.current]; }
@@ -42,6 +51,8 @@ export class Player {
     if (this.hurtFlash > 0) this.hurtFlash -= dt;
     if (this.muzzle > 0) this.muzzle -= dt;
     if (this.invuln > 0) this.invuln -= dt;
+    if (this.recoil > 0) this.recoil = Math.max(0, this.recoil - dt * 7);
+    if (this.swingT > 0) this.swingT = Math.max(0, this.swingT - dt);
 
     const wantMove = input.moveMag > 0.08;
     const sprinting = input.moveMag > 0.92 && wantMove;
@@ -135,6 +146,9 @@ export const ZOMBIE_TYPES = {
   crawler: { hp: 22,  speed: 66, r: 5,  dmg: 6,  pattern: "wanderChase", knockResist: 0.1, score: 14, color: "crawler", gore: 0.7 },
   brute:   { hp: 180, speed: 30, r: 12, dmg: 22, pattern: "direct",      knockResist: 0.75, score: 40, color: "brute",   gore: 2 },
   spitter: { hp: 40,  speed: 40, r: 7,  dmg: 5,  pattern: "ranged",      knockResist: 0.2, score: 24, color: "spitter", gore: 1 },
+  // Prone crawler: drags itself along the ground with no legs. High base speed
+  // so the legless drag still lunges at a menacing pace.
+  prone:   { hp: 30,  speed: 140, r: 6, dmg: 10, pattern: "wanderChase", knockResist: 0.15, score: 20, color: "crawler", gore: 0.9, bornProne: true },
 };
 
 export class Zombie {
@@ -159,6 +173,38 @@ export class Zombie {
     this.dead = false;
     this.knock = { x: 0, y: 0 };
     this.flankSign = chance(0.5) ? 1 : -1;
+    this.mass = t.r; // heavier things shove lighter ones in collisions
+
+    // Dismemberment: each limb is attached (1) or severed (0).
+    this.parts = { larm: 1, rarm: 1, lleg: 1, rleg: 1 };
+    if (t.bornProne) { this.parts.lleg = 0; this.parts.rleg = 0; }
+    this.speedMul = 1;
+    this.dmgMul = 1;
+    this.prone = false;
+    this._recomputeParts();
+  }
+
+  // Recompute mobility & damage from remaining limbs. No legs => prone crawl.
+  _recomputeParts() {
+    const legs = this.parts.lleg + this.parts.rleg;
+    const arms = this.parts.larm + this.parts.rarm;
+    this.speedMul = legs === 2 ? 1 : legs === 1 ? 0.58 : 0.34;
+    this.dmgMul = arms === 2 ? 1 : arms === 1 ? 0.6 : 0.28;
+    this.prone = legs === 0;
+  }
+
+  // Sever a random still-attached limb; returns its name or null.
+  _severRandom(preferLegs) {
+    let pool = Object.keys(this.parts).filter((k) => this.parts[k]);
+    if (preferLegs) {
+      const legs = pool.filter((k) => k.endsWith("leg"));
+      if (legs.length) pool = legs;
+    }
+    if (!pool.length) return null;
+    const part = pool[(Math.random() * pool.length) | 0];
+    this.parts[part] = 0;
+    this._recomputeParts();
+    return part;
   }
 
   // Heading toward the player: straight line when there's LOS or we're close,
@@ -184,6 +230,7 @@ export class Zombie {
     const seek = this._seek(player, world, nav);
     const d = seek.d;
     const sees = d < 560;
+    const spd = this.speed * this.speedMul; // wounds/dismemberment slow movement
     let tvx = 0, tvy = 0;
 
     switch (this.def.pattern) {
@@ -192,10 +239,10 @@ export class Zombie {
         if (this.state !== "chase") {
           this.wanderTimer -= dt;
           if (this.wanderTimer <= 0) { this.wanderAngle = rand(0, TAU); this.wanderTimer = rand(0.6, 2.2); }
-          tvx = Math.cos(this.wanderAngle) * this.speed * 0.4;
-          tvy = Math.sin(this.wanderAngle) * this.speed * 0.4;
+          tvx = Math.cos(this.wanderAngle) * spd * 0.4;
+          tvy = Math.sin(this.wanderAngle) * spd * 0.4;
         } else {
-          tvx = seek.hx * this.speed; tvy = seek.hy * this.speed;
+          tvx = seek.hx * spd; tvy = seek.hy * spd;
         }
         break;
       }
@@ -203,11 +250,11 @@ export class Zombie {
         const a = angleTo(this.x, this.y, player.x, player.y);
         this.angle = angleLerp(this.angle, a, clamp(dt * 6, 0, 1));
         const ideal = 180;
-        if (!seek.los || d > ideal + 40) { tvx = seek.hx * this.speed; tvy = seek.hy * this.speed; }
-        else if (d < ideal - 40) { tvx = -Math.cos(a) * this.speed * 0.7; tvy = -Math.sin(a) * this.speed * 0.7; }
+        if (!seek.los || d > ideal + 40) { tvx = seek.hx * spd; tvy = seek.hy * spd; }
+        else if (d < ideal - 40) { tvx = -Math.cos(a) * spd * 0.7; tvy = -Math.sin(a) * spd * 0.7; }
         else { // strafe
-          tvx = Math.cos(a + Math.PI / 2) * this.speed * 0.5 * this.flankSign;
-          tvy = Math.sin(a + Math.PI / 2) * this.speed * 0.5 * this.flankSign;
+          tvx = Math.cos(a + Math.PI / 2) * spd * 0.5 * this.flankSign;
+          tvy = Math.sin(a + Math.PI / 2) * spd * 0.5 * this.flankSign;
         }
         this.spitCd -= dt;
         if (sees && seek.los && this.spitCd <= 0 && d < 320) {
@@ -217,8 +264,8 @@ export class Zombie {
         break;
       }
       default: { // direct
-        tvx = seek.hx * this.speed;
-        tvy = seek.hy * this.speed;
+        tvx = seek.hx * spd;
+        tvy = seek.hy * spd;
       }
     }
 
@@ -237,9 +284,9 @@ export class Zombie {
     const res = world.collide(nx, ny, this.r);
     this.x = res.x; this.y = res.y;
 
-    // Melee the player on contact.
+    // Melee the player on contact. Fewer arms => weaker hits (dmgMul).
     if (d < this.r + player.r + 2 && this.attackCd <= 0) {
-      player.hurt(this.def.dmg);
+      player.hurt(this.def.dmg * this.dmgMul);
       this.attackCd = 0.7;
       const a = angleTo(this.x, this.y, player.x, player.y);
       player.vx += Math.cos(a) * 60;
@@ -253,12 +300,20 @@ export class Zombie {
     this.knock.y += Math.sin(angle) * f;
   }
 
-  damage(amount, angle, force) {
+  // Returns { dead, severed } where severed is the limb name lost (or null).
+  damage(amount, angle, force, sever = 0) {
     this.hp -= amount;
     this.hurtFlash = 0.08;
     if (force) this.applyKnockback(angle, force);
-    if (this.hp <= 0) this.dead = true;
-    return this.dead;
+    let severed = null;
+    if (this.hp > 0) {
+      // Bigger hits and dismembering weapons are likelier to tear a limb off.
+      const p = sever + amount * 0.004;
+      if (Math.random() < p) severed = this._severRandom();
+    } else {
+      this.dead = true;
+    }
+    return { dead: this.dead, severed };
   }
 }
 
@@ -278,6 +333,7 @@ export class Projectile {
     this.explosive = opts.explosive || 0;
     this.knockback = opts.knockback || 0;
     this.pierce = opts.pierce || 0;
+    this.sever = opts.sever || 0;
     this.hitSet = new Set();
     this.kind = opts.kind || "bullet";
     this.r = opts.r || 1.6;
