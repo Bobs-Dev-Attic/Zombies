@@ -23,6 +23,8 @@ export class Player {
     this.exhausted = false;
     this.kills = 0;
     this.invuln = 0;
+    this.moving = false;
+    this.running = false;
     // Arm animation: recoil (0..1 decaying) for guns; swing timer for melee.
     this.recoil = 0;
     this.swingT = 0;
@@ -67,6 +69,10 @@ export class Player {
       this.stamina = clamp(this.stamina + 12 * dt, 0, this.maxStamina);
     }
     if (this.exhausted && this.stamina > 35) this.exhausted = false;
+
+    // Expose gait state for the walk/run animation.
+    this.moving = wantMove;
+    this.running = sprinting && !this.exhausted && this.stamina > 0;
 
     const spd = this.baseSpeed * this.speedFactor(sprinting) * clamp(input.moveMag / 0.9, 0, 1);
     const tvx = wantMove ? input.moveX * spd : 0;

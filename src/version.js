@@ -1,7 +1,17 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.3.1";
+export const VERSION = "0.3.2";
 
 export const CHANGELOG = [
+  {
+    version: "0.3.2",
+    date: "2026-07-13",
+    title: "Boots on the Ground",
+    changes: [
+      "Fixed weapon rotation — held weapons now truly point where the player faces (they were drawn flat, so they looked stuck at 90°).",
+      "Rebuilt the player as a fully rotating figure, so the body and weapon align to any direction.",
+      "New walk/run cycle: legs and feet actually step, with bigger, faster strides when sprinting.",
+    ],
+  },
   {
     version: "0.3.1",
     date: "2026-07-13",

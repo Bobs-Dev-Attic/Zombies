@@ -22,73 +22,97 @@ function limb(ctx, x0, y0, x1, y1, w, color) {
   }
 }
 
-// Draw the player: body faces `angle`; arms hold and animate the weapon.
-// action = { recoil (0..1), swingT, swingDur, melee }
+// Chunky pixel limb in the current (already-transformed) coordinate space.
+function limb2(ctx, x0, y0, x1, y1, w, color) {
+  const dx = x1 - x0, dy = y1 - y0;
+  const steps = Math.max(1, Math.round(Math.hypot(dx, dy) / 1.4));
+  ctx.fillStyle = color;
+  const o = w / 2;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    ctx.fillRect(x0 + dx * t - o, y0 + dy * t - o, w, w);
+  }
+}
+
+// Draw the player. The whole figure is rendered in a context rotated to
+// `angle`, so the body, feet and weapon all point where the player faces.
+// action = { recoil, swingT, swingDur, melee, moving, run }
 export function drawPlayer(ctx, cx, cy, angle, frame, hurtFlash, weaponKind, palette, action) {
-  action = action || { recoil: 0, swingT: 0, swingDur: 0.22, melee: false };
-  const bc = Math.cos(angle), bs = Math.sin(angle);
-  const perpX = -bs, perpY = bc;
+  action = action || {};
   const skin = hurtFlash ? "#ff6b5e" : palette.skin;
 
-  // Shadow
+  // Ground shadow (world-aligned).
   ctx.fillStyle = "rgba(0,0,0,0.32)";
   ctx.beginPath();
   ctx.ellipse(cx, cy + 6, 7, 3.4, 0, 0, TAU);
   ctx.fill();
 
-  // Legs (walk-cycle bob)
-  const bob = Math.sin(frame) * 1.6;
-  px(ctx, cx, cy, -2, 4 + bob, 3, 4, bc, bs, palette.pants);
-  px(ctx, cx, cy, 2, 4 - bob, 3, 4, bc, bs, palette.pants);
-  // Torso
-  px(ctx, cx, cy, 0, 0, 9, 9, bc, bs, palette.shirt);
-  px(ctx, cx, cy, 0, -3, 9, 3, bc, bs, palette.vest);
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle); // +x now points where the player faces
+  const R = (ox, oy, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(ox - w / 2, oy - h / 2, w, h); };
 
-  // Weapon pose: recoil pulls the grip back on guns; melee sweeps it in an arc.
-  const melee = action.melee;
-  let sweep = 0, handFwd = 8, recoilBack = 0;
+  // --- Legs & feet: an alternating step cycle. Feet stride forward/back along
+  // the facing axis and lift, so it reads as real walking; bigger & faster when running.
+  const moving = !!action.moving, run = !!action.run;
+  const amp = run ? 4.8 : 3.0;
+  const step = moving ? Math.sin(frame) * amp : 0;
+  const lift = moving ? Math.max(0, Math.cos(frame)) : 0;
+  const leg = (ph, oy, liftPhase) => {
+    R(ph * 0.45, oy, 3, 4, palette.pants);                  // upper leg
+    R(ph, oy, 4, 3 + liftPhase * 1.4, "#20242a");           // foot/shoe (lengthens as it lifts forward)
+  };
+  leg(step, -2.6, step > 0 ? lift : 0);
+  leg(-step, 2.6, step < 0 ? lift : 0);
+
+  // --- Torso
+  R(0, 0, 9, 9, palette.shirt);
+  R(-2.5, 0, 3, 9, palette.vest); // vest/pack toward the back
+
+  // --- Weapon pose (recoil on guns, arc sweep on melee)
+  const melee = !!action.melee;
+  let sweep = 0, handFwd = 8;
   if (melee) {
     if (action.swingT > 0) {
-      const prog = 1 - action.swingT / (action.swingDur || 0.22); // 0..1 across the swing
-      sweep = 1.05 - prog * 2.1;                                   // slash across, centred on facing
-      handFwd = 8 + Math.sin(prog * Math.PI) * 5;                  // lunge outward mid-swing
-    } else {
-      sweep = 0; handFwd = 8;                                      // rest: aligned with where you face
-    }
+      const prog = 1 - action.swingT / (action.swingDur || 0.22);
+      sweep = 1.05 - prog * 2.1;
+      handFwd = 8 + Math.sin(prog * Math.PI) * 5;
+    } else { sweep = 0; handFwd = 8; }
   } else {
-    recoilBack = (action.recoil || 0) * 3.5;
-    handFwd = 8 - recoilBack;
+    handFwd = 8 - (action.recoil || 0) * 3.5;
   }
-  const wa = angle + sweep;
-  const wc = Math.cos(wa), ws = Math.sin(wa);
-  const gx = cx + wc * handFwd, gy = cy + ws * handFwd; // grip point
+  const gx = Math.cos(sweep) * handFwd, gy = Math.sin(sweep) * handFwd;
 
-  // Shoulders, then both arms reaching to the grip (two-handed hold).
-  const lsx = cx + bc * 1 + perpX * 3.2, lsy = cy + bs * 1 + perpY * 3.2;
-  const rsx = cx + bc * 1 - perpX * 3.2, rsy = cy + bs * 1 - perpY * 3.2;
-  limb(ctx, lsx, lsy, gx, gy, 3, skin);
-  limb(ctx, rsx, rsy, gx, gy, 3, skin);
+  // Arms reach from shoulders to the grip (two-handed hold).
+  limb2(ctx, 1, -3.2, gx, gy, 3, skin);
+  limb2(ctx, 1, 3.2, gx, gy, 3, skin);
 
-  // Weapon at the grip, oriented along the (possibly swinging) weapon angle.
-  drawHeldWeapon(ctx, gx, gy, wc, ws, weaponKind);
+  // Weapon at the grip, aligned to facing (plus any melee sweep).
+  ctx.save();
+  ctx.translate(gx, gy);
+  ctx.rotate(sweep);
+  drawWeaponLocal(ctx, weaponKind);
+  ctx.restore();
 
-  // Head on top.
-  px(ctx, cx, cy, 1, 0, 6, 6, bc, bs, skin);
-  px(ctx, cx, cy, 3, 0, 2, 5, bc, bs, palette.hair);
+  // Head (forward) + hair.
+  R(2, 0, 6, 6, skin);
+  R(3, 0, 2, 5, palette.hair);
+
+  ctx.restore();
 }
 
-// Weapon drawn relative to the grip point (gx,gy), extending forward.
-function drawHeldWeapon(ctx, gx, gy, cos, sin, kind) {
-  const B = (ox, oy, w, h, c) => px(ctx, gx, gy, ox, oy, w, h, cos, sin, c);
+// Weapon drawn from the grip (0,0) extending along +x (forward).
+function drawWeaponLocal(ctx, kind) {
+  const R = (ox, oy, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(ox, oy - h / 2, w, h); };
   switch (kind) {
-    case "melee_knife": B(4, 1, 5, 2, "#cfd6e0"); B(1, 1, 2, 2, "#5a4632"); break;
-    case "melee_bat": B(6, 1, 9, 3, "#9c6b3a"); B(1, 1, 3, 2, "#5a4632"); break;
-    case "pistol": B(3, 1, 5, 3, "#2c2f33"); break;
-    case "shotgun": B(6, 1, 11, 3, "#3a2f28"); B(11, 1, 4, 2, "#20242a"); break;
-    case "rifle": B(7, 1, 13, 2, "#26411f"); B(1, 2, 3, 3, "#1a1c1a"); break;
-    case "smg": B(4, 1, 8, 3, "#2a2a2f"); B(2, 3, 2, 4, "#1a1a1f"); break;
-    case "bazooka": B(7, 1, 15, 5, "#3d4a2a"); B(0, 1, 4, 4, "#2a331d"); break;
-    default: B(3, 1, 5, 3, "#2c2f33");
+    case "melee_knife": R(-1, 0, 2, 2, "#5a4632"); R(1, 0, 6, 2, "#cfd6e0"); break;
+    case "melee_bat": R(-3, 0, 3, 2, "#5a4632"); R(0, 0, 11, 3, "#9c6b3a"); break;
+    case "pistol": R(-1, 1.5, 2, 3, "#20242a"); R(0, 0, 6, 3, "#2c2f33"); break;
+    case "shotgun": R(0, 0, 13, 3, "#3a2f28"); R(11, 0, 4, 2, "#20242a"); break;
+    case "rifle": R(-3, 0, 4, 3, "#1a1c1a"); R(0, 0, 15, 2, "#26411f"); break;
+    case "smg": R(1, 2, 3, 3, "#1a1a1f"); R(0, 0, 9, 3, "#2a2a2f"); break;
+    case "bazooka": R(-3, 0, 3, 3, "#2a331d"); R(-2, 0, 18, 5, "#3d4a2a"); break;
+    default: R(0, 0, 6, 3, "#2c2f33");
   }
 }
 

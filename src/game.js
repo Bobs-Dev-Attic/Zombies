@@ -757,7 +757,7 @@ export class Game {
 
   _drawPlayer(ctx) {
     const p = this.player;
-    const action = { recoil: p.recoil, swingT: p.swingT, swingDur: p.swingDur, melee: p.weapon.melee };
+    const action = { recoil: p.recoil, swingT: p.swingT, swingDur: p.swingDur, melee: p.weapon.melee, moving: p.moving, run: p.running };
     drawPlayer(ctx, p.x, p.y, p.angle, p.walkFrame, p.hurtFlash > 0, p.weapon.kind, PLAYER_PAL, action);
     if (p.muzzle > 0 && !p.weapon.melee) drawMuzzle(ctx, p.x, p.y, p.angle, p.weapon.explosive ? 5 : 3);
     if (p.invuln > 0 && Math.floor(p.invuln * 12) % 2 === 0) {

@@ -7,6 +7,11 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.3.2] — 2026-07-13
+### Boots on the Ground
+- Fixed weapon rotation: held weapons were drawn as flat, axis-aligned sprites whose position rotated but whose shape didn't — so they always looked stuck at ~90°. The player is now rendered as a fully rotating figure, so the body **and** weapon point wherever the player faces (verified across all 8 directions).
+- New walk/run animation: the legs and feet step forward and back in an alternating cycle, with bigger, faster strides when sprinting.
+
 ## [0.3.1] — 2026-07-13
 ### The Shamble
 - Held weapons now rotate to point exactly where the player faces (fixed the melee weapon resting off to the side).
@@ -54,6 +59,7 @@ project uses [Semantic Versioning](https://semver.org/).
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.3.2]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.3.2
 [0.3.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.3.0
 [0.2.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.2.1
