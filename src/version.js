@@ -1,7 +1,18 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.5.0";
+export const VERSION = "0.6.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.6.0",
+    date: "2026-07-13",
+    title: "Sprite Sheets",
+    changes: [
+      "The player is now drawn from a hand-illustrated sprite sheet instead of procedural pixels.",
+      "Facing snaps to up/down/left/right with idle, walk, run and reaching poses.",
+      "Dying plays a 3-frame collapse before the game-over screen.",
+      "The weapon is still drawn on top so it aims freely; procedural art remains as an automatic fallback.",
+    ],
+  },
   {
     version: "0.5.0",
     date: "2026-07-13",

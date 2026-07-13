@@ -4,7 +4,8 @@ import { Input } from "./input.js";
 import { World, TILE, T, SETTINGS } from "./world.js";
 import { Player, Zombie, Projectile, Particle, Pickup, ZOMBIE_TYPES } from "./entities.js";
 import { WEAPONS, WEAPON_ORDER, newLoadout } from "./weapons.js";
-import { drawPlayer, drawZombie, drawPickup, drawMuzzle, drawFurniture, drawBodyDecal, drawGroundLimb } from "./sprites.js";
+import { drawPlayer, drawZombie, drawPickup, drawMuzzle, drawFurniture, drawBodyDecal, drawGroundLimb, PLAYER_ATLAS, facing4, drawWeaponOverlay } from "./sprites.js";
+import { SpriteSheet } from "./assets.js";
 
 const PLAYER_PAL = { skin: "#d9a066", hair: "#3a2a1a", shirt: "#3b5a8c", vest: "#2c3e52", pants: "#2a2a33" };
 const ZOMBIE_LIMB = { walker: "#72a83a", runner: "#8fb84a", crawler: "#a0c15a", brute: "#5c7a2e", spitter: "#9ab84a", leaper: "#8fb84a", prone: "#a0c15a" };
@@ -23,6 +24,7 @@ export class Game {
     this.cam = { x: 0, y: 0 };
     this.bufW = MIN_BUFFER; this.bufH = MIN_BUFFER;
     this.dpr = 1;
+    this.playerSheet = new SpriteSheet("./src/assets/player.png");
 
     this.stains = []; // persistent ground blood (capped)
     this._resize();
@@ -59,6 +61,7 @@ export class Game {
     this.bodies = [];  // persistent fallen zombie decals
     this.limbs = [];   // persistent severed-limb decals on the ground
     this.gibs = [];    // limbs mid-flight before they settle
+    this.playerDeathT = null;
     this.score = 0;
     this.wave = 0;
     this.waveActive = false;
@@ -178,6 +181,20 @@ export class Game {
   }
 
   _update(dt) {
+    // Death sequence: let FX settle while the DIE frames play, then game over.
+    if (this.playerDeathT != null) {
+      this.playerDeathT -= dt;
+      for (const p of this.particles) p.update(dt);
+      this.particles = this.particles.filter((p) => !p.dead);
+      this._updateGibs(dt);
+      this.world.update(dt);
+      this.cam.x += (this.player.x - this.cam.x) * clamp(dt * 8, 0, 1);
+      this.cam.y += (this.player.y - this.cam.y) * clamp(dt * 8, 0, 1);
+      if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 40);
+      if (this.playerDeathT <= 0) { this.playerDeathT = null; this._gameOver(); }
+      return;
+    }
+
     const inp = this.input;
     inp.sampleKeyboard();
     const actions = inp.consume();
@@ -275,9 +292,12 @@ export class Game {
     this.cam.y += (this.player.y - this.cam.y) * clamp(dt * 8, 0, 1);
     if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 40);
 
-    // HUD + death.
+    // HUD + death (play the DIE sprite sequence first, if the sheet is loaded).
     this.hooks.onStats?.(this._stats());
-    if (this.player.health <= 0) this._gameOver();
+    if (this.player.health <= 0) {
+      if (this.playerSheet.ready()) this.playerDeathT = 0.75;
+      else this._gameOver();
+    }
   }
 
   _stats() {
@@ -970,6 +990,8 @@ export class Game {
 
   _drawPlayer(ctx) {
     const p = this.player;
+    // Prefer the sprite sheet; fall back to procedural art if it isn't loaded.
+    if (this.playerSheet.ready() && this._drawPlayerSprite(ctx, p)) return;
     const action = { recoil: p.recoil, swingT: p.swingT, swingDur: p.swingDur, melee: p.weapon.melee, variant: p.meleeVariant, moving: p.moving, run: p.running, vx: p.vx, vy: p.vy };
     drawPlayer(ctx, p.x, p.y, p.angle, p.walkFrame, p.hurtFlash > 0, p.weapon.kind, PLAYER_PAL, action);
     if (p.muzzle > 0 && !p.weapon.melee) drawMuzzle(ctx, p.x, p.y, p.angle, p.weapon.explosive ? 5 : 3, p.muzzle / 0.06);
@@ -977,6 +999,50 @@ export class Game {
       ctx.strokeStyle = "rgba(224,184,58,0.7)";
       ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, TAU); ctx.stroke();
     }
+  }
+
+  _drawPlayerSprite(ctx, p) {
+    const SCALE = 0.26;            // source px -> buffer px
+    const dir = facing4(p.angle);
+    // Walk bounce & dynamic shadow (as with the procedural art).
+    const moving = p.moving, run = p.running;
+    const bounce = (moving && this.playerDeathT == null) ? Math.abs(Math.sin(p.walkFrame)) * (run ? 3.4 : 2.2) : 0;
+
+    // Ground shadow.
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.beginPath();
+    ctx.ellipse(p.x + (p.vx || 0) * 0.02, p.y + 8, 8 - bounce * 0.2, 4 - bounce * 0.1, 0, 0, TAU);
+    ctx.fill();
+
+    // Pick the animation frame.
+    let frame;
+    if (this.playerDeathT != null) {
+      const prog = clamp(1 - this.playerDeathT / 0.75, 0, 1); // 0..1 through the death sequence
+      const fi = Math.min(2, Math.floor(prog * 3));
+      frame = PLAYER_ATLAS.DIE[fi][dir];
+    } else {
+      const reaching = p.muzzle > 0 || p.swingT > 0 || p.recoil > 0.25;
+      let state;
+      if (reaching) state = "REACH";
+      else if (run) state = "RUN";
+      else if (moving) state = (Math.floor(p.walkFrame / Math.PI) % 2 === 0) ? "WALK" : "IDLE"; // 2-pose step cycle
+      else state = "IDLE";
+      frame = PLAYER_ATLAS[state][dir];
+    }
+
+    const drawn = this.playerSheet.drawFrame(ctx, frame, p.x, p.y - bounce, SCALE);
+    if (!drawn) return false;
+
+    // Weapon on top (aims freely), plus muzzle flash. Not during death.
+    if (this.playerDeathT == null) {
+      drawWeaponOverlay(ctx, p.x, p.y - bounce, p.angle, p.recoil, p.weapon.kind);
+      if (p.muzzle > 0 && !p.weapon.melee) drawMuzzle(ctx, p.x, p.y - bounce, p.angle, p.weapon.explosive ? 5 : 3, p.muzzle / 0.06);
+      if (p.invuln > 0 && Math.floor(p.invuln * 12) % 2 === 0) {
+        ctx.strokeStyle = "rgba(224,184,58,0.7)";
+        ctx.beginPath(); ctx.arc(p.x, p.y - bounce, 11, 0, TAU); ctx.stroke();
+      }
+    }
+    return true;
   }
 
   _drawProjectiles(ctx) {
