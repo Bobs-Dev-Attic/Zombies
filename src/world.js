@@ -2,7 +2,7 @@
 import { randInt, rand, chance, pick, clamp } from "./util.js";
 
 export const TILE = 32;
-export const T = { FLOOR: 0, WALL: 1, DOOR: 2, EXIT: 3, PROP: 4, WINDOW: 5, STAIRS: 6 };
+export const T = { FLOOR: 0, WALL: 1, DOOR: 2, EXIT: 3, PROP: 4, WINDOW: 5, STAIRS: 6, FENCE: 7 };
 
 export const SETTINGS = [
   { id: "house", name: "The House", floor: "#4a3b2a", floor2: "#523f2c", wall: "#6a5340", wallTop: "#8a6d50", accent: "#4a3d2c" },
@@ -21,14 +21,26 @@ export const ROOM_FLOOR = {
   4: ["#403830", "#463e35"], // hall / landing
 };
 
+// Outdoor "streets" terrain colours (checker pairs), keyed by floorTint value.
+export const STREET_TERRAIN = {
+  0: ["#2e3a24", "#334026"], // grass (fallback)
+  1: ["#2e3a24", "#334026"], // yard / grass
+  2: ["#26262b", "#2b2b31"], // road asphalt
+  3: ["#4c4e4a", "#525450"], // sidewalk concrete
+  4: ["#4a3d29", "#524331"], // dirt driveway
+  5: ["#26262b", "#2b2b31"], // vertical road centre-line
+  6: ["#26262b", "#2b2b31"], // horizontal road centre-line
+};
+
 export class World {
   constructor(settingIndex = 0, floorLevel = 0) {
     this.setting = SETTINGS[settingIndex % SETTINGS.length];
     this.settingIndex = settingIndex;
     this.isHouse = this.setting.id === "house";
+    this.isStreets = this.setting.id === "streets";
     this.floorLevel = floorLevel; // 0 = ground, 1 = upstairs
-    this.cols = this.isHouse ? 40 : randInt(40, 52);
-    this.rows = this.isHouse ? 38 : randInt(40, 52);
+    this.cols = this.isHouse ? 40 : this.isStreets ? 48 : randInt(40, 52);
+    this.rows = this.isHouse ? 38 : this.isStreets ? 46 : randInt(40, 52);
     this.grid = new Uint8Array(this.cols * this.rows);
     this.explored = new Uint8Array(this.cols * this.rows); // fog-of-war memory
     this.floorTint = new Uint8Array(this.cols * this.rows); // per-tile room colour id
@@ -42,7 +54,16 @@ export class World {
     this.exitFacing = "up";
     this.spawnPoint = { x: 0, y: 0 };
     if (this.isHouse) { if (floorLevel === 1) this._houseUpper(); else this._houseGround(); }
+    else if (this.isStreets) this._streets();
     else this._generate();
+  }
+
+  // Floor checker-pair for a tile, tinted by terrain (house rooms / streets).
+  floorPair(cx, cy) {
+    if (!this.isHouse && !this.isStreets) return null;
+    const id = this.floorTint[this.idx(cx, cy)];
+    const pal = this.isHouse ? ROOM_FLOOR : STREET_TERRAIN;
+    return pal[id] || pal[0];
   }
 
   // Doorways: a normal open door, or a locked one to break/unlock.
@@ -223,6 +244,135 @@ export class World {
     this.exitFacing = "up";
   }
 
+  // A free-standing obstacle placed at world coords (vehicles, benches...).
+  _furn(x, y, type, hw, hh, hp, angle = 0) {
+    this.furniture.push({
+      cx: Math.floor(x / TILE), cy: Math.floor(y / TILE), x, y, hw, hh, type,
+      hp, maxHp: hp, broken: false, overturned: false, angle,
+    });
+  }
+
+  // The Streets: an outdoor neighbourhood — a grid of roads & sidewalks with
+  // fenced yards, houses, sheds, parked cars/trucks, trees and small parks.
+  _streets() {
+    const cols = this.cols, rows = this.rows;
+    this.grid.fill(T.FLOOR);
+    this.floorTint.fill(1); // grass everywhere by default
+    this.furniture = [];
+    this.rooms = [];
+    // Hedge border around the whole block.
+    for (let x = 0; x < cols; x++) { this._set(x, 0, T.WALL); this._set(x, rows - 1, T.WALL); }
+    for (let y = 0; y < rows; y++) { this._set(0, y, T.WALL); this._set(cols - 1, y, T.WALL); }
+
+    const vC = [9, 24, 39];  // vertical-road centre columns
+    const hC = [11, 23, 35]; // horizontal-road centre rows
+    const inRoadV = (x) => vC.some((c) => Math.abs(x - c) <= 1);
+    const inRoadH = (y) => hC.some((c) => Math.abs(y - c) <= 1);
+
+    // Lay the asphalt, centre-lines and flanking sidewalks.
+    for (let y = 1; y < rows - 1; y++) {
+      for (let x = 1; x < cols - 1; x++) {
+        const rv = inRoadV(x), rh = inRoadH(y);
+        if (rv || rh) {
+          let tint = 2;
+          if (rv && vC.includes(x) && !rh) tint = 5;      // vertical centre-line
+          else if (rh && hC.includes(y) && !rv) tint = 6; // horizontal centre-line
+          this._tint(x, y, tint);
+        } else if (inRoadV(x - 1) || inRoadV(x + 1) || inRoadH(y - 1) || inRoadH(y + 1)) {
+          this._tint(x, y, 3); // sidewalk hugging the kerb
+        }
+      }
+    }
+
+    // Blocks are the gaps between the road+sidewalk bands.
+    const xB = [[1, 6], [12, 21], [26, 36], [41, 46]];
+    const yB = [[1, 8], [14, 20], [26, 32], [38, 44]];
+    for (const [x0, x1] of xB) {
+      for (const [y0, y1] of yB) {
+        this._streetBlock(x0, y0, x1, y1);
+      }
+    }
+
+    // Parked cars & trucks along the kerbs.
+    const laneSpots = [];
+    for (const c of vC) for (let y = 3; y < rows - 3; y += 5) laneSpots.push({ x: c + 1, y, vert: true });
+    for (const c of hC) for (let x = 4; x < cols - 4; x += 6) laneSpots.push({ x, y: c + 1, vert: false });
+    for (const s of laneSpots) {
+      if (!chance(0.32)) continue;
+      if (this.tileAt(s.x, s.y) !== T.FLOOR) continue;
+      const truck = chance(0.35);
+      const wx = (s.x + 0.5) * TILE, wy = (s.y + 0.5) * TILE;
+      const L = truck ? 30 : 22, W = truck ? 13 : 11;
+      this._furn(wx, wy, truck ? "truck" : "car", s.vert ? W : L, s.vert ? L : W, truck ? 220 : 160);
+    }
+
+    // Player starts at the central intersection; the exit road runs off the
+    // bottom of the map.
+    this.spawnPoint = { x: (vC[1] + 0.5) * TILE, y: (hC[1] + 0.5) * TILE };
+    const exCx = vC[1];
+    this._set(exCx, rows - 1, T.EXIT); this._tint(exCx, rows - 1, 2);
+    this._set(exCx - 1, rows - 1, T.FLOOR); this._tint(exCx - 1, rows - 1, 2);
+    this._set(exCx + 1, rows - 1, T.FLOOR); this._tint(exCx + 1, rows - 1, 2);
+    this.exit = { x: (exCx + 0.5) * TILE, y: (rows - 1 + 0.5) * TILE };
+    this.exitFacing = "down";
+  }
+
+  // Furnish one neighbourhood block: a fenced yard with a house (or a park /
+  // empty lot), a driveway, maybe a shed, and some trees.
+  _streetBlock(x0, y0, x1, y1) {
+    const w = x1 - x0 + 1, h = y1 - y0 + 1;
+    const roll = Math.random();
+    const treeAt = (cx, cy) => { if (this.tileAt(cx, cy) === T.FLOOR && this.floorTint[this.idx(cx, cy)] === 1) this._set(cx, cy, T.PROP); };
+
+    // Small lots become parks / empty lots: open grass with trees (and a bench).
+    if (w < 5 || h < 5 || roll < 0.22) {
+      const trees = randInt(2, 5);
+      for (let i = 0; i < trees; i++) treeAt(randInt(x0, x1), randInt(y0, y1));
+      if (w >= 4 && h >= 4 && chance(0.5)) this._furn((x0 + 1.5) * TILE, (y0 + 1.5) * TILE, "bench", 12, 5, 40);
+      return;
+    }
+
+    // Fence the yard perimeter, leaving a gate gap on the bottom edge.
+    const gate = Math.floor((x0 + x1) / 2);
+    for (let x = x0; x <= x1; x++) {
+      if (this.tileAt(x, y0) === T.FLOOR) this._set(x, y0, T.FENCE);
+      if (x !== gate && x !== gate + 1 && this.tileAt(x, y1) === T.FLOOR) this._set(x, y1, T.FENCE);
+    }
+    for (let y = y0; y <= y1; y++) {
+      if (this.tileAt(x0, y) === T.FLOOR) this._set(x0, y, T.FENCE);
+      if (this.tileAt(x1, y) === T.FLOOR) this._set(x1, y, T.FENCE);
+    }
+
+    // The house occupies the back of the lot; front yard faces the gate.
+    const hx0 = x0 + 1, hx1 = x1 - 1, hy0 = y0 + 1, hy1 = y1 - 3;
+    const roof = chance(0.5) ? 10 : 11;
+    if (hy1 >= hy0 && hx1 >= hx0) {
+      for (let y = hy0; y <= hy1; y++) for (let x = hx0; x <= hx1; x++) { this._set(x, y, T.WALL); this._tint(x, y, roof); }
+    }
+
+    // Driveway (dirt) from the gate up toward the house front.
+    for (let y = y1 - 1; y > hy1; y--) { if (this.tileAt(gate, y) === T.FLOOR) this._tint(gate, y, 4); }
+
+    // A shed in a back corner of some yards.
+    if (chance(0.5) && hy1 - 1 >= hy0) {
+      const sx = chance(0.5) ? hx0 : hx1 - 1;
+      const sy = hy1 + 1;
+      if (sy < y1 && this.tileAt(sx, sy) === T.FLOOR) {
+        for (let yy = sy; yy <= Math.min(sy + 1, y1 - 1); yy++) for (let xx = sx; xx <= Math.min(sx + 1, x1 - 1); xx++) {
+          if (this.tileAt(xx, yy) === T.FLOOR) { this._set(xx, yy, T.WALL); this._tint(xx, yy, 12); }
+        }
+      }
+    }
+
+    // A parked car on the driveway now and then.
+    if (chance(0.45) && this.tileAt(gate, y1 - 1) === T.FLOOR && this.tileAt(gate, y1 - 2) === T.FLOOR) {
+      this._furn((gate + 0.5) * TILE, (y1 - 1 + 0.5) * TILE, chance(0.3) ? "truck" : "car", 11, 20, 160);
+    }
+
+    // A tree or two in the front yard.
+    for (let i = 0; i < randInt(0, 2); i++) treeAt(randInt(x0 + 1, x1 - 1), y1 - 1);
+  }
+
   _generate() {
     const { cols, rows } = this;
     this.grid.fill(T.WALL);
@@ -359,7 +509,7 @@ export class World {
   solidAt(x, y) {
     const cx = Math.floor(x / TILE), cy = Math.floor(y / TILE);
     const t = this.tileAt(cx, cy);
-    if (t === T.WALL || t === T.PROP || t === T.WINDOW) return true;
+    if (t === T.WALL || t === T.PROP || t === T.WINDOW || t === T.FENCE) return true;
     if (t === T.DOOR) return !this.doorPassable(this.doorAt(cx, cy));
     return this.furnitureAt(x, y) != null;
   }
@@ -413,7 +563,7 @@ export class World {
 
   _tileSolid(cx, cy, throughWindows) {
     const t = this.tileAt(cx, cy);
-    if (t === T.WALL || t === T.PROP) return true;
+    if (t === T.WALL || t === T.PROP || t === T.FENCE) return true;
     if (t === T.WINDOW) return !throughWindows; // zombies climb through windows
     if (t === T.DOOR) return !this.doorPassable(this.doorAt(cx, cy));
     return false;
@@ -435,7 +585,7 @@ export class World {
 
   passableTile(cx, cy) {
     const t = this.tileAt(cx, cy);
-    if (t === T.WALL || t === T.PROP) return false;
+    if (t === T.WALL || t === T.PROP || t === T.FENCE) return false;
     if (t === T.DOOR) return this.doorPassable(this.doorAt(cx, cy)); // locked doors block pathing
     // Windows & stairs are passable to the pathing flow (zombies climb / ascend).
     for (const f of this.furniture) if (!f.broken && f.cx === cx && f.cy === cy) return false;

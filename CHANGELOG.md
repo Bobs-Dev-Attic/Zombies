@@ -7,6 +7,14 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.11.0] — 2026-07-13
+### The Neighborhood
+- **The Streets is now an outdoor neighborhood** rather than the old indoor room-and-corridor maze. A dedicated generator lays out a **grid of asphalt roads** with dashed **centre-line markings** and flanking **concrete sidewalks**.
+- **Fenced yards & houses** — each block is a fenced front yard (wooden picket fences with a gate gap) around a **house** with a shingled roof (red or grey), a **dirt driveway**, and often a **backyard shed**. Some lots are small **parks / empty lots** with trees and a bench.
+- **Parked cars & trucks** — assorted-colour vehicles sit along the kerbs and in driveways as **solid cover**; they block movement and shots and can be shot up / smashed like other furniture.
+- **Trees** dot the yards, a **hedge/tree-line** rings the map edge, and a road runs off the **bottom of the map to the exit**.
+- New `FENCE` tile (solid, blocks pathing) and reusable **terrain tinting** (grass / asphalt / sidewalk / driveway) plus mini-map colours for the new tiles.
+
 ## [0.10.0] — 2026-07-13
 ### Bleed Out
 - **Drawn-out death** — dying no longer cuts straight to the game-over screen. The world keeps running for about **60 seconds** as you bleed out (zombies keep shambling over your fallen body).
@@ -124,6 +132,7 @@ _Next: 2b locked doors + key/axe, 2c functional stairs to upper floors, 2d the o
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.11.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.11.0
 [0.10.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.10.0
 [0.9.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.9.0
 [0.8.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.8.0
