@@ -268,6 +268,115 @@ export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts,
   eye(4, -1.5); eye(4, 1.5);
 }
 
+// A dead zombie settled on the ground (permanent decal).
+export function drawBodyDecal(ctx, x, y, angle, type, r, parts) {
+  const pal = ZOMBIE_PAL[type] || ZOMBIE_PAL.walker;
+  const s = r / 7;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.fillStyle = "rgba(60,10,10,0.45)"; // blood pool
+  ctx.beginPath(); ctx.ellipse(0, 0, 10 * s, 6.5 * s, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = pal.skin;
+  const limbR = (ang, len, ok) => { if (!ok) return; ctx.save(); ctx.rotate(ang); ctx.fillRect(2, -1.3, len, 2.6); ctx.restore(); };
+  limbR(-0.7, 7 * s, parts.rarm); limbR(0.7, 7 * s, parts.larm);
+  limbR(Math.PI - 0.5, 6 * s, parts.rleg); limbR(Math.PI + 0.5, 6 * s, parts.lleg);
+  ctx.fillStyle = pal.dark;
+  ctx.beginPath(); ctx.ellipse(0, 0, 6.5 * s, 4.2 * s, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = pal.skin;
+  ctx.beginPath(); ctx.arc(5 * s, 0, 2.6 * s, 0, TAU); ctx.fill();
+  ctx.fillStyle = "#7a1010";
+  ctx.fillRect(-1, -1, 2, 2);
+  ctx.restore();
+}
+
+// A severed limb lying on the ground (or, when zHeight>0, tumbling in the air).
+export function drawGroundLimb(ctx, x, y, angle, part, color, zHeight) {
+  const len = part && part.endsWith("leg") ? 8 : 6;
+  if (zHeight > 0) {
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.beginPath(); ctx.ellipse(x, y, len * 0.5, 2, 0, 0, TAU); ctx.fill();
+  }
+  ctx.save();
+  ctx.translate(x, y - (zHeight || 0));
+  ctx.rotate(angle);
+  if (!zHeight) { ctx.fillStyle = "rgba(60,10,10,0.4)"; ctx.beginPath(); ctx.ellipse(0, 0, len * 0.7, 3, 0, 0, TAU); ctx.fill(); }
+  ctx.fillStyle = color || "#72a83a";
+  ctx.fillRect(-len / 2, -1.6, len, 3.2);
+  ctx.fillStyle = "#5a1010"; // bloody torn end
+  ctx.fillRect(len / 2 - 1.6, -1.6, 1.6, 3.2);
+  ctx.restore();
+}
+
+const FURN = {
+  crate:  { body: "#6b4a28", top: "#8a6a44", edge: "#4a3420" },
+  table:  { body: "#7a542e", top: "#96703e", edge: "#573a1e" },
+  chair:  { body: "#6b4a28", top: "#86633c", edge: "#4a3420" },
+  barrel: { body: "#5a4632", top: "#7a5f42", edge: "#3a2c1e" },
+  shelf:  { body: "#5f4326", top: "#7d5c34", edge: "#412e1a" },
+  couch:  { body: "#48566a", top: "#5a6a80", edge: "#333e4c" },
+};
+
+// Furniture: intact obstacle, or a broken / overturned pile once destroyed.
+export function drawFurniture(ctx, f) {
+  const c = FURN[f.type] || FURN.crate;
+  ctx.save();
+  ctx.translate(f.x, f.y);
+  // Shadow.
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.beginPath(); ctx.ellipse(0, f.hh * 0.7, f.hw, f.hh * 0.55, 0, 0, TAU); ctx.fill();
+
+  if (f.broken) {
+    ctx.rotate(f.overturned ? f.angle + 0.5 : f.angle);
+    ctx.globalAlpha = 0.9;
+    if (f.overturned) {
+      // Tipped over: a squashed body still slightly there.
+      ctx.fillStyle = c.edge; ctx.fillRect(-f.hw, -f.hh * 0.5, f.hw * 2, f.hh);
+      ctx.fillStyle = c.body; ctx.fillRect(-f.hw + 1, -f.hh * 0.5 + 1, f.hw * 2 - 2, f.hh * 0.5);
+    } else {
+      // Smashed to planks.
+      for (let i = 0; i < 5; i++) {
+        ctx.save();
+        ctx.rotate((i - 2) * 0.5 + f.angle);
+        ctx.fillStyle = i % 2 ? c.body : c.edge;
+        ctx.fillRect(-f.hw * 0.8, -1.5, f.hw * 1.6, 3);
+        ctx.restore();
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    return;
+  }
+
+  ctx.rotate(f.angle);
+  ctx.fillStyle = c.edge;
+  ctx.fillRect(-f.hw, -f.hh, f.hw * 2, f.hh * 2);
+  ctx.fillStyle = c.body;
+  ctx.fillRect(-f.hw + 1, -f.hh + 1, f.hw * 2 - 2, f.hh * 2 - 2);
+  ctx.fillStyle = c.top;
+  if (f.type === "barrel") {
+    ctx.beginPath(); ctx.arc(0, 0, Math.min(f.hw, f.hh) - 1, 0, TAU); ctx.fillStyle = c.body; ctx.fill();
+    ctx.strokeStyle = c.edge; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 0, Math.min(f.hw, f.hh) - 1, 0, TAU); ctx.stroke();
+    ctx.fillStyle = c.top; ctx.beginPath(); ctx.arc(0, 0, Math.min(f.hw, f.hh) * 0.5, 0, TAU); ctx.fill();
+  } else if (f.type === "table" || f.type === "shelf" || f.type === "couch") {
+    ctx.fillRect(-f.hw + 2, -f.hh + 2, f.hw * 2 - 4, f.hh * 2 - 4);
+    ctx.fillStyle = c.edge;
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) ctx.fillRect(sx * (f.hw - 3) - 1, sy * (f.hh - 3) - 1, 2, 2);
+  } else {
+    // crate / chair: slats
+    ctx.fillStyle = c.edge;
+    ctx.fillRect(-f.hw + 1, -1, f.hw * 2 - 2, 1.5);
+    ctx.fillRect(-1, -f.hh + 1, 1.5, f.hh * 2 - 2);
+  }
+  // Damage cracks as it weakens.
+  if (f.hp < f.maxHp * 0.5) {
+    ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(-f.hw * 0.5, -f.hh * 0.4); ctx.lineTo(f.hw * 0.3, f.hh * 0.5); ctx.stroke();
+  }
+  ctx.lineWidth = 1;
+  ctx.restore();
+}
+
 // Pickup icons.
 export function drawPickup(ctx, cx, cy, kind, t) {
   const float = Math.sin(t * 3) * 1.5;

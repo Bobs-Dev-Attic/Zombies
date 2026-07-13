@@ -4,9 +4,10 @@ import { Input } from "./input.js";
 import { World, TILE, T, SETTINGS } from "./world.js";
 import { Player, Zombie, Projectile, Particle, Pickup, ZOMBIE_TYPES } from "./entities.js";
 import { WEAPONS, WEAPON_ORDER, newLoadout } from "./weapons.js";
-import { drawPlayer, drawZombie, drawPickup, drawMuzzle } from "./sprites.js";
+import { drawPlayer, drawZombie, drawPickup, drawMuzzle, drawFurniture, drawBodyDecal, drawGroundLimb } from "./sprites.js";
 
 const PLAYER_PAL = { skin: "#d9a066", hair: "#3a2a1a", shirt: "#3b5a8c", vest: "#2c3e52", pants: "#2a2a33" };
+const ZOMBIE_LIMB = { walker: "#72a83a", runner: "#8fb84a", crawler: "#a0c15a", brute: "#5c7a2e", spitter: "#9ab84a", leaper: "#8fb84a", prone: "#a0c15a" };
 const MIN_BUFFER = 220; // logical px on the short screen axis
 
 export class Game {
@@ -55,6 +56,9 @@ export class Game {
     this.pickups = [];
     this.stains = [];
     this.corpses = [];
+    this.bodies = [];  // persistent fallen zombie decals
+    this.limbs = [];   // persistent severed-limb decals on the ground
+    this.gibs = [];    // limbs mid-flight before they settle
     this.score = 0;
     this.wave = 0;
     this.waveActive = false;
@@ -87,6 +91,7 @@ export class Game {
     this.player.health = hp; this.player.stamina = sta;
     this.player.kills = kills;
     this.zombies = []; this.projectiles = []; this.particles = []; this.pickups = []; this.stains = []; this.corpses = [];
+    this.bodies = []; this.limbs = []; this.gibs = [];
     this.score = score; this.wave = wave;
     this.waveActive = false; this.spawnQueue = 0; this.betweenWaves = 2; this.exitReady = false;
     this.cam.x = this.player.x; this.cam.y = this.player.y;
@@ -215,6 +220,17 @@ export class Game {
     for (const s of this.stains) s.life -= dt * 0.15;
     for (const pk of this.pickups) pk.update(dt);
     for (const c of this.corpses) { c.t += dt; if (c.bannerT > 0) c.bannerT -= dt; }
+    this._updateGibs(dt);
+    this._brutesSmashFurniture(dt);
+
+    // A corpse that finished falling settles into a permanent body decal.
+    for (const c of this.corpses) {
+      if (c.t >= c.dur && !c._settled) {
+        c._settled = true;
+        this.bodies.push({ x: c.x, y: c.y, angle: c.angle, type: c.type, r: c.r, parts: c.parts });
+        if (this.bodies.length > 60) this.bodies.shift();
+      }
+    }
 
     // Cull dead.
     this._reapZombies();
@@ -396,6 +412,10 @@ export class Game {
         hit = true;
       }
     }
+    // Melee also smashes furniture in front of the player.
+    const fx = p.x + Math.cos(p.angle) * (range * 0.6), fy = p.y + Math.sin(p.angle) * (range * 0.6);
+    const f = this.world.furnitureAt(fx, fy);
+    if (f) { this._damageFurniture(f, w.damage, p.angle, w.knockback); hit = true; }
     this.shake += hit ? 3 : 1;
     if (hit) this.hooks.vibrate?.(20);
   }
@@ -413,16 +433,23 @@ export class Game {
         continue;
       }
       // Player projectile vs zombies (segment check for fast bullets).
+      let hitZombie = false;
       for (const z of this.zombies) {
         if (z.dead || proj.hitSet.has(z)) continue;
         if (this._segHitsCircle(proj.px, proj.py, proj.x, proj.y, z.x, z.y, z.r + proj.r)) {
           proj.hitSet.add(z);
+          hitZombie = true;
           if (proj.explosive) { this._explode(z.x, z.y, proj); proj.dead = true; break; }
           this._damageZombie(z, proj.damage, proj.angle, proj.knockback, proj.sever || 0, proj.hs || 0);
           this._blood(z.x, z.y, proj.angle, 5);
           if (proj.pierce > 0) proj.pierce--;
           else { proj.dead = true; break; }
         }
+      }
+      // Bullet passed no zombie but struck furniture — damage & (usually) stop it.
+      if (!hitZombie && !proj.explosive && proj.kind === "bullet") {
+        const f = this.world.furnitureHitBySegment(proj.px, proj.py, proj.x, proj.y);
+        if (f) { this._damageFurniture(f, proj.damage, proj.angle, proj.knockback); if (proj.pierce > 0) proj.pierce--; else proj.dead = true; }
       }
       if (proj.dead && proj.explosive) this._explode(proj.x, proj.y, proj);
       else if (proj.dead && !proj.hostile && proj.kind === "bullet") this._spark(proj.x, proj.y);
@@ -439,6 +466,11 @@ export class Game {
         this._damageZombie(z, proj.damage * falloff, a, 220 * falloff, 0.6 * falloff);
         this._blood(z.x, z.y, a, 8);
       }
+    }
+    // Blow apart nearby furniture.
+    for (const f of this.world.furniture) {
+      if (f.broken) continue;
+      if (dist(x, y, f.x, f.y) < radius + Math.max(f.hw, f.hh)) this._damageFurniture(f, 999, angleTo(x, y, f.x, f.y), 200);
     }
     // Splash damage to player too if close.
     const pd = dist(x, y, this.player.x, this.player.y);
@@ -508,20 +540,67 @@ export class Game {
     if (res.dead) this._killZombie(z, angle, false);
   }
 
-  // A limb tears off: fling a gore chunk, spray blood, leave a stain.
+  // A limb tears off: fling the actual body part (it lands and stays), spray blood.
   _severFX(z, part, angle) {
-    const pal = { larm: "#7a8f3a", rarm: "#7a8f3a", lleg: "#6a7a34", rleg: "#6a7a34" }[part] || "#7a8f3a";
     this._blood(z.x, z.y, angle, 6);
-    for (let i = 0; i < 4; i++) {
-      const a = angle + rand(-1, 1), s = rand(50, 150);
+    // The severed limb flies off with a spin and settles on the ground.
+    const a = angle + rand(-0.7, 0.7), s = rand(70, 150);
+    this.gibs.push({
+      x: z.x, y: z.y - 5, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 50,
+      z: 5, vz: rand(40, 90), angle: rand(0, TAU), spin: rand(-14, 14),
+      part, color: part.endsWith("leg") ? "#6a7a34" : "#7a8f3a", limbColor: ZOMBIE_LIMB[z.type] || "#72a83a",
+    });
+    for (let i = 0; i < 3; i++) {
+      const ba = angle + rand(-1, 1), bs = rand(40, 120);
       this.particles.push(new Particle(z.x, z.y, {
-        vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.7, 1.5),
-        color: pick([pal, "#a01818", "#7a1010"]), size: randInt(3, 5), drag: 0.85, stain: true,
+        vx: Math.cos(ba) * bs, vy: Math.sin(ba) * bs, life: rand(0.5, 1.1),
+        color: pick(["#a01818", "#7a1010"]), size: randInt(2, 4), drag: 0.85, stain: true,
       }));
     }
     this.stains.push({ x: z.x + rand(-4, 4), y: z.y + rand(-4, 4), r: rand(3, 6), life: rand(8, 14), color: "#4a0c0c" });
     this.shake += 2;
     if (z.prone) this._announce("Legless!");
+  }
+
+  // Flying limbs fall under gravity, tumble, and settle into ground decals.
+  _updateGibs(dt) {
+    for (const g of this.gibs) {
+      g.x += g.vx * dt; g.y += g.vy * dt;
+      g.vx *= Math.pow(0.1, dt); g.vy *= Math.pow(0.1, dt);
+      g.z += g.vz * dt; g.vz -= 260 * dt; // height above ground
+      g.angle += g.spin * dt;
+      if (g.z <= 0) {
+        g.z = 0;
+        this.limbs.push({ x: g.x, y: g.y, angle: g.angle, part: g.part, color: g.limbColor });
+        if (this.limbs.length > 80) this.limbs.shift();
+        this.stains.push({ x: g.x, y: g.y, r: rand(3, 5), life: rand(8, 14), color: "#4a0c0c" });
+        g.dead = true;
+      }
+    }
+    this.gibs = this.gibs.filter((g) => !g.dead);
+  }
+
+  _damageFurniture(f, dmg, angle, force) {
+    const destroyed = this.world.hitFurniture(f, dmg, angle, force);
+    // Splinter debris.
+    for (let i = 0; i < (destroyed ? 10 : 3); i++) {
+      const a = angle + rand(-1.2, 1.2), s = rand(40, destroyed ? 170 : 90);
+      this.particles.push(new Particle(f.x + rand(-f.hw, f.hw), f.y + rand(-f.hh, f.hh), {
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.3, 0.8),
+        color: pick(["#8a6a44", "#6b4a28", "#5a4632", "#a0824e"]), size: randInt(2, 4), drag: 0.84,
+      }));
+    }
+    this.shake += destroyed ? 4 : 1;
+    if (destroyed) this.hooks.vibrate?.(20);
+  }
+
+  // Brutes barge through furniture, smashing anything they lean on.
+  _brutesSmashFurniture(dt) {
+    for (const z of this.zombies) {
+      if (z.type !== "brute" && !z.leaping) continue;
+      const f = this.world.furnitureAt(z.x + z.vx * 0.05, z.y + z.vy * 0.05) || this.world.furnitureAt(z.x, z.y);
+      if (f) this._damageFurniture(f, (z.leaping ? 60 : 40) * dt * 6, z.angle, 0);
+    }
   }
 
   _killZombie(z, angle, headshot = false) {
@@ -717,10 +796,14 @@ export class Game {
     ctx.translate(ox, oy);
     this._drawWorld(ctx, -ox, -oy);
     this._drawStains(ctx);
+    this._drawBodies(ctx);
+    this._drawLimbs(ctx);
+    this._drawFurniture(ctx);
     this._drawCorpses(ctx);
     this._drawPickups(ctx);
     this._drawZombiesBehind(ctx);
     this._drawPlayer(ctx);
+    this._drawGibs(ctx);
     this._drawProjectiles(ctx);
     this._drawParticles(ctx);
     this._drawBanners(ctx);
@@ -784,11 +867,27 @@ export class Game {
             ctx.fillRect(x + 3, y + 3, TILE - 6 - slide, 3);
           }
           if (t === T.EXIT) {
-            ctx.fillStyle = "#123a12";
-            ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
-            ctx.fillStyle = "#39d353";
-            ctx.fillRect(x + 6, y + 8, TILE - 12, 4);
-            ctx.fillRect(x + TILE / 2 - 2, y + 8, 4, TILE - 14);
+            // Doorway to the outside — daylight spills across the threshold.
+            const cxp = x + TILE / 2, cyp = y + TILE / 2;
+            const g = ctx.createRadialGradient(cxp, cyp, 2, cxp, cyp, TILE);
+            g.addColorStop(0, "#fbe9b0");
+            g.addColorStop(0.6, "#c8d29a");
+            g.addColorStop(1, "rgba(200,210,160,0)");
+            ctx.fillStyle = g;
+            ctx.fillRect(x - 6, y - 6, TILE + 12, TILE + 12);
+            ctx.fillStyle = "#f2e7c0"; // bright opening
+            ctx.fillRect(x + 7, y + 6, TILE - 14, TILE - 8);
+            ctx.fillStyle = "#3a2c1a"; // door frame
+            ctx.fillRect(x + 4, y + 2, 3, TILE - 4);
+            ctx.fillRect(x + TILE - 7, y + 2, 3, TILE - 4);
+            ctx.fillRect(x + 4, y + 2, TILE - 8, 3);
+            ctx.fillStyle = "#1f7a2f"; // EXIT sign
+            ctx.fillRect(cxp - 9, y - 3, 18, 6);
+            ctx.fillStyle = "#bff0c0";
+            ctx.font = "5px 'Courier New', monospace";
+            ctx.textAlign = "center";
+            ctx.fillText("EXIT", cxp, y + 2);
+            ctx.textAlign = "left";
           }
         }
       }
@@ -808,6 +907,22 @@ export class Game {
 
   _drawPickups(ctx) {
     for (const pk of this.pickups) drawPickup(ctx, pk.x, pk.y, pk.kind === "weapon" ? "weapon" : pk.kind, pk.t);
+  }
+
+  _drawBodies(ctx) {
+    for (const b of this.bodies) drawBodyDecal(ctx, b.x, b.y, b.angle, b.type, b.r, b.parts);
+  }
+
+  _drawLimbs(ctx) {
+    for (const l of this.limbs) drawGroundLimb(ctx, l.x, l.y, l.angle, l.part, l.color, 0);
+  }
+
+  _drawGibs(ctx) {
+    for (const g of this.gibs) drawGroundLimb(ctx, g.x, g.y, g.angle, g.part, g.limbColor, g.z);
+  }
+
+  _drawFurniture(ctx) {
+    for (const f of this.world.furniture) drawFurniture(ctx, f);
   }
 
   _drawCorpses(ctx) {

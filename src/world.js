@@ -20,9 +20,35 @@ export class World {
     this.grid = new Uint8Array(this.cols * this.rows);
     this.doors = []; // {cx, cy, open, openT}
     this.props = []; // decorative, non-blocking-ish
+    this.furniture = []; // smashable / knock-over objects
     this.exit = { x: 0, y: 0 };
+    this.exitFacing = "up";
     this.spawnPoint = { x: 0, y: 0 };
     this._generate();
+  }
+
+  // Damage a piece of furniture; returns it if this hit destroyed it, else null.
+  hitFurniture(f, dmg, angle, force) {
+    if (f.broken) return null;
+    f.hp -= dmg;
+    if (force) f.angle += (force / 400) * (Math.cos(angle) * -f.hh + Math.sin(angle) * f.hw) * 0.01;
+    if (f.hp <= 0) {
+      f.broken = true;
+      f.overturned = Math.random() < 0.5; // tipped over vs smashed to bits
+      return f;
+    }
+    return null;
+  }
+
+  // Furniture whose intact AABB the segment (ax,ay)->(bx,by) crosses.
+  furnitureHitBySegment(ax, ay, bx, by) {
+    const steps = Math.max(2, Math.ceil(Math.hypot(bx - ax, by - ay) / 4));
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const f = this.furnitureAt(ax + (bx - ax) * t, ay + (by - ay) * t);
+      if (f) return f;
+    }
+    return null;
   }
 
   idx(cx, cy) { return cy * this.cols + cx; }
@@ -64,13 +90,16 @@ export class World {
 
     // Scatter some interior wall props / obstacles inside rooms.
     for (const r of rooms) {
-      const blobs = randInt(0, 3);
+      const blobs = randInt(0, 2);
       for (let b = 0; b < blobs; b++) {
         const px = randInt(r.x0 + 1, r.x0 + r.rw - 2);
         const py = randInt(r.y0 + 1, r.y0 + r.rh - 2);
-        if (this.tileAt(px, py) === T.FLOOR && chance(0.7)) this._set(px, py, T.PROP);
+        if (this.tileAt(px, py) === T.FLOOR && chance(0.6)) this._set(px, py, T.PROP);
       }
     }
+
+    // Furniture the player can shoot / smash and zombies can knock over.
+    this._placeFurniture(rooms);
 
     // Player starts at first room centre; exit at the farthest room.
     const first = rooms[0];
@@ -82,7 +111,52 @@ export class World {
     }
     this._set(far.cx, far.cy, T.EXIT);
     this.exit = { x: (far.cx + 0.5) * TILE, y: (far.cy + 0.5) * TILE };
+    // Face the exit doorway toward the nearest map border (leads "outside").
+    const distToBorder = { up: far.cy, down: this.rows - 1 - far.cy, left: far.cx, right: this.cols - 1 - far.cx };
+    this.exitFacing = Object.entries(distToBorder).sort((a, b) => a[1] - b[1])[0][0];
     this.rooms = rooms;
+    // Keep no furniture on the spawn or exit tiles.
+    this.furniture = this.furniture.filter((f) =>
+      !(f.cx === first.cx && f.cy === first.cy) && !(f.cx === far.cx && f.cy === far.cy));
+  }
+
+  _placeFurniture(rooms) {
+    const TYPES = {
+      crate:  { hw: 10, hh: 10, hp: 40 },
+      table:  { hw: 13, hh: 9,  hp: 55 },
+      chair:  { hw: 7,  hh: 7,  hp: 22 },
+      barrel: { hw: 8,  hh: 8,  hp: 48 },
+      shelf:  { hw: 13, hh: 7,  hp: 60 },
+      couch:  { hw: 15, hh: 9,  hp: 72 },
+    };
+    const kinds = Object.keys(TYPES);
+    this.furniture = [];
+    const used = new Set();
+    for (const r of rooms) {
+      const n = randInt(1, 4);
+      for (let i = 0; i < n; i++) {
+        const cx = randInt(r.x0 + 1, r.x0 + r.rw - 2);
+        const cy = randInt(r.y0 + 1, r.y0 + r.rh - 2);
+        const key = cx + "," + cy;
+        if (used.has(key) || this.tileAt(cx, cy) !== T.FLOOR) continue;
+        used.add(key);
+        const type = pick(kinds);
+        const def = TYPES[type];
+        this.furniture.push({
+          cx, cy, x: (cx + 0.5) * TILE, y: (cy + 0.5) * TILE,
+          hw: def.hw, hh: def.hh, type, hp: def.hp, maxHp: def.hp,
+          broken: false, overturned: false, angle: rand(-0.15, 0.15),
+        });
+      }
+    }
+  }
+
+  furnitureAt(x, y) {
+    for (const f of this.furniture) {
+      if (f.broken) continue;
+      if (Math.abs(x - f.x) <= f.hw && Math.abs(y - f.y) <= f.hh) return f;
+    }
+    return null;
   }
 
   _corridor(a, b) {
@@ -124,7 +198,7 @@ export class World {
       const d = this.doorAt(cx, cy);
       return !(d && d.open);
     }
-    return false;
+    return this.furnitureAt(x, y) != null;
   }
 
   // Circle-vs-tile resolution: returns adjusted {x, y}.
@@ -149,6 +223,25 @@ export class World {
             // centre inside tile: shove out along smallest axis
             nx = closestX + (nx < tx0 + TILE / 2 ? -r : r);
           }
+        }
+      }
+      // Push out of intact furniture (circle vs AABB).
+      for (const f of this.furniture) {
+        if (f.broken) continue;
+        const closestX = clamp(nx, f.x - f.hw, f.x + f.hw);
+        const closestY = clamp(ny, f.y - f.hh, f.y + f.hh);
+        const dx = nx - closestX, dy = ny - closestY;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < r * r && d2 > 0.0001) {
+          const d = Math.sqrt(d2), push = (r - d) / d;
+          nx += dx * push; ny += dy * push;
+        } else if (d2 <= 0.0001) {
+          // centre inside: eject along the nearest edge
+          const toL = nx - (f.x - f.hw), toR = (f.x + f.hw) - nx;
+          const toT = ny - (f.y - f.hh), toB = (f.y + f.hh) - ny;
+          const m = Math.min(toL, toR, toT, toB);
+          if (m === toL) nx = f.x - f.hw - r; else if (m === toR) nx = f.x + f.hw + r;
+          else if (m === toT) ny = f.y - f.hh - r; else ny = f.y + f.hh + r;
         }
       }
     }
@@ -180,6 +273,7 @@ export class World {
     const t = this.tileAt(cx, cy);
     if (t === T.WALL || t === T.PROP) return false;
     if (t === T.DOOR) { const d = this.doorAt(cx, cy); return !(d && !d.open); }
+    for (const f of this.furniture) if (!f.broken && f.cx === cx && f.cy === cy) return false;
     return true;
   }
 
