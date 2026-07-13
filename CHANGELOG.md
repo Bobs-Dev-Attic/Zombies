@@ -7,6 +7,10 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.6.1] — 2026-07-13
+### Back to the Original
+- Reverted the player to the original procedural hand-drawn character (by preference). The sprite-sheet rendering path and loader were removed; the committed `src/assets/player.png` is left in the repo unused in case it's wanted again.
+
 ## [0.6.0] — 2026-07-13
 ### Sprite Sheets
 - The player is now rendered from a hand-illustrated **sprite sheet** (`src/assets/player.png`) instead of procedural pixel shapes.
@@ -87,6 +91,7 @@ project uses [Semantic Versioning](https://semver.org/).
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.6.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.6.1
 [0.6.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.6.0
 [0.5.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.4.0
