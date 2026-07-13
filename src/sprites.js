@@ -159,6 +159,7 @@ function drawWeaponLocal(ctx, kind) {
   switch (kind) {
     case "melee_knife": R(-1, 0, 2, 2, "#5a4632"); R(1, 0, 6, 2, "#cfd6e0"); break;
     case "melee_bat": R(-3, 0, 3, 2, "#5a4632"); R(0, 0, 11, 3, "#9c6b3a"); break;
+    case "melee_axe": R(-2, 0, 3, 2, "#6a4a2c"); R(1, 0, 8, 2, "#7a5636"); ctx.fillStyle = "#c0c8d0"; ctx.beginPath(); ctx.moveTo(8, -1); ctx.lineTo(12, -4); ctx.lineTo(12, 3); ctx.lineTo(8, 1); ctx.closePath(); ctx.fill(); break;
     case "pistol": R(-1, 1.5, 2, 3, "#20242a"); R(0, 0, 6, 3, "#2c2f33"); break;
     case "shotgun": R(0, 0, 13, 3, "#3a2f28"); R(11, 0, 4, 2, "#20242a"); break;
     case "rifle": R(-3, 0, 4, 3, "#1a1c1a"); R(0, 0, 15, 2, "#26411f"); break;
@@ -441,6 +442,14 @@ export function drawPickup(ctx, cx, cy, kind, t) {
       ctx.fillRect(Math.round(cx - 5), Math.round(y - 4), 10, 8);
       ctx.fillStyle = "#5a4a1a";
       ctx.fillRect(Math.round(cx - 5), Math.round(y - 4), 10, 2);
+      break;
+    case "key":
+      ctx.fillStyle = "#e8c24a";
+      ctx.beginPath(); ctx.arc(cx - 3, y, 3, 0, TAU); ctx.fill();
+      ctx.fillRect(Math.round(cx - 1), Math.round(y - 1), 7, 2); // shaft
+      ctx.fillRect(Math.round(cx + 4), Math.round(y - 1), 2, 4); // teeth
+      ctx.fillStyle = "#3a2c10";
+      ctx.beginPath(); ctx.arc(cx - 3, y, 1.2, 0, TAU); ctx.fill();
       break;
     default: {
       box("#5a4632");

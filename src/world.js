@@ -22,24 +22,52 @@ export const ROOM_FLOOR = {
 };
 
 export class World {
-  constructor(settingIndex = 0) {
+  constructor(settingIndex = 0, floorLevel = 0) {
     this.setting = SETTINGS[settingIndex % SETTINGS.length];
     this.settingIndex = settingIndex;
     this.isHouse = this.setting.id === "house";
+    this.floorLevel = floorLevel; // 0 = ground, 1 = upstairs
     this.cols = this.isHouse ? 40 : randInt(40, 52);
     this.rows = this.isHouse ? 38 : randInt(40, 52);
     this.grid = new Uint8Array(this.cols * this.rows);
     this.explored = new Uint8Array(this.cols * this.rows); // fog-of-war memory
     this.floorTint = new Uint8Array(this.cols * this.rows); // per-tile room colour id
-    this.doors = []; // {cx, cy, open, openT}
+    this.doors = []; // {cx, cy, open, openT, locked, hp, maxHp, broken}
     this.props = []; // decorative, non-blocking-ish
     this.furniture = []; // smashable / knock-over objects
     this.rooms = [];
+    this.stairsCells = []; // tiles that move the player between floors
+    this.landing = null;   // where the player arrives on this floor
     this.exit = { x: 0, y: 0 };
     this.exitFacing = "up";
     this.spawnPoint = { x: 0, y: 0 };
-    if (this.isHouse) this._generateHouse(); else this._generate();
+    if (this.isHouse) { if (floorLevel === 1) this._houseUpper(); else this._houseGround(); }
+    else this._generate();
   }
+
+  // Doorways: a normal open door, or a locked one to break/unlock.
+  _doorway(cx, cy, opts = {}) {
+    this._set(cx, cy, T.DOOR);
+    const locked = !!opts.locked;
+    this.doors.push({ cx, cy, open: !locked && opts.open !== false, openT: locked ? 0 : 1, locked, hp: opts.hp || (locked ? 140 : 70), maxHp: opts.hp || (locked ? 140 : 70), broken: false });
+  }
+
+  doorNear(x, y) {
+    const cx = Math.floor(x / TILE), cy = Math.floor(y / TILE);
+    for (let gy = cy - 1; gy <= cy + 1; gy++)
+      for (let gx = cx - 1; gx <= cx + 1; gx++) { const d = this.doorAt(gx, gy); if (d) return d; }
+    return null;
+  }
+
+  // Damage a shut door (bullets / melee). Returns true if this broke it open.
+  hitDoor(d, dmg) {
+    if (!d || d.broken || (d.open && !d.locked)) return false;
+    d.hp -= dmg;
+    if (d.hp <= 0) { d.broken = true; d.open = true; d.openT = 1; return true; }
+    return false;
+  }
+
+  doorPassable(d) { return d && (d.broken || (d.open && !d.locked)); }
 
   // Damage a piece of furniture; returns it if this hit destroyed it, else null.
   hitFurniture(f, dmg, angle, force) {
@@ -74,86 +102,125 @@ export class World {
 
   // Hand-shaped ground-floor house: living room, kitchen, dining room, a yard
   // with windows & doors the zombies break in through, and a staircase.
-  _generateHouse() {
+  _houseShell(bw, bh) {
     const cols = this.cols, rows = this.rows;
-    // Yard everywhere, bounded by a wall ring.
     this.grid.fill(T.FLOOR);
     for (let x = 0; x < cols; x++) { this._set(x, 0, T.WALL); this._set(x, rows - 1, T.WALL); }
     for (let y = 0; y < rows; y++) { this._set(0, y, T.WALL); this._set(cols - 1, y, T.WALL); }
-
-    const bw = 26, bh = 20, bx = (cols - bw) >> 1, by = (rows - bh) >> 1;
+    const bx = (cols - bw) >> 1, by = (rows - bh) >> 1;
     const x1 = bx + bw - 1, y1 = by + bh - 1;
-    // Exterior walls.
     for (let x = bx; x <= x1; x++) { this._set(x, by, T.WALL); this._set(x, y1, T.WALL); }
     for (let y = by; y <= y1; y++) { this._set(bx, y, T.WALL); this._set(x1, y, T.WALL); }
+    return { bx, by, x1, y1 };
+  }
 
-    // Interior partitions: vertical wall splits living (left) from the right side;
-    // a horizontal wall splits the right side into kitchen (top) and dining (bottom).
-    const vx = bx + 14, hy = by + 10;
-    for (let y = by + 1; y <= y1 - 1; y++) this._set(vx, y, T.WALL);
-    for (let x = vx; x <= x1 - 1; x++) this._set(x, hy, T.WALL);
-
-    // Interior doorways (open).
-    const doorway = (cx, cy) => { this._set(cx, cy, T.DOOR); this.doors.push({ cx, cy, open: true, openT: 1 }); };
-    doorway(vx, by + 4);           // living <-> kitchen
-    doorway(vx, hy + 4);           // living <-> dining
-    doorway(vx + 5, hy);           // kitchen <-> dining
-
-    // Front door (bottom wall) leads to the yard.
-    const fdx = bx + 7;
-    doorway(fdx, y1);
-
-    // Windows along the exterior walls (skip corners & the front door).
+  _addWindows(bx, by, x1, y1, skip) {
     const winOk = (cx, cy) => this.tileAt(cx, cy) === T.WALL;
     for (let x = bx + 2; x <= x1 - 2; x += 4) {
       if (winOk(x, by)) this._set(x, by, T.WINDOW);
-      if (x !== fdx && winOk(x, y1)) this._set(x, y1, T.WINDOW);
+      if ((!skip || x !== skip) && winOk(x, y1)) this._set(x, y1, T.WINDOW);
     }
     for (let y = by + 3; y <= y1 - 2; y += 4) {
       if (winOk(bx, y)) this._set(bx, y, T.WINDOW);
       if (winOk(x1, y)) this._set(x1, y, T.WINDOW);
     }
+  }
 
-    // Room floor tints.
-    const fill = (rx0, ry0, rx1, ry1, tint) => {
-      for (let y = ry0; y <= ry1; y++) for (let x = rx0; x <= rx1; x++) if (this.tileAt(x, y) === T.FLOOR) this._tint(x, y, tint);
-    };
-    fill(bx + 1, by + 1, vx - 1, y1 - 1, 1);      // living
-    fill(vx + 1, by + 1, x1 - 1, hy - 1, 2);      // kitchen
-    fill(vx + 1, hy + 1, x1 - 1, y1 - 1, 3);      // dining
+  _place(cx, cy, type) {
+    if (this.tileAt(cx, cy) !== T.FLOOR) return;
+    const F = { crate: [10, 10, 40], table: [13, 9, 55], chair: [7, 7, 22], barrel: [8, 8, 48], shelf: [13, 7, 60], couch: [15, 9, 72], bed: [13, 9, 60] };
+    const d = F[type] || F.crate;
+    this.furniture.push({ cx, cy, x: (cx + 0.5) * TILE, y: (cy + 0.5) * TILE, hw: d[0], hh: d[1], type: type === "bed" ? "couch" : type, hp: d[2], maxHp: d[2], broken: false, overturned: false, angle: rand(-0.05, 0.05) });
+  }
 
-    this.rooms = [
-      { name: "living", cx: bx + 7, cy: by + 10 },
-      { name: "kitchen", cx: vx + 5, cy: by + 5 },
-      { name: "dining", cx: vx + 5, cy: hy + 5 },
+  _fillTint(rx0, ry0, rx1, ry1, tint) {
+    for (let y = ry0; y <= ry1; y++) for (let x = rx0; x <= rx1; x++) if (this.tileAt(x, y) === T.FLOOR) this._tint(x, y, tint);
+  }
+
+  // Ground floor: living room, kitchen, a locked dining room, staircase, yard.
+  _houseGround() {
+    const rows = this.rows;
+    const { bx, by, x1, y1 } = this._houseShell(26, 20);
+    const vx = bx + 14, hy = by + 10;
+    for (let y = by + 1; y <= y1 - 1; y++) this._set(vx, y, T.WALL);
+    for (let x = vx; x <= x1 - 1; x++) this._set(x, hy, T.WALL);
+
+    this._doorway(vx, by + 4);                 // living <-> kitchen (open)
+    this._doorway(vx + 5, hy, { locked: true }); // kitchen <-> dining (LOCKED)
+    const fdx = bx + 7;
+    this._doorway(fdx, y1);                     // front door
+    this._addWindows(bx, by, x1, y1, fdx);
+
+    this._fillTint(bx + 1, by + 1, vx - 1, y1 - 1, 1); // living
+    this._fillTint(vx + 1, by + 1, x1 - 1, hy - 1, 2); // kitchen
+    this._fillTint(vx + 1, hy + 1, x1 - 1, y1 - 1, 3); // dining
+
+    this.rooms = [{ name: "living", cx: bx + 7, cy: by + 10 }, { name: "kitchen", cx: vx + 5, cy: by + 5 }, { name: "dining", cx: vx + 5, cy: hy + 5 }];
+
+    // Staircase up, in the living room's top corner.
+    for (let y = by + 1; y <= by + 4; y++) for (let x = bx + 1; x <= bx + 2; x++) { this._set(x, y, T.STAIRS); this.stairsCells.push({ cx: x, cy: y }); }
+    this.landing = { x: (bx + 3 + 0.5) * TILE, y: (by + 3 + 0.5) * TILE }; // arrive here coming down
+
+    // Furniture.
+    this._place(bx + 6, y1 - 3, "couch"); this._place(bx + 9, y1 - 6, "table"); this._place(bx + 4, by + 8, "shelf");
+    this._place(x1 - 2, by + 2, "shelf"); this._place(x1 - 5, by + 2, "shelf"); this._place(vx + 2, by + 5, "barrel");
+    this._place(vx + 6, hy + 5, "table"); this._place(vx + 4, hy + 5, "chair"); this._place(vx + 8, hy + 5, "chair");
+    this._place(vx + 6, hy + 3, "chair"); this._place(vx + 6, hy + 7, "chair");
+
+    // Loot hints (game turns these into pickups): key in living, axe in kitchen, reward in the locked dining room.
+    this.loot = [
+      { cx: bx + 4, cy: by + 12, kind: "key" },
+      { cx: vx + 3, cy: by + 3, kind: "weapon", data: "axe" },
+      { cx: vx + 8, cy: hy + 7, kind: "weapon", data: "shotgun" },
+      { cx: vx + 4, cy: hy + 8, kind: "ammo", data: { type: "shells", amount: 16 } },
     ];
 
-    // Staircase in the living room's top corner (decorative for now).
-    for (let y = by + 1; y <= by + 4; y++) for (let x = bx + 1; x <= bx + 2; x++) this._set(x, y, T.STAIRS);
-
-    // Furniture themed per room.
-    const F = { crate: [10, 10, 40], table: [13, 9, 55], chair: [7, 7, 22], barrel: [8, 8, 48], shelf: [13, 7, 60], couch: [15, 9, 72] };
-    const place = (cx, cy, type) => {
-      if (this.tileAt(cx, cy) !== T.FLOOR) return;
-      const d = F[type];
-      this.furniture.push({ cx, cy, x: (cx + 0.5) * TILE, y: (cy + 0.5) * TILE, hw: d[0], hh: d[1], type, hp: d[2], maxHp: d[2], broken: false, overturned: false, angle: rand(-0.05, 0.05) });
-    };
-    place(bx + 6, y1 - 3, "couch");     // living: couch + coffee table + tv
-    place(bx + 9, y1 - 6, "table");
-    place(bx + 4, by + 8, "shelf");
-    place(x1 - 2, by + 2, "shelf");     // kitchen counters
-    place(x1 - 5, by + 2, "shelf");
-    place(vx + 2, by + 5, "barrel");
-    place(vx + 6, hy + 5, "table");     // dining table + chairs
-    place(vx + 4, hy + 5, "chair"); place(vx + 8, hy + 5, "chair");
-    place(vx + 6, hy + 3, "chair"); place(vx + 6, hy + 7, "chair");
-
-    // Spawn in the living room; exit is out the front, across the yard.
     this.spawnPoint = { x: (bx + 7 + 0.5) * TILE, y: (by + 12 + 0.5) * TILE };
     const exCx = fdx, exCy = rows - 3;
     this._set(exCx, exCy, T.EXIT);
     this.exit = { x: (exCx + 0.5) * TILE, y: (exCy + 0.5) * TILE };
     this.exitFacing = "down";
+  }
+
+  // Upper floor: landing (down-stairs) + hallway to two bedrooms and a bathroom.
+  _houseUpper() {
+    const { bx, by, x1, y1 } = this._houseShell(26, 20);
+    const vx = bx + 14, hy = by + 10;
+    // A hallway runs along the left of the building; rooms open off it.
+    for (let y = by + 1; y <= y1 - 1; y++) this._set(vx, y, T.WALL);
+    for (let x = vx; x <= x1 - 1; x++) this._set(x, hy, T.WALL);
+    // Hallway is the left strip (like living); doors into the two right rooms.
+    this._doorway(vx, by + 4);   // hall <-> bedroom 1 (top-right)
+    this._doorway(vx + 5, hy);   // bedroom 1 <-> bathroom (bottom-right)
+    this._doorway(bx + 10, y1 - 5, { open: false }); // a closet door in the hall (closed)
+    this._addWindows(bx, by, x1, y1, null);
+
+    this._fillTint(bx + 1, by + 1, vx - 1, y1 - 1, 4); // landing / hall
+    this._fillTint(vx + 1, by + 1, x1 - 1, hy - 1, 1); // bedroom 1 (carpet)
+    this._fillTint(vx + 1, hy + 1, x1 - 1, y1 - 1, 2); // bathroom (tile)
+
+    this.rooms = [{ name: "landing", cx: bx + 5, cy: by + 5 }, { name: "bedroom", cx: vx + 5, cy: by + 5 }, { name: "bathroom", cx: vx + 5, cy: hy + 5 }];
+
+    // Down staircase at the top of the landing.
+    for (let y = by + 1; y <= by + 4; y++) for (let x = bx + 1; x <= bx + 2; x++) { this._set(x, y, T.STAIRS); this.stairsCells.push({ cx: x, cy: y }); }
+    this.landing = { x: (bx + 3 + 0.5) * TILE, y: (by + 3 + 0.5) * TILE }; // arrive here coming up
+
+    // Bedroom & bathroom furniture.
+    this._place(vx + 3, by + 3, "bed"); this._place(x1 - 3, by + 7, "shelf");
+    this._place(vx + 3, hy + 3, "barrel"); this._place(x1 - 3, y1 - 3, "shelf");
+    this._place(bx + 6, y1 - 4, "couch");
+
+    this.loot = [
+      { cx: vx + 6, cy: by + 4, kind: "medkit" },
+      { cx: vx + 3, cy: hy + 6, kind: "weapon", data: "rifle" },
+      { cx: vx + 7, cy: hy + 3, kind: "ammo", data: { type: "rounds", amount: 40 } },
+      { cx: bx + 10, cy: y1 - 6, kind: "adrenaline" },
+    ];
+
+    this.spawnPoint = { x: this.landing.x, y: this.landing.y + TILE };
+    // No setting-exit up here — the way down is the staircase. Point the beacon at it.
+    this.exit = { x: (bx + 2 + 0.5) * TILE, y: (by + 2 + 0.5) * TILE };
+    this.exitFacing = "up";
   }
 
   _generate() {
@@ -293,10 +360,7 @@ export class World {
     const cx = Math.floor(x / TILE), cy = Math.floor(y / TILE);
     const t = this.tileAt(cx, cy);
     if (t === T.WALL || t === T.PROP || t === T.WINDOW) return true;
-    if (t === T.DOOR) {
-      const d = this.doorAt(cx, cy);
-      return !(d && d.open);
-    }
+    if (t === T.DOOR) return !this.doorPassable(this.doorAt(cx, cy));
     return this.furnitureAt(x, y) != null;
   }
 
@@ -351,7 +415,7 @@ export class World {
     const t = this.tileAt(cx, cy);
     if (t === T.WALL || t === T.PROP) return true;
     if (t === T.WINDOW) return !throughWindows; // zombies climb through windows
-    if (t === T.DOOR) { const d = this.doorAt(cx, cy); return !(d && d.open); }
+    if (t === T.DOOR) return !this.doorPassable(this.doorAt(cx, cy));
     return false;
   }
 
@@ -372,7 +436,7 @@ export class World {
   passableTile(cx, cy) {
     const t = this.tileAt(cx, cy);
     if (t === T.WALL || t === T.PROP) return false;
-    if (t === T.DOOR) { const d = this.doorAt(cx, cy); return !(d && !d.open); }
+    if (t === T.DOOR) return this.doorPassable(this.doorAt(cx, cy)); // locked doors block pathing
     // Windows & stairs are passable to the pathing flow (zombies climb / ascend).
     for (const f of this.furniture) if (!f.broken && f.cx === cx && f.cy === cy) return false;
     return true;
