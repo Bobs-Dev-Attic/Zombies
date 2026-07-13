@@ -1,7 +1,7 @@
 // Core game: loop, camera, rendering, waves, combat resolution and HUD.
 import { clamp, rand, randInt, chance, pick, angleTo, angleLerp, dist, dist2, TAU } from "./util.js";
 import { Input } from "./input.js";
-import { World, TILE, T, SETTINGS, ROOM_FLOOR } from "./world.js";
+import { World, TILE, T, SETTINGS } from "./world.js";
 import { Player, Zombie, Projectile, Particle, Pickup, ZOMBIE_TYPES } from "./entities.js";
 import { WEAPONS, WEAPON_ORDER, newLoadout } from "./weapons.js";
 import { drawPlayer, drawZombie, drawPickup, drawMuzzle, drawFurniture, drawBodyDecal, drawGroundLimb } from "./sprites.js";
@@ -1042,7 +1042,7 @@ export class Game {
       for (let cx = 0; cx < w.cols; cx++) {
         if (!w.explored[w.idx(cx, cy)]) continue;
         const t = w.tileAt(cx, cy);
-        mc.fillStyle = (t === T.WALL || t === T.PROP) ? "#3c4636" : t === T.WINDOW ? "#7fb0c0" : t === T.EXIT ? "#39d353" : t === T.STAIRS ? "#8a6d40" : "#6f7d5e";
+        mc.fillStyle = (t === T.WALL || t === T.PROP) ? "#3c4636" : t === T.FENCE ? "#4a5a3a" : t === T.WINDOW ? "#7fb0c0" : t === T.EXIT ? "#39d353" : t === T.STAIRS ? "#8a6d40" : "#6f7d5e";
         mc.fillRect(oxm + cx * scale, oym + cy * scale, scale + 0.6, scale + 0.6);
       }
     }
@@ -1076,15 +1076,51 @@ export class Game {
         const t = w.tileAt(cx, cy);
         const x = cx * TILE, y = cy * TILE;
         if (t === T.WALL) {
-          // Solid, darker body for deep wall; lit cap only where a wall face is exposed to floor above.
-          const exposed = w.tileAt(cx, cy - 1) !== T.WALL;
-          ctx.fillStyle = exposed ? set.wall : set.accent;
+          if (w.isStreets) {
+            const border = cx === 0 || cy === 0 || cx === w.cols - 1 || cy === w.rows - 1;
+            if (border) {
+              // Hedge / tree-line along the edge of the neighbourhood.
+              ctx.fillStyle = "#1c2a17"; ctx.fillRect(x, y, TILE, TILE);
+              ctx.fillStyle = "#26381f"; ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 6);
+              ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fillRect(x, y + TILE - 3, TILE, 3);
+            } else {
+              // Rooftop of a house or shed, coloured by its roof id.
+              const rid = w.floorTint[w.idx(cx, cy)];
+              const roof = rid === 11 ? "#4a5560" : rid === 12 ? "#5a4a34" : "#6e3b2c";
+              const ridge = rid === 11 ? "#5c6a76" : rid === 12 ? "#6f5c42" : "#8a4c39";
+              ctx.fillStyle = roof; ctx.fillRect(x, y, TILE, TILE);
+              ctx.fillStyle = "rgba(0,0,0,0.16)";
+              for (let sy = 0; sy < TILE; sy += 6) ctx.fillRect(x, y + sy, TILE, 1.5); // shingle rows
+              if (w.tileAt(cx, cy - 1) !== T.WALL) { ctx.fillStyle = ridge; ctx.fillRect(x, y, TILE, 4); }       // sunlit ridge
+              if (w.tileAt(cx, cy + 1) !== T.WALL) { ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.fillRect(x, y + TILE - 4, TILE, 4); } // eave shadow
+            }
+          } else {
+            // Solid, darker body for deep wall; lit cap only where a wall face is exposed to floor above.
+            const exposed = w.tileAt(cx, cy - 1) !== T.WALL;
+            ctx.fillStyle = exposed ? set.wall : set.accent;
+            ctx.fillRect(x, y, TILE, TILE);
+            if (exposed) {
+              ctx.fillStyle = set.wallTop;
+              ctx.fillRect(x, y, TILE, 7);
+              ctx.fillStyle = "rgba(0,0,0,0.28)";
+              ctx.fillRect(x, y + TILE - 4, TILE, 4);
+            }
+          }
+        } else if (t === T.FENCE) {
+          // Grass underfoot with a wooden picket fence line.
+          const rp = w.floorPair(cx, cy) || [set.floor, set.floor2];
+          ctx.fillStyle = ((cx + cy) & 1) ? rp[0] : rp[1];
           ctx.fillRect(x, y, TILE, TILE);
-          if (exposed) {
-            ctx.fillStyle = set.wallTop;
-            ctx.fillRect(x, y, TILE, 7);
-            ctx.fillStyle = "rgba(0,0,0,0.28)";
-            ctx.fillRect(x, y + TILE - 4, TILE, 4);
+          const hRun = w.tileAt(cx - 1, cy) === T.FENCE || w.tileAt(cx + 1, cy) === T.FENCE;
+          ctx.fillStyle = "#6b5836";
+          if (hRun) {
+            ctx.fillRect(x, y + TILE / 2 - 4, TILE, 2); ctx.fillRect(x, y + TILE / 2 + 2, TILE, 2);
+            ctx.fillStyle = "#836b44";
+            for (let px = 2; px < TILE; px += 6) ctx.fillRect(x + px, y + TILE / 2 - 7, 2, 13);
+          } else {
+            ctx.fillRect(x + TILE / 2 - 4, y, 2, TILE); ctx.fillRect(x + TILE / 2 + 2, y, 2, TILE);
+            ctx.fillStyle = "#836b44";
+            for (let py = 2; py < TILE; py += 6) ctx.fillRect(x + TILE / 2 - 7, y + py, 13, 2);
           }
         } else if (t === T.WINDOW) {
           // Wall with a glass pane the horde can smash through.
@@ -1096,11 +1132,18 @@ export class Game {
           ctx.beginPath(); ctx.moveTo(x + TILE / 2, y + 8); ctx.lineTo(x + TILE / 2, y + TILE - 7); ctx.stroke();
           ctx.lineWidth = 1;
         } else {
-          // floor with a subtle checker (room-tinted in the house)
+          // floor with a subtle checker (tinted by room in the house, by
+          // terrain — grass / asphalt / sidewalk — in the streets)
           let fc0 = set.floor, fc1 = set.floor2;
-          if (w.isHouse) { const rp = ROOM_FLOOR[w.floorTint[w.idx(cx, cy)]] || ROOM_FLOOR[0]; fc0 = rp[0]; fc1 = rp[1]; }
+          const rp = w.floorPair(cx, cy);
+          if (rp) { fc0 = rp[0]; fc1 = rp[1]; }
           ctx.fillStyle = ((cx + cy) & 1) ? fc0 : fc1;
           ctx.fillRect(x, y, TILE, TILE);
+          if (w.isStreets) {
+            const rid = w.floorTint[w.idx(cx, cy)];
+            if (rid === 5 && (cy & 1)) { ctx.fillStyle = "rgba(210,190,80,0.7)"; ctx.fillRect(x + TILE / 2 - 1, y + 4, 2, TILE - 8); }
+            else if (rid === 6 && (cx & 1)) { ctx.fillStyle = "rgba(210,190,80,0.7)"; ctx.fillRect(x + 4, y + TILE / 2 - 1, TILE - 8, 2); }
+          }
           if (t === T.STAIRS) {
             ctx.fillStyle = "#5f4a2c"; ctx.fillRect(x + 2, y + 1, TILE - 4, TILE - 2);
             ctx.fillStyle = "#3f2f1a";
@@ -1108,10 +1151,18 @@ export class Game {
             ctx.fillStyle = "rgba(255,255,255,0.06)"; ctx.fillRect(x + 2, y + 1, TILE - 4, 3);
           }
           if (t === T.PROP) {
-            ctx.fillStyle = set.accent;
-            ctx.fillRect(x + 5, y + 5, TILE - 10, TILE - 10);
-            ctx.fillStyle = "rgba(0,0,0,0.25)";
-            ctx.fillRect(x + 5, y + TILE - 9, TILE - 10, 4);
+            if (w.isStreets) {
+              // A tree: trunk + leafy canopy.
+              ctx.fillStyle = "#3a2a18"; ctx.fillRect(x + TILE / 2 - 2, y + TILE / 2, 4, TILE / 2 - 2);
+              ctx.fillStyle = "#2f4a24"; ctx.beginPath(); ctx.arc(x + TILE / 2, y + TILE / 2 - 2, 9, 0, TAU); ctx.fill();
+              ctx.fillStyle = "#3c5c2e"; ctx.beginPath(); ctx.arc(x + TILE / 2 - 3, y + TILE / 2 - 4, 5, 0, TAU); ctx.fill();
+              ctx.fillStyle = "rgba(0,0,0,0.22)"; ctx.beginPath(); ctx.arc(x + TILE / 2 + 3, y + TILE / 2 + 1, 5, 0, TAU); ctx.fill();
+            } else {
+              ctx.fillStyle = set.accent;
+              ctx.fillRect(x + 5, y + 5, TILE - 10, TILE - 10);
+              ctx.fillStyle = "rgba(0,0,0,0.25)";
+              ctx.fillRect(x + 5, y + TILE - 9, TILE - 10, 4);
+            }
           }
           if (t === T.DOOR) {
             const d = w.doorAt(cx, cy);

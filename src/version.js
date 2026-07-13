@@ -1,7 +1,18 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.10.0";
+export const VERSION = "0.11.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.11.0",
+    date: "2026-07-13",
+    title: "The Neighborhood",
+    changes: [
+      "The Streets is now a real outdoor neighborhood instead of an indoor maze — a grid of asphalt roads with painted centre-lines and concrete sidewalks.",
+      "Fenced front yards with houses (varied rooftops), backyard sheds, and dirt driveways line every block.",
+      "Parked cars and trucks in assorted colours sit along the kerbs and in driveways — solid cover you can also shoot up and smash.",
+      "Trees dot the yards, small parks fill the empty lots, and a road runs off the bottom of the map to the exit.",
+    ],
+  },
   {
     version: "0.10.0",
     date: "2026-07-13",

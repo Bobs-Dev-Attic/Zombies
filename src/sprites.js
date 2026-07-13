@@ -348,6 +348,9 @@ const FURN = {
   barrel: { body: "#5a4632", top: "#7a5f42", edge: "#3a2c1e" },
   shelf:  { body: "#5f4326", top: "#7d5c34", edge: "#412e1a" },
   couch:  { body: "#48566a", top: "#5a6a80", edge: "#333e4c" },
+  car:    { body: "#8a3b33", top: "#b0554b", edge: "#1a1a1e" },
+  truck:  { body: "#3f5a6b", top: "#557488", edge: "#1a1a1e" },
+  bench:  { body: "#6b4a28", top: "#86633c", edge: "#4a3420" },
 };
 
 // Furniture: intact obstacle, or a broken / overturned pile once destroyed.
@@ -382,6 +385,38 @@ export function drawFurniture(ctx, f) {
   }
 
   ctx.rotate(f.angle);
+
+  // Vehicles: a body with a cabin, windows and a dark underbody.
+  if (f.type === "car" || f.type === "truck") {
+    const vert = f.hh >= f.hw;
+    if (!vert) ctx.rotate(Math.PI / 2);
+    const hw = vert ? f.hw : f.hh, hh = vert ? f.hh : f.hw;
+    const CARS = ["#8a3b33", "#c0a040", "#6b6f76", "#7a5230", "#2f6b4a", "#3a5a8a", "#b5b5b8"];
+    const body = f.type === "truck" ? "#3f5a6b" : CARS[(((f.cx * 7 + f.cy * 13) % CARS.length) + CARS.length) % CARS.length];
+    ctx.fillStyle = "#111114"; ctx.fillRect(-hw, -hh, hw * 2, hh * 2);              // underbody / tyres
+    ctx.fillStyle = body; ctx.fillRect(-hw + 1, -hh + 2, hw * 2 - 2, hh * 2 - 4);   // painted shell
+    if (f.type === "truck") {
+      ctx.fillStyle = "#6a7280"; ctx.fillRect(-hw + 1, 1, hw * 2 - 2, hh - 2);      // cargo bed
+      ctx.fillStyle = "#2a2e33"; ctx.fillRect(-hw + 2, -hh + 4, hw * 2 - 4, hh * 0.55); // cab roof
+      ctx.fillStyle = "rgba(160,205,225,0.7)"; ctx.fillRect(-hw + 2, -hh + 3, hw * 2 - 4, 2); // windshield
+    } else {
+      ctx.fillStyle = "#2a2e33"; ctx.fillRect(-hw + 2, -hh * 0.35, hw * 2 - 4, hh * 0.7);     // roof
+      ctx.fillStyle = "rgba(160,205,225,0.7)";
+      ctx.fillRect(-hw + 2, -hh + 3, hw * 2 - 4, 3); // windshield
+      ctx.fillRect(-hw + 2, hh - 6, hw * 2 - 4, 3);  // rear window
+    }
+    ctx.fillStyle = "rgba(255,255,255,0.12)"; ctx.fillRect(-hw + 1, -hh + 2, 2, hh * 2 - 4);  // side sheen
+    if (f.hp < f.maxHp * 0.5) { ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-hw * 0.5, -hh * 0.3); ctx.lineTo(hw * 0.4, hh * 0.4); ctx.stroke(); }
+    ctx.restore();
+    return;
+  }
+  if (f.type === "bench") {
+    ctx.fillStyle = c.edge; ctx.fillRect(-f.hw, -f.hh, f.hw * 2, f.hh * 2);
+    ctx.fillStyle = c.body; for (let i = -1; i <= 1; i++) ctx.fillRect(-f.hw, i * 2 - 0.7, f.hw * 2, 1.4);
+    ctx.restore();
+    return;
+  }
+
   ctx.fillStyle = c.edge;
   ctx.fillRect(-f.hw, -f.hh, f.hw * 2, f.hh * 2);
   ctx.fillStyle = c.body;
