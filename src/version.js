@@ -1,7 +1,15 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.2.0";
+export const VERSION = "0.2.1";
 
 export const CHANGELOG = [
+  {
+    version: "0.2.1",
+    date: "2026-07-13",
+    title: "Fresh Updates",
+    changes: [
+      "Fixed caching so new versions show up immediately after each deploy (no more stale game code for returning players).",
+    ],
+  },
   {
     version: "0.2.0",
     date: "2026-07-13",

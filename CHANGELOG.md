@@ -7,6 +7,10 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] — 2026-07-13
+### Fresh Updates
+- Fixed asset caching (`vercel.json`) so new versions are picked up immediately after each deploy — returning players no longer run stale game code for up to an hour.
+
 ## [0.2.0] — 2026-07-13
 ### Manual Aiming
 - Removed auto-aim — the player now controls the direction they shoot and swing.
@@ -34,6 +38,7 @@ project uses [Semantic Versioning](https://semver.org/).
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.2.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.2.0
 [0.1.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.1.0
