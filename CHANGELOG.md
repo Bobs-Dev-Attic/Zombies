@@ -7,6 +7,15 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] — 2026-07-13
+### Welcome Home (Phase 2a of the house overhaul)
+- **New "The House" setting** you start inside: a hand-shaped ground floor with a **living room → kitchen → dining room**, each with its own floor colour and themed furniture (couch/coffee table, kitchen counters, dining table + chairs), plus a **staircase** and a **front door** to the yard.
+- **Windows & doors** line the exterior. **Zombies climb in through the windows** and pour through doors; the player can't climb through a window but can **shoot the glass out**. Windows shatter (with glass FX) when a zombie enters or a bullet hits.
+- Zombies now **emerge from the other rooms and the yard** rather than just spawning off-screen — the layout funnels the horde in through the breach points.
+- New tile types (window, stairs) with entity-aware collision (windows are solid for the player/bullets, passable for climbing zombies), room-tinted floors, and mini-map colours for them.
+
+_Next: 2b locked doors + key/axe, 2c functional stairs to upper floors, 2d the outdoor neighborhood._
+
 ## [0.7.0] — 2026-07-13
 ### Fog & Map
 - **Fog of war** — the map is now hidden except within the player's line of sight. Explored areas stay dimly "remembered", and unseen areas are dark. Uses per-tile raycast visibility that lights the walls you're facing but not what's behind them.
@@ -97,6 +106,7 @@ project uses [Semantic Versioning](https://semver.org/).
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.8.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.8.0
 [0.7.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.7.0
 [0.6.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.6.1
 [0.6.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.6.0
