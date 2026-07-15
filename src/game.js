@@ -72,6 +72,8 @@ export class Game {
     this.spawnTimer = 0;
     this.betweenWaves = 2;
     this.exitReady = false;
+    this.sideFlash = 0;              // red edge-flash intensity when hurt
+    this._prevHp = this.player.health;
     this.cam.x = this.player.x;
     this.cam.y = this.player.y;
     this._seedLevelLoot();
@@ -129,6 +131,17 @@ export class Game {
     for (let i = 0; i < randInt(2, 3); i++) {
       const p = this.world.randomFloor();
       this.pickups.push(new Pickup(p.x, p.y, chance(0.7) ? "medkit" : "adrenaline"));
+    }
+    // Protective gear — sometimes light, sometimes heavier plating.
+    for (let i = 0; i < randInt(1, 2); i++) {
+      const p = this.world.randomFloor();
+      const heavy = chance(0.4);
+      this.pickups.push(new Pickup(p.x, p.y, "armor", { value: heavy ? 80 : 40, max: heavy ? 100 : 50 }));
+    }
+    if (chance(0.7)) {
+      const p = this.world.randomFloor();
+      const heavy = chance(0.4);
+      this.pickups.push(new Pickup(p.x, p.y, "helmet", { value: heavy ? 50 : 25, max: heavy ? 60 : 30 }));
     }
   }
 
@@ -290,7 +303,7 @@ export class Game {
     for (const c of this.corpses) {
       if (c.t >= c.dur && !c._settled) {
         c._settled = true;
-        this.bodies.push({ x: c.x, y: c.y, angle: c.angle, type: c.type, r: c.r, parts: c.parts });
+        this.bodies.push({ x: c.x, y: c.y, angle: c.angle, type: c.type, r: c.r, parts: c.parts, look: c.look });
         if (this.bodies.length > 60) this.bodies.shift();
       }
     }
@@ -348,6 +361,18 @@ export class Game {
     this.cam.y += (this.player.y - this.cam.y) * clamp(dt * 8, 0, 1);
     if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 40);
 
+    // Damage side-flash: intensity scales with the health actually lost this
+    // frame (so armour soaking a hit yields a smaller flash), then fades.
+    const drop = this._prevHp - this.player.health;
+    if (drop > 0.5) this.sideFlash = Math.max(this.sideFlash, clamp(drop / 22, 0.28, 1));
+    this._prevHp = this.player.health;
+    if (this.sideFlash > 0) this.sideFlash = Math.max(0, this.sideFlash - dt * 1.6);
+    // Announce armour breaking as it happens.
+    if (this.player.armorBroke) {
+      this._announce(this.player.armorBroke === "helmet" ? "Helmet destroyed" : "Armor destroyed", "");
+      this.player.armorBroke = null;
+    }
+
     // HUD + death.
     this.hooks.onStats?.(this._stats());
     if (this.player.health <= 0) this._gameOver();
@@ -362,10 +387,16 @@ export class Game {
       const clip = l.clip[l.current] ?? 0;
       ammoStr = `${clip} / ${l.ammo[w.ammoType] ?? 0}`;
     }
+    const armMax = l.armorMax || 0, helmMax = l.helmetMax || 0;
     return {
       hp: this.player.health / this.player.maxHealth,
       stamina: this.player.stamina / this.player.maxStamina,
       exhausted: this.player.exhausted,
+      adrenaline: this.player.adrenaline > 0,
+      armor: armMax > 0 ? (l.armor || 0) / armMax : 0,
+      hasArmor: (l.armor || 0) > 0,
+      helmet: helmMax > 0 ? (l.helmet || 0) / helmMax : 0,
+      hasHelmet: (l.helmet || 0) > 0,
       wave: this.wave,
       score: this.score,
       weapon: w.name + (this.player.reloading > 0 ? " …" : ""),
@@ -720,7 +751,7 @@ export class Game {
     // The body falls down: hand it to the corpse list for a collapse animation.
     this.corpses.push({
       x: z.x, y: z.y, angle: z.angle, type: z.type, r: z.r,
-      parts: z.parts, prone: z.prone, t: 0, dur: 0.5,
+      parts: z.parts, prone: z.prone, t: 0, dur: 0.5, look: z.look,
       headshot, bannerT: headshot ? 1.3 : 0,
     });
     // Chance to drop loot.
@@ -885,9 +916,22 @@ export class Game {
       case "medkit":
         p.heal(45); this._announce("+45 HP", "medkit"); break;
       case "adrenaline":
-        p.stamina = p.maxStamina; p.exhausted = false; p.invuln = 3; this._announce("Adrenaline!", "boosted"); break;
+        p.stamina = p.maxStamina; p.exhausted = false; p.invuln = 3; p.adrenaline = 14;
+        this._announce("Adrenaline!", "rush — slow-burn stamina"); break;
       case "key":
         l.keys = (l.keys || 0) + 1; this._announce("Key", "keys: " + l.keys); break;
+      case "armor": {
+        const d = pk.data || { value: 40, max: 50 };
+        l.armorMax = Math.max(l.armorMax || 0, d.max);
+        l.armor = Math.min((l.armor || 0) + d.value, l.armorMax);
+        this._announce("Body Armor", "+" + d.value); break;
+      }
+      case "helmet": {
+        const d = pk.data || { value: 25, max: 30 };
+        l.helmetMax = Math.max(l.helmetMax || 0, d.max);
+        l.helmet = Math.min((l.helmet || 0) + d.value, l.helmetMax);
+        this._announce("Helmet", "+" + d.value); break;
+      }
     }
     this.hooks.vibrate?.(15);
     pk.dead = true;
@@ -969,6 +1013,20 @@ export class Game {
     ctx.restore();
 
     this._drawMinimap();
+
+    // Damage side-flash: blood-red bars sweeping in from both edges, fading.
+    if (this.sideFlash > 0.01) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      const a = this.sideFlash * 0.62, W = this.canvas.width, H = this.canvas.height, bw = W * 0.17;
+      let g = ctx.createLinearGradient(0, 0, bw, 0);
+      g.addColorStop(0, `rgba(150,0,0,${a.toFixed(3)})`); g.addColorStop(1, "rgba(150,0,0,0)");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, bw, H);
+      g = ctx.createLinearGradient(W, 0, W - bw, 0);
+      g.addColorStop(0, `rgba(150,0,0,${a.toFixed(3)})`); g.addColorStop(1, "rgba(150,0,0,0)");
+      ctx.fillStyle = g; ctx.fillRect(W - bw, 0, bw, H);
+      ctx.restore();
+    }
 
     // Low-HP vignette.
     const hp = this.player ? this.player.health / this.player.maxHealth : 1;
@@ -1244,7 +1302,7 @@ export class Game {
   }
 
   _drawBodies(ctx) {
-    for (const b of this.bodies) drawBodyDecal(ctx, b.x, b.y, b.angle, b.type, b.r, b.parts);
+    for (const b of this.bodies) drawBodyDecal(ctx, b.x, b.y, b.angle, b.type, b.r, b.parts, b.look);
   }
 
   _drawLimbs(ctx) {
@@ -1269,7 +1327,7 @@ export class Game {
         ctx.save();
         ctx.globalAlpha = clamp(1 - k / 0.6, 0, 1);
         ctx.translate(c.x, c.y); ctx.scale(1, 1 - k * 0.5); ctx.translate(-c.x, -c.y);
-        drawZombie(ctx, c.x, c.y, c.angle, 0, c.type, c.r, false, c.parts, true, 1, 0, 0, 0);
+        drawZombie(ctx, c.x, c.y, c.angle, 0, c.type, c.r, false, c.parts, true, 1, 0, 0, 0, c.look);
         ctx.restore();
       }
       // Body decal fades in and settles to full size.
@@ -1277,7 +1335,7 @@ export class Game {
       ctx.globalAlpha = clamp(k * 1.4, 0, 1);
       const grow = 0.82 + 0.18 * k;
       ctx.translate(c.x, c.y); ctx.scale(grow, grow); ctx.translate(-c.x, -c.y);
-      drawBodyDecal(ctx, c.x, c.y, c.angle, c.type, c.r, c.parts);
+      drawBodyDecal(ctx, c.x, c.y, c.angle, c.type, c.r, c.parts, c.look);
       ctx.restore();
     }
     ctx.globalAlpha = 1;
@@ -1307,7 +1365,7 @@ export class Game {
   _drawZombiesBehind(ctx) {
     // Sort by y for pseudo-depth.
     const sorted = this.zombies.slice().sort((a, b) => a.y - b.y);
-    for (const z of sorted) drawZombie(ctx, z.x, z.y, z.angle, z.frame, z.type, z.r, z.hurtFlash > 0, z.parts, z.prone, z.strideAmp, z.jumpH, z.vx, z.vy);
+    for (const z of sorted) drawZombie(ctx, z.x, z.y, z.angle, z.frame, z.type, z.r, z.hurtFlash > 0, z.parts, z.prone, z.strideAmp, z.jumpH, z.vx, z.vy, z.look);
   }
 
   _drawPlayer(ctx) {
@@ -1322,7 +1380,12 @@ export class Game {
       ctx.restore();
       return;
     }
-    const action = { recoil: p.recoil, swingT: p.swingT, swingDur: p.swingDur, melee: p.weapon.melee, variant: p.meleeVariant, moving: p.moving, run: p.running, vx: p.vx, vy: p.vy };
+    const action = {
+      recoil: p.recoil, swingT: p.swingT, swingDur: p.swingDur, melee: p.weapon.melee,
+      variant: p.meleeVariant, moving: p.moving, run: p.running, vx: p.vx, vy: p.vy,
+      stamina: p.stamina / p.maxStamina, idleT: p.idleT,
+      helmet: (p.loadout.helmet || 0) > 0, armor: (p.loadout.armor || 0) > 0,
+    };
     drawPlayer(ctx, p.x, p.y, p.angle, p.walkFrame, p.hurtFlash > 0, p.weapon.kind, PLAYER_PAL, action);
     if (p.muzzle > 0 && !p.weapon.melee) drawMuzzle(ctx, p.x, p.y, p.angle, p.weapon.explosive ? 5 : 3, p.muzzle / 0.06);
     if (p.invuln > 0 && Math.floor(p.invuln * 12) % 2 === 0) {

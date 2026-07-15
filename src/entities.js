@@ -1,6 +1,7 @@
 // Game entities: Player, Zombie, Projectile, Particle, Pickup.
 import { clamp, rand, randInt, chance, angleTo, angleLerp, dist, TAU, pick } from "./util.js";
 import { WEAPONS } from "./weapons.js";
+import { makeZombieLook } from "./sprites.js";
 
 // ---------------------------------------------------------------- Player
 export class Player {
@@ -25,6 +26,9 @@ export class Player {
     this.invuln = 0;
     this.moving = false;
     this.running = false;
+    this.idleT = 0;        // ever-advancing clock for the idle/breathing animation
+    this.adrenaline = 0;   // seconds of adrenaline rush remaining
+    this.armorFlash = 0;   // brief flash when armour soaks a hit
     // Arm animation: recoil (0..1 decaying) for guns; swing timer for melee.
     this.recoil = 0;
     this.swingT = 0;
@@ -59,9 +63,12 @@ export class Player {
   }
 
   update(dt, input, world) {
+    this.idleT += dt;
     if (this.hurtFlash > 0) this.hurtFlash -= dt;
     if (this.muzzle > 0) this.muzzle -= dt;
     if (this.invuln > 0) this.invuln -= dt;
+    if (this.adrenaline > 0) this.adrenaline -= dt;
+    if (this.armorFlash > 0) this.armorFlash -= dt;
     if (this.recoil > 0) this.recoil = Math.max(0, this.recoil - dt * 7);
     if (this.swingT > 0) this.swingT = Math.max(0, this.swingT - dt);
     if (this.lungeT > 0) {
@@ -73,14 +80,16 @@ export class Player {
     const wantMove = input.moveMag > 0.08;
     const sprinting = input.moveMag > 0.92 && wantMove;
 
-    // Stamina drain / regen.
+    // Stamina drain / regen. Adrenaline slows BOTH the drain and the regen, so
+    // you can sprint far longer (but it also refills more gently).
+    const rate = this.adrenaline > 0 ? 0.5 : 1;
     if (sprinting && !this.exhausted && this.stamina > 0) {
-      this.stamina = clamp(this.stamina - 34 * dt, 0, this.maxStamina);
+      this.stamina = clamp(this.stamina - 34 * dt * rate, 0, this.maxStamina);
       if (this.stamina <= 0) this.exhausted = true;
     } else if (!wantMove) {
-      this.stamina = clamp(this.stamina + 26 * dt, 0, this.maxStamina);
+      this.stamina = clamp(this.stamina + 26 * dt * rate, 0, this.maxStamina);
     } else {
-      this.stamina = clamp(this.stamina + 12 * dt, 0, this.maxStamina);
+      this.stamina = clamp(this.stamina + 12 * dt * rate, 0, this.maxStamina);
     }
     if (this.exhausted && this.stamina > 35) this.exhausted = false;
 
@@ -121,7 +130,21 @@ export class Player {
 
   hurt(amount) {
     if (this.invuln > 0) return;
-    this.health = clamp(this.health - amount, 0, this.maxHealth);
+    let dmg = amount;
+    const l = this.loadout;
+    // A helmet soaks a slice of every blow (head protection) until it shatters.
+    if (l && l.helmet > 0 && dmg > 0) {
+      const soak = Math.min(l.helmet, dmg * 0.4);
+      l.helmet -= soak; dmg -= soak; this.armorFlash = 0.18;
+      if (l.helmet <= 0.001) { l.helmet = 0; this.armorBroke = "helmet"; }
+    }
+    // Body armour soaks the bulk of what's left, then breaks and falls away.
+    if (l && l.armor > 0 && dmg > 0) {
+      const soak = Math.min(l.armor, dmg * 0.6);
+      l.armor -= soak; dmg -= soak; this.armorFlash = 0.18;
+      if (l.armor <= 0.001) { l.armor = 0; this.armorBroke = "armor"; }
+    }
+    this.health = clamp(this.health - dmg, 0, this.maxHealth);
     this.hurtFlash = 0.18;
     this.invuln = 0.35;
   }
@@ -197,6 +220,7 @@ export class Zombie {
     this.knock = { x: 0, y: 0 };
     this.flankSign = chance(0.5) ? 1 : -1;
     this.mass = t.r; // heavier things shove lighter ones in collisions
+    this.look = makeZombieLook(type); // per-zombie skin/clothes/hair variety
 
     // Per-zombie gait so they shamble on differing strides and paths, not lines.
     const shamble = t.shamble ?? 0.3, lurch = t.lurch ?? 0.25;
