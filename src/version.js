@@ -1,7 +1,18 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.13.0";
+export const VERSION = "0.14.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.14.0",
+    date: "2026-07-15",
+    title: "Into the Sewers",
+    changes: [
+      "Open manholes are scattered across the streets — step onto one to drop down into the sewers.",
+      "The sewers are a dark maze of water tunnels and concrete, with ladders back up to the surface.",
+      "The ladders come up at different manholes, so you can travel underground and surface in another part of the neighborhood — handy for slipping past the horde.",
+      "The sewers keep their own layout, loot and mess, and have their own murky look and mini-map.",
+    ],
+  },
   {
     version: "0.13.0",
     date: "2026-07-15",

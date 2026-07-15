@@ -2,7 +2,7 @@
 import { randInt, rand, chance, pick, clamp } from "./util.js";
 
 export const TILE = 32;
-export const T = { FLOOR: 0, WALL: 1, DOOR: 2, EXIT: 3, PROP: 4, WINDOW: 5, STAIRS: 6, FENCE: 7 };
+export const T = { FLOOR: 0, WALL: 1, DOOR: 2, EXIT: 3, PROP: 4, WINDOW: 5, STAIRS: 6, FENCE: 7, MANHOLE: 8 };
 
 export const SETTINGS = [
   { id: "house", name: "The House", floor: "#4a3b2a", floor2: "#523f2c", wall: "#6a5340", wallTop: "#8a6d50", accent: "#4a3d2c" },
@@ -32,13 +32,20 @@ export const STREET_TERRAIN = {
   6: ["#26262b", "#2b2b31"], // horizontal road centre-line
 };
 
+// Sewer tunnel terrain — murky water over concrete.
+export const SEWER_TERRAIN = {
+  0: ["#1c2a26", "#213330"], // channel water
+  1: ["#2a2f30", "#30383a"], // dry ledge
+};
+
 export class World {
   constructor(settingIndex = 0, floorLevel = 0) {
     this.setting = SETTINGS[settingIndex % SETTINGS.length];
     this.settingIndex = settingIndex;
     this.isHouse = this.setting.id === "house";
     this.isStreets = this.setting.id === "streets";
-    this.floorLevel = floorLevel; // 0 = ground, 1 = upstairs
+    this.isSewers = this.isStreets && floorLevel === 1; // sewer maze beneath the streets
+    this.floorLevel = floorLevel; // 0 = ground/street, 1 = upstairs/sewers
     this.cols = this.isHouse ? 40 : this.isStreets ? 48 : randInt(40, 52);
     this.rows = this.isHouse ? 38 : this.isStreets ? 46 : randInt(40, 52);
     this.grid = new Uint8Array(this.cols * this.rows);
@@ -49,20 +56,22 @@ export class World {
     this.furniture = []; // smashable / knock-over objects
     this.rooms = [];
     this.stairsCells = []; // tiles that move the player between floors
+    this.manholes = [];    // street manhole cells (down into the sewers)
+    this.ladders = [];     // sewer ladder cells (up to the street)
     this.landing = null;   // where the player arrives on this floor
     this.exit = { x: 0, y: 0 };
     this.exitFacing = "up";
     this.spawnPoint = { x: 0, y: 0 };
     if (this.isHouse) { if (floorLevel === 1) this._houseUpper(); else this._houseGround(); }
-    else if (this.isStreets) this._streets();
+    else if (this.isStreets) { if (floorLevel === 1) this._sewers(); else this._streets(); }
     else this._generate();
   }
 
-  // Floor checker-pair for a tile, tinted by terrain (house rooms / streets).
+  // Floor checker-pair for a tile, tinted by terrain (house rooms / streets / sewers).
   floorPair(cx, cy) {
     if (!this.isHouse && !this.isStreets) return null;
     const id = this.floorTint[this.idx(cx, cy)];
-    const pal = this.isHouse ? ROOM_FLOOR : STREET_TERRAIN;
+    const pal = this.isSewers ? SEWER_TERRAIN : this.isHouse ? ROOM_FLOOR : STREET_TERRAIN;
     return pal[id] || pal[0];
   }
 
@@ -309,6 +318,10 @@ export class World {
       this.furniture[this.furniture.length - 1].burning = chance(0.22); // some are ablaze
     }
 
+    // Open manholes at four intersections drop into the sewers below.
+    const holeCells = [[vC[0], hC[0]], [vC[2], hC[0]], [vC[0], hC[2]], [vC[2], hC[2]]];
+    for (const [hx, hy] of holeCells) { this._set(hx, hy, T.MANHOLE); this.manholes.push({ cx: hx, cy: hy }); }
+
     // Player starts at the central intersection; the exit road runs off the
     // bottom of the map.
     this.spawnPoint = { x: (vC[1] + 0.5) * TILE, y: (hC[1] + 0.5) * TILE };
@@ -378,6 +391,57 @@ export class World {
       const bxg = chance(0.5) ? x0 + 1 : x1 - 1, byg = y1 - 1;
       if (this.tileAt(bxg, byg) === T.FLOOR) this._furn((bxg + 0.5) * TILE, (byg + 0.5) * TILE, "bush", 9, 8, 26);
     }
+  }
+
+  // The sewers: a maze of 2-wide tunnels carved through concrete, with ladders
+  // back up to the street's manholes at spread-out corners (so you can travel
+  // underground and surface somewhere else in the neighbourhood).
+  _sewers() {
+    const cols = this.cols, rows = this.rows;
+    this.grid.fill(T.WALL);
+    this.floorTint.fill(0);
+    this.furniture = [];
+    this.rooms = [];
+    const STEP = 4;
+    const mCols = Math.floor((cols - 2) / STEP), mRows = Math.floor((rows - 2) / STEP);
+    const cellX = (mx) => 1 + mx * STEP, cellY = (my) => 1 + my * STEP;
+    const carveCell = (mx, my) => { const x = cellX(mx), y = cellY(my); for (let yy = y; yy < y + 2; yy++) for (let xx = x; xx < x + 2; xx++) this._set(xx, yy, T.FLOOR); };
+    const carveLink = (ax, ay, bx, by) => {
+      const x0 = cellX(ax), y0 = cellY(ay), x1 = cellX(bx), y1 = cellY(by);
+      for (let x = Math.min(x0, x1); x <= Math.max(x0, x1) + 1; x++) for (let d = 0; d < 2; d++) this._set(x, y0 + d, T.FLOOR);
+      for (let y = Math.min(y0, y1); y <= Math.max(y0, y1) + 1; y++) for (let d = 0; d < 2; d++) this._set(x0 + d, y, T.FLOOR);
+    };
+    // Randomized DFS maze over the coarse cell grid.
+    const visited = new Uint8Array(mCols * mRows);
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const stack = [[0, 0]]; visited[0] = 1; carveCell(0, 0);
+    while (stack.length) {
+      const [cx, cy] = stack[stack.length - 1];
+      const opts = dirs.filter(([dx, dy]) => { const nx = cx + dx, ny = cy + dy; return nx >= 0 && ny >= 0 && nx < mCols && ny < mRows && !visited[ny * mCols + nx]; });
+      if (!opts.length) { stack.pop(); continue; }
+      const [dx, dy] = opts[randInt(0, opts.length - 1)];
+      const nx = cx + dx, ny = cy + dy;
+      visited[ny * mCols + nx] = 1; carveCell(nx, ny); carveLink(cx, cy, nx, ny);
+      stack.push([nx, ny]);
+    }
+    // Knock a few extra holes so it loops instead of being a perfect maze.
+    for (let i = 0; i < mCols + mRows; i++) {
+      const mx = randInt(0, mCols - 2), my = randInt(0, mRows - 2);
+      if (chance(0.5)) carveLink(mx, my, mx + 1, my); else carveLink(mx, my, mx, my + 1);
+    }
+
+    // Ladders up at the four corner cells (match the street's four manholes).
+    const corners = [[0, 0], [mCols - 1, 0], [0, mRows - 1], [mCols - 1, mRows - 1]];
+    for (const [mx, my] of corners) { const x = cellX(mx), y = cellY(my); this._set(x, y, T.MANHOLE); this.ladders.push({ cx: x, cy: y }); }
+
+    // Scatter some pipes/debris to smash and a little grime.
+    for (let i = 0; i < 10; i++) { const p = this.randomFloor(); this._place(Math.floor(p.x / TILE), Math.floor(p.y / TILE), chance(0.5) ? "barrel" : "crate"); }
+
+    this.landing = { x: (cellX(0) + 0.5) * TILE, y: (cellY(0) + 1.5) * TILE }; // just off ladder 0
+    this.spawnPoint = { x: this.landing.x, y: this.landing.y };
+    // No street exit down here — surface via a ladder. Point the beacon at one.
+    this.exit = { x: (cellX(0) + 0.5) * TILE, y: (cellY(0) + 0.5) * TILE };
+    this.exitFacing = "up";
   }
 
   _generate() {
