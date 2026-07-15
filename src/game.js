@@ -2,13 +2,13 @@
 import { clamp, rand, randInt, chance, pick, angleTo, angleLerp, dist, dist2, TAU } from "./util.js";
 import { Input } from "./input.js";
 import { World, TILE, T, SETTINGS } from "./world.js";
-import { Player, Zombie, Projectile, Particle, Pickup, ZOMBIE_TYPES } from "./entities.js";
+import { Player, Zombie, Projectile, Particle, Pickup, Thrown, ZOMBIE_TYPES } from "./entities.js";
 import { WEAPONS, WEAPON_ORDER, newLoadout } from "./weapons.js";
 import { drawPlayer, drawZombie, drawPickup, drawMuzzle, drawFurniture, drawBodyDecal, drawGroundLimb } from "./sprites.js";
 import { DeathBlood } from "./deathblood.js";
 
 const PLAYER_PAL = { skin: "#d9a066", hair: "#3a2a1a", shirt: "#3b5a8c", vest: "#2c3e52", pants: "#2a2a33" };
-const ZOMBIE_LIMB = { walker: "#72a83a", runner: "#8fb84a", crawler: "#a0c15a", brute: "#5c7a2e", spitter: "#9ab84a", leaper: "#8fb84a", prone: "#a0c15a" };
+const ZOMBIE_LIMB = { walker: "#72a83a", runner: "#8fb84a", crawler: "#a0c15a", brute: "#5c7a2e", spitter: "#9ab84a", leaper: "#8fb84a", prone: "#a0c15a", dog: "#8a9a52" };
 const MIN_BUFFER = 220; // logical px on the short screen axis
 
 export class Game {
@@ -65,11 +65,14 @@ export class Game {
     this.bodies = [];  // persistent fallen zombie decals
     this.limbs = [];   // persistent severed-limb decals on the ground
     this.gibs = [];    // limbs mid-flight before they settle
+    this.thrown = [];  // grenades / flares in flight or on the ground
+    this.shockwaves = []; // expanding blast rings
     this.score = 0;
     this.wave = 0;
     this.waveActive = false;
     this.spawnQueue = 0;
     this.spawnTimer = 0;
+    this.waveOrigins = []; // where the horde streams in from this wave
     this.betweenWaves = 2;
     this.exitReady = false;
     this.sideFlash = 0;              // red edge-flash intensity when hurt
@@ -102,9 +105,9 @@ export class Game {
     this.player.health = hp; this.player.stamina = sta;
     this.player.kills = kills;
     this.zombies = []; this.projectiles = []; this.particles = []; this.pickups = []; this.stains = []; this.corpses = [];
-    this.bodies = []; this.limbs = []; this.gibs = [];
+    this.bodies = []; this.limbs = []; this.gibs = []; this.thrown = []; this.shockwaves = [];
     this.score = score; this.wave = wave;
-    this.waveActive = false; this.spawnQueue = 0; this.betweenWaves = 2; this.exitReady = false;
+    this.waveActive = false; this.spawnQueue = 0; this.waveOrigins = []; this.betweenWaves = 2; this.exitReady = false;
     this.cam.x = this.player.x; this.cam.y = this.player.y;
     this._seedLevelLoot();
     this._announce(this.world.setting.name, "NEW GROUND");
@@ -143,6 +146,9 @@ export class Game {
       const heavy = chance(0.4);
       this.pickups.push(new Pickup(p.x, p.y, "helmet", { value: heavy ? 50 : 25, max: heavy ? 60 : 30 }));
     }
+    // Throwables: grenades everywhere, flares mostly outside.
+    if (chance(0.8)) { const p = this.world.randomFloor(); this.pickups.push(new Pickup(p.x, p.y, "grenade", { amount: randInt(1, 3) })); }
+    if (this.world.isStreets && chance(0.8)) { const p = this.world.randomFloor(); this.pickups.push(new Pickup(p.x, p.y, "flare", { amount: randInt(1, 2) })); }
   }
 
   // House floors carry a curated loot list (key/axe/room rewards).
@@ -173,7 +179,7 @@ export class Game {
     }
     // Land next to the destination staircase; the horde and shots don't follow.
     this.player.x = this.world.landing.x; this.player.y = this.world.landing.y;
-    this.zombies = []; this.projectiles = []; this.particles = [];
+    this.zombies = []; this.projectiles = []; this.particles = []; this.thrown = []; this.shockwaves = [];
     this.cam.x = this.player.x; this.cam.y = this.player.y;
     this.flow = null; this.flowTimer = 0; // rebuild the flow field for the new grid
     this.floorCooldown = 1.2; // don't bounce straight back onto the stairs
@@ -199,26 +205,43 @@ export class Game {
   _startWave() {
     this.wave++;
     this.waveActive = true;
-    const base = 4 + this.wave * 2;
-    this.spawnQueue = base;
+    // Difficulty ramps: bigger hordes each wave (with a quadratic tail so later
+    // waves swell), spawning faster.
+    this.spawnQueue = 4 + Math.round(this.wave * 3 + this.wave * this.wave * 0.25);
     this.spawnTimer = 0;
+    this._pickWaveOrigins();
     this.hooks.onWave?.(this.wave);
     this._announce("WAVE " + this.wave, this.spawnQueue + " incoming");
   }
 
+  // Choose a fresh set of origin fronts the horde streams in from this wave, so
+  // they don't always come from the same place.
+  _pickWaveOrigins() {
+    const n = 2 + (this.wave % 3); // 2..4 fronts
+    const min = Math.max(this.bufW, this.bufH) * 0.5;
+    this.waveOrigins = [];
+    for (let i = 0; i < n; i++) {
+      const p = this.world.randomFloorFar(this.player.x, this.player.y, min);
+      if (p) this.waveOrigins.push(p);
+    }
+    if (!this.waveOrigins.length) { const p = this.world.randomFloor(); if (p) this.waveOrigins.push(p); }
+  }
+
   _spawnPoint() {
-    // Spawn just off-screen (reachable) so zombies converge quickly instead of
-    // trekking across the whole map.
-    const view = Math.max(this.bufW, this.bufH);
-    const min = view * 0.5, max = view * 0.85;
-    for (let i = 0; i < 60; i++) {
-      const p = this.world.randomFloor();
-      const d = dist(p.x, p.y, this.player.x, this.player.y);
-      if (d < min || d > max) continue;
+    // Stream in near one of this wave's origin fronts (with jitter), but the
+    // point must be reachable and not right on top of the player.
+    const minFromPlayer = Math.max(this.bufW, this.bufH) * 0.5;
+    const origins = this.waveOrigins;
+    for (let i = 0; i < 70; i++) {
+      let p;
+      if (origins && origins.length && chance(0.8)) p = this.world.randomFloorNear(pick(origins), 96);
+      else p = this.world.randomFloor();
+      if (!p) continue;
+      if (dist(p.x, p.y, this.player.x, this.player.y) < minFromPlayer) continue;
       if (this.flow && !this._flowAt(p.x, p.y).seen) continue; // must be able to path in
       return p;
     }
-    return this.world.randomFloorFar(this.player.x, this.player.y, min);
+    return this.world.randomFloorFar(this.player.x, this.player.y, minFromPlayer);
   }
 
   _spawnZombie() {
@@ -232,11 +255,12 @@ export class Game {
     if (w >= 2) table.push(["crawler", 3]);
     if (w >= 3) table.push(["leaper", 2]); // pouncers
     if (w >= 4) table.push(["spitter", 2]);
-    if (w >= 5) table.push(["brute", 1 + Math.floor(w / 6)]);
+    if (w >= 5) table.push(["brute", 1 + Math.floor(w / 5)]);
+    if (this.world.isStreets && w >= 2) table.push(["dog", 2 + Math.floor(w / 4)]); // packs outside
     const total = table.reduce((s, t) => s + t[1], 0);
     let r = rand(0, total), type = "walker";
     for (const [k, wgt] of table) { if ((r -= wgt) <= 0) { type = k; break; } }
-    const hpScale = 1 + (w - 1) * 0.12;
+    const hpScale = 1 + (w - 1) * 0.16; // tougher each wave
     this.zombies.push(new Zombie(p.x, p.y, type, hpScale));
   }
 
@@ -287,10 +311,13 @@ export class Game {
       los: (x, y) => this.world.lineClear(x, y, this.player.x, this.player.y),
     });
 
-    // Entities.
-    for (const z of this.zombies) z.update(dt, this.player, this.world, nav, (x, y, a, kind) => this._spawnHostile(x, y, a, kind));
+    // Entities. A burning flare on the ground lures the horde toward it.
+    const hasFlare = this.thrown.some((t) => t.kind === "flare");
+    for (const z of this.zombies) z.update(dt, this.player, this.world, nav, (x, y, a, kind) => this._spawnHostile(x, y, a, kind), hasFlare ? this._nearestFlare(z.x, z.y) : null);
     this._resolveCollisions(); // no two bodies share the same space
     this._updateProjectiles(dt);
+    this._updateThrown(dt);
+    this._updateBurning(dt);
     for (const p of this.particles) p.update(dt);
     for (const s of this.stains) s.life -= dt * 0.15;
     for (const pk of this.pickups) pk.update(dt);
@@ -298,6 +325,8 @@ export class Game {
     this._updateGibs(dt);
     this._brutesSmashFurniture(dt);
     this._breakWindowsUnderZombies();
+    for (const sw of this.shockwaves) { sw.life -= dt; sw.r += (sw.max - sw.r) * clamp(dt * 12, 0, 1); }
+    this.shockwaves = this.shockwaves.filter((s) => s.life > 0);
 
     // A corpse that finished falling settles into a permanent body decal.
     for (const c of this.corpses) {
@@ -326,7 +355,7 @@ export class Game {
       if (this.spawnQueue > 0 && this.spawnTimer <= 0) {
         this._spawnZombie();
         this.spawnQueue--;
-        this.spawnTimer = clamp(1.4 - this.wave * 0.05, 0.35, 1.4);
+        this.spawnTimer = clamp(1.4 - this.wave * 0.08, 0.26, 1.4);
       }
       if (this.spawnQueue <= 0 && this.zombies.length === 0) {
         this.waveActive = false;
@@ -383,6 +412,7 @@ export class Game {
     const w = this.player.weapon;
     let ammoStr;
     if (w.melee) ammoStr = "∞";
+    else if (w.throwable) ammoStr = "×" + (l.ammo[w.ammoType] || 0);
     else {
       const clip = l.clip[l.current] ?? 0;
       ammoStr = `${clip} / ${l.ammo[w.ammoType] ?? 0}`;
@@ -478,6 +508,7 @@ export class Game {
     p.triggerRecoil(w, variant); // kick the arms/weapon (gun recoil or melee attack)
 
     if (w.melee) { this._meleeSwing(w, variant); return; }
+    if (w.throwable) { this._throw(w); return; }
 
     p.loadout.clip[p.loadout.current]--;
     const pellets = w.pellets || 1;
@@ -577,33 +608,96 @@ export class Game {
 
   _explode(x, y, proj) {
     const radius = proj.explosive;
+    const blast = radius + 26; // the shockwave reaches a bit past the fireball
+    const sever = proj.sever != null ? proj.sever : 0.6;
+    // Everyone in the blast is hurt and hurled outward.
     for (const z of this.zombies) {
       const d = dist(x, y, z.x, z.y);
-      if (d < radius + z.r) {
-        const falloff = clamp(1 - d / (radius + z.r), 0.2, 1);
+      if (d < blast + z.r) {
+        const falloff = clamp(1 - d / (blast + z.r), 0.15, 1);
         const a = angleTo(x, y, z.x, z.y);
-        this._damageZombie(z, proj.damage * falloff, a, 220 * falloff, 0.6 * falloff);
+        this._damageZombie(z, proj.damage * falloff, a, 360 * falloff, sever * falloff);
         this._blood(z.x, z.y, a, 8);
       }
     }
-    // Blow apart nearby furniture.
+    // Blow apart AND fling nearby furniture (wrecks skid outward).
     for (const f of this.world.furniture) {
       if (f.broken) continue;
-      if (dist(x, y, f.x, f.y) < radius + Math.max(f.hw, f.hh)) this._damageFurniture(f, 999, angleTo(x, y, f.x, f.y), 200);
+      const d = dist(x, y, f.x, f.y);
+      if (d < blast + Math.max(f.hw, f.hh)) {
+        const a = angleTo(x, y, f.x, f.y);
+        this._damageFurniture(f, 999, a, 260);
+        const push = 44 * clamp(1 - d / blast, 0, 1);
+        f.x += Math.cos(a) * push; f.y += Math.sin(a) * push;
+      }
     }
-    // Splash damage to player too if close.
+    // The player is caught too: damaged AND blown back along the shockwave.
     const pd = dist(x, y, this.player.x, this.player.y);
-    if (pd < radius) this.player.hurt(30 * clamp(1 - pd / radius, 0, 1));
-    // FX
-    for (let i = 0; i < 26; i++) {
-      const a = rand(0, TAU), s = rand(40, 200);
+    if (pd < blast) {
+      const falloff = clamp(1 - pd / blast, 0, 1);
+      this.player.hurt(34 * falloff);
+      const a = pd < 0.001 ? rand(0, TAU) : angleTo(x, y, this.player.x, this.player.y);
+      this.player.vx += Math.cos(a) * 440 * falloff;
+      this.player.vy += Math.sin(a) * 440 * falloff;
+    }
+    // Break windows / doors in the blast so the shockwave really shatters things.
+    const bc = Math.floor(blast / TILE);
+    const ccx = Math.floor(x / TILE), ccy = Math.floor(y / TILE);
+    for (let gy = ccy - bc; gy <= ccy + bc; gy++) for (let gx = ccx - bc; gx <= ccx + bc; gx++) {
+      if (dist(x, y, (gx + 0.5) * TILE, (gy + 0.5) * TILE) > blast) continue;
+      const t = this.world.tileAt(gx, gy);
+      if (t === T.WINDOW) { this.world.breakWindow(gx, gy); this._glass((gx + 0.5) * TILE, (gy + 0.5) * TILE); }
+      else if (t === T.DOOR) { const dd = this.world.doorAt(gx, gy); if (dd && !dd.broken) this.world.hitDoor(dd, 999); }
+    }
+    // Expanding shockwave ring + fireball FX.
+    this.shockwaves.push({ x, y, r: 8, max: blast + 12, life: 0.45 });
+    for (let i = 0; i < 30; i++) {
+      const a = rand(0, TAU), s = rand(40, 220);
       this.particles.push(new Particle(x, y, {
-        vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.2, 0.6),
-        color: pick(["#ffce54", "#ff7043", "#ffffff", "#6b6b6b"]), size: randInt(2, 4), drag: 0.86,
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.2, 0.65),
+        color: pick(["#ffce54", "#ff7043", "#ffffff", "#6b6b6b", "#ffab40"]), size: randInt(2, 4), drag: 0.86,
       }));
     }
-    this.shake += 14;
+    this.shake += 16;
     this.hooks.vibrate?.(60);
+  }
+
+  // ------------------------------------------------------- Throwables
+  _throw(w) {
+    const p = this.player;
+    p.loadout.ammo[w.ammoType] = (p.loadout.ammo[w.ammoType] || 0) - 1;
+    this.thrown.push(new Thrown(p.x + Math.cos(p.angle) * 10, p.y + Math.sin(p.angle) * 10, p.angle, {
+      kind: w.kind, speed: w.throwSpeed, fuse: w.fuse || 2.5,
+      explosive: w.explosive || 0, damage: w.damage || 0, knockback: w.knockback || 0, sever: w.sever || 0,
+    }));
+    this._announce(w.name, "thrown");
+    this.shake += 1;
+  }
+
+  _updateThrown(dt) {
+    for (const t of this.thrown) {
+      t.update(dt, this.world);
+      if (t.kind === "grenade") {
+        if (chance(0.5)) this.particles.push(new Particle(t.x, t.y - t.z, { vx: rand(-6, 6), vy: rand(-14, -4), life: rand(0.2, 0.4), color: "rgba(120,120,120,0.5)", size: 2, drag: 0.85 }));
+        if (t.fuse <= 0) { this._explode(t.x, t.y, t); t.dead = true; }
+      } else { // flare: hisses out red light and sparks while it burns
+        if (chance(0.85)) this.particles.push(new Particle(t.x + rand(-2, 2), t.y - t.z, { vx: rand(-20, 20), vy: rand(-50, -12), life: rand(0.25, 0.55), color: pick(["#ff5a2a", "#ffce54", "#ff8a3a", "#ffffff"]), size: randInt(1, 2), drag: 0.84 }));
+        if (chance(0.25)) this.stains.push({ x: t.x + rand(-3, 3), y: t.y + rand(-3, 3), r: rand(2, 4), life: rand(2, 4), color: "#5a1a08" });
+        if (t.fuse <= 0) t.dead = true;
+      }
+    }
+    this.thrown = this.thrown.filter((t) => !t.dead);
+  }
+
+  // The nearest burning flare on the ground (a lure the horde flocks toward).
+  _nearestFlare(x, y) {
+    let best = null, bd = Infinity;
+    for (const t of this.thrown) {
+      if (t.kind !== "flare") continue;
+      const d = dist2(x, y, t.x, t.y);
+      if (d < bd) { bd = d; best = t; }
+    }
+    return best;
   }
 
   // Separate overlapping bodies: zombie-vs-zombie and zombie-vs-player.
@@ -739,6 +833,24 @@ export class Game {
       if (z.type !== "brute" && !z.leaping) continue;
       const f = this.world.furnitureAt(z.x + z.vx * 0.05, z.y + z.vy * 0.05) || this.world.furnitureAt(z.x, z.y);
       if (f) this._damageFurniture(f, (z.leaping ? 60 : 40) * dt * 6, z.angle, 0);
+    }
+  }
+
+  // Wrecked vehicles smoulder: licking flames and rising smoke.
+  _updateBurning(dt) {
+    for (const f of this.world.furniture) {
+      if (!f.burning || f.broken) continue;
+      f._emberT = (f._emberT || 0) - dt;
+      if (f._emberT > 0) continue;
+      f._emberT = rand(0.05, 0.14);
+      this.particles.push(new Particle(f.x + rand(-f.hw * 0.6, f.hw * 0.6), f.y + rand(-f.hh * 0.5, f.hh * 0.5), {
+        vx: rand(-8, 8), vy: rand(-46, -16), life: rand(0.3, 0.7),
+        color: pick(["#ff9030", "#ffce54", "#ff5a2a", "#c0341a"]), size: randInt(2, 3), drag: 0.86, gravity: -26,
+      }));
+      if (chance(0.6)) this.particles.push(new Particle(f.x + rand(-6, 6), f.y - 6, {
+        vx: rand(-10, 10), vy: rand(-30, -12), life: rand(0.7, 1.3),
+        color: pick(["rgba(60,60,60,0.5)", "rgba(90,90,90,0.4)", "rgba(40,40,40,0.5)"]), size: randInt(3, 5), drag: 0.9,
+      }));
     }
   }
 
@@ -932,6 +1044,16 @@ export class Game {
         l.helmet = Math.min((l.helmet || 0) + d.value, l.helmetMax);
         this._announce("Helmet", "+" + d.value); break;
       }
+      case "grenade": {
+        const amt = (pk.data && pk.data.amount) || 1;
+        l.owned.grenade = true; l.ammo.grenades = (l.ammo.grenades || 0) + amt;
+        this._announce("Grenades", "+" + amt); break;
+      }
+      case "flare": {
+        const amt = (pk.data && pk.data.amount) || 1;
+        l.owned.flare = true; l.ammo.flares = (l.ammo.flares || 0) + amt;
+        this._announce("Flares", "+" + amt); break;
+      }
     }
     this.hooks.vibrate?.(15);
     pk.dead = true;
@@ -1003,9 +1125,11 @@ export class Game {
     this._drawCorpses(ctx);
     this._drawPickups(ctx);
     this._drawZombiesBehind(ctx);
+    this._drawThrown(ctx);
     this._drawPlayer(ctx);
     this._drawGibs(ctx);
     this._drawParticles(ctx);
+    this._drawShockwaves(ctx);
     this._drawFog(ctx, -ox, -oy);
     this._drawProjectiles(ctx); // over the fog so tracers are always crisp
     this._drawBanners(ctx);
@@ -1165,20 +1289,20 @@ export class Game {
             }
           }
         } else if (t === T.FENCE) {
-          // Grass underfoot with a wooden picket fence line.
+          // Grass underfoot with a tidy wooden picket fence line.
           const rp = w.floorPair(cx, cy) || [set.floor, set.floor2];
           ctx.fillStyle = ((cx + cy) & 1) ? rp[0] : rp[1];
           ctx.fillRect(x, y, TILE, TILE);
           const hRun = w.tileAt(cx - 1, cy) === T.FENCE || w.tileAt(cx + 1, cy) === T.FENCE;
-          ctx.fillStyle = "#6b5836";
+          const rail = "#5a4a2e", wood = "#7a6038", woodTop = "#96774c";
           if (hRun) {
-            ctx.fillRect(x, y + TILE / 2 - 4, TILE, 2); ctx.fillRect(x, y + TILE / 2 + 2, TILE, 2);
-            ctx.fillStyle = "#836b44";
-            for (let px = 2; px < TILE; px += 6) ctx.fillRect(x + px, y + TILE / 2 - 7, 2, 13);
+            ctx.fillStyle = "rgba(0,0,0,0.22)"; ctx.fillRect(x, y + TILE / 2 + 6, TILE, 2); // cast shadow
+            ctx.fillStyle = rail; ctx.fillRect(x, y + TILE / 2 - 1, TILE, 3);               // top rail
+            for (let px = 2; px < TILE; px += 7) { ctx.fillStyle = wood; ctx.fillRect(x + px, y + TILE / 2 - 8, 3, 15); ctx.fillStyle = woodTop; ctx.fillRect(x + px, y + TILE / 2 - 8, 3, 2); }
           } else {
-            ctx.fillRect(x + TILE / 2 - 4, y, 2, TILE); ctx.fillRect(x + TILE / 2 + 2, y, 2, TILE);
-            ctx.fillStyle = "#836b44";
-            for (let py = 2; py < TILE; py += 6) ctx.fillRect(x + TILE / 2 - 7, y + py, 13, 2);
+            ctx.fillStyle = "rgba(0,0,0,0.22)"; ctx.fillRect(x + TILE / 2 + 6, y, 2, TILE);
+            ctx.fillStyle = rail; ctx.fillRect(x + TILE / 2 - 1, y, 3, TILE);
+            for (let py = 2; py < TILE; py += 7) { ctx.fillStyle = wood; ctx.fillRect(x + TILE / 2 - 8, y + py, 15, 3); ctx.fillStyle = woodTop; ctx.fillRect(x + TILE / 2 - 8, y + py, 2, 3); }
           }
         } else if (t === T.WINDOW) {
           // Wall with a glass pane the horde can smash through.
@@ -1210,11 +1334,13 @@ export class Game {
           }
           if (t === T.PROP) {
             if (w.isStreets) {
-              // A tree: trunk + leafy canopy.
-              ctx.fillStyle = "#3a2a18"; ctx.fillRect(x + TILE / 2 - 2, y + TILE / 2, 4, TILE / 2 - 2);
-              ctx.fillStyle = "#2f4a24"; ctx.beginPath(); ctx.arc(x + TILE / 2, y + TILE / 2 - 2, 9, 0, TAU); ctx.fill();
-              ctx.fillStyle = "#3c5c2e"; ctx.beginPath(); ctx.arc(x + TILE / 2 - 3, y + TILE / 2 - 4, 5, 0, TAU); ctx.fill();
-              ctx.fillStyle = "rgba(0,0,0,0.22)"; ctx.beginPath(); ctx.arc(x + TILE / 2 + 3, y + TILE / 2 + 1, 5, 0, TAU); ctx.fill();
+              // A leafy tree: ground shadow, trunk, and a layered round canopy.
+              const cxp = x + TILE / 2, cyp = y + TILE / 2;
+              ctx.fillStyle = "rgba(0,0,0,0.22)"; ctx.beginPath(); ctx.ellipse(cxp, cyp + 9, 9, 4, 0, 0, TAU); ctx.fill();
+              ctx.fillStyle = "#3a2a18"; ctx.fillRect(cxp - 2, cyp, 4, TILE / 2 - 3);
+              ctx.fillStyle = "#26401e"; ctx.beginPath(); ctx.arc(cxp, cyp - 3, 10, 0, TAU); ctx.fill();
+              ctx.fillStyle = "#31502a"; for (const [ox, oy, rr] of [[-4, -4, 5], [4, -3, 5], [0, -7, 5], [2, 1, 5]]) { ctx.beginPath(); ctx.arc(cxp + ox, cyp + oy, rr, 0, TAU); ctx.fill(); }
+              ctx.fillStyle = "#3e6234"; for (const [ox, oy, rr] of [[-3, -6, 3], [2, -5, 3]]) { ctx.beginPath(); ctx.arc(cxp + ox, cyp + oy, rr, 0, TAU); ctx.fill(); }
             } else {
               ctx.fillStyle = set.accent;
               ctx.fillRect(x + 5, y + 5, TILE - 10, TILE - 10);
@@ -1311,6 +1437,42 @@ export class Game {
 
   _drawGibs(ctx) {
     for (const g of this.gibs) drawGroundLimb(ctx, g.x, g.y, g.angle, g.part, g.limbColor, g.z);
+  }
+
+  _drawThrown(ctx) {
+    for (const t of this.thrown) {
+      // Ground shadow, then the item lifted by its arc height z.
+      ctx.fillStyle = "rgba(0,0,0,0.28)";
+      ctx.beginPath(); ctx.ellipse(t.x, t.y, 3, 1.6, 0, 0, TAU); ctx.fill();
+      const yy = t.y - t.z;
+      if (t.kind === "grenade") {
+        ctx.save(); ctx.translate(t.x, yy); ctx.rotate(t.angle);
+        ctx.fillStyle = "#3a4a2c"; ctx.fillRect(-2.5, -2.5, 5, 5);
+        ctx.fillStyle = "#2a3620"; ctx.fillRect(-2.5, -0.7, 5, 1.4);
+        ctx.fillStyle = "#8a8f6a"; ctx.fillRect(-1, -3.5, 2, 1.4);
+        // fuse blink as it's about to blow
+        if (t.fuse < 0.6 && Math.floor(t.t * 14) % 2 === 0) { ctx.fillStyle = "#ffd27a"; ctx.fillRect(-0.8, -4.2, 1.6, 1.6); }
+        ctx.restore();
+      } else { // flare: a hot glowing stick with a red halo
+        const halo = ctx.createRadialGradient(t.x, yy, 1, t.x, yy, 22);
+        halo.addColorStop(0, "rgba(255,90,40,0.5)"); halo.addColorStop(1, "rgba(255,60,20,0)");
+        ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(t.x, yy, 22, 0, TAU); ctx.fill();
+        ctx.save(); ctx.translate(t.x, yy); ctx.rotate(t.angle);
+        ctx.fillStyle = "#b03030"; ctx.fillRect(-1, -3, 2, 6);
+        ctx.restore();
+        ctx.fillStyle = "#fff2c0"; ctx.beginPath(); ctx.arc(t.x, yy, 2, 0, TAU); ctx.fill();
+      }
+    }
+  }
+
+  _drawShockwaves(ctx) {
+    for (const sw of this.shockwaves) {
+      const a = clamp(sw.life / 0.45, 0, 1);
+      ctx.strokeStyle = `rgba(255,220,160,${(a * 0.6).toFixed(3)})`;
+      ctx.lineWidth = 2 + (1 - a) * 4;
+      ctx.beginPath(); ctx.arc(sw.x, sw.y, sw.r, 0, TAU); ctx.stroke();
+    }
+    ctx.lineWidth = 1;
   }
 
   _drawFurniture(ctx) {

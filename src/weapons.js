@@ -44,16 +44,25 @@ export const WEAPONS = {
     spread: 0.01, range: 420, speed: 300, clip: 1, ammoType: "rockets",
     reload: 2.6, knockback: 200, explosive: 42, sever: 0.7, hs: 0, sound: "launch",
   },
+  grenade: {
+    name: "Grenade", kind: "grenade", throwable: true, damage: 95, fireRate: 1.1,
+    ammoType: "grenades", explosive: 44, fuse: 1.3, throwSpeed: 235, knockback: 220,
+    sever: 0.5, sound: "clink",
+  },
+  flare: {
+    name: "Flare", kind: "flare", throwable: true, damage: 0, fireRate: 1.2,
+    ammoType: "flares", fuse: 9, throwSpeed: 210, sound: "hiss",
+  },
 };
 
 // Order used when swapping weapons.
-export const WEAPON_ORDER = ["knife", "bat", "axe", "pistol", "smg", "shotgun", "rifle", "bazooka"];
+export const WEAPON_ORDER = ["knife", "bat", "axe", "pistol", "smg", "shotgun", "rifle", "bazooka", "grenade", "flare"];
 
 export function newLoadout() {
   return {
     owned: { knife: true, pistol: true },
     clip: { pistol: WEAPONS.pistol.clip },
-    ammo: { shells: 0, rounds: 48, rockets: 0 },
+    ammo: { shells: 0, rounds: 48, rockets: 0, grenades: 0, flares: 0 },
     keys: 0,
     armor: 0, armorMax: 0,   // body-armour points (absorbs damage, then breaks)
     helmet: 0, helmetMax: 0, // helmet points

@@ -254,8 +254,12 @@ export function makeZombieLook(type) {
     cloth2: jitterHex(cloth, 24),                 // trousers / accent
     hair: ZHAIR[(Math.random() * ZHAIR.length) | 0],
     hairLen: roll < 0.16 ? -1 : roll < 0.62 ? 0 : 1, // -1 bald, 0 short, 1 long
+    // Per-individual gait: how big/fast the arms swing and legs stride.
+    armAmp: rand(0.55, 1.6), armRate: rand(0.7, 1.6), legAmp: rand(0.7, 1.5),
   };
 }
+
+function rand(a, b) { return a + Math.random() * (b - a); }
 
 // Draw a zombie. parts = {larm,rarm,lleg,rleg} (1 attached / 0 severed); prone = dragging.
 export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts, prone, strideAmp, jumpH, vx, vy, look) {
@@ -283,9 +287,10 @@ export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts,
     const sx = bx + cos * (1.5 * s) + perpX * shoulderSide;
     const sy = by + sin * (1.5 * s) + perpY * shoulderSide;
     if (!ok) { ctx.fillStyle = STUMP; ctx.fillRect(Math.round(sx - 1), Math.round(sy - 1), Math.max(2, Math.round(2 * s)), Math.max(2, Math.round(2 * s))); return; }
-    const sway = Math.sin(frame * 3 * strideAmp + (side < 0 ? 0 : Math.PI)) * 0.24;
+    const armRate = look.armRate || 1, armAmp = look.armAmp || 1;
+    const sway = Math.sin(frame * (2.6 * armRate) * strideAmp + (side < 0 ? 0 : Math.PI)) * (0.24 * armAmp);
     const armA = angle + side * 0.3 + sway;
-    const reach = (longReach ? r * 2.3 : r * 1.7) + Math.sin(frame * 2 + (side < 0 ? 0 : 1.5)) * (r * 0.28);
+    const reach = (longReach ? r * 2.3 : r * 1.7) + Math.sin(frame * 2 * armRate + (side < 0 ? 0 : 1.5)) * (r * 0.28 * armAmp);
     const hx = bx + Math.cos(armA) * reach, hy = by + Math.sin(armA) * reach;
     limb(ctx, sx, sy, hx, hy, Math.max(2, Math.round(2.2 * s)), skin);
     ctx.fillStyle = dark; // clawed hand
@@ -305,6 +310,23 @@ export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts,
     } else B(hx - 0.2, 0, 1.8, 2.2, look.dark);                            // bald: bare scalp with a scar
   };
 
+  // Zombie dog: a low, mangy four-legged runner.
+  if (type === "dog") {
+    const fur = cloth, gait = Math.sin(frame * 2.4) * strideAmp;
+    const Ld = (ox, oy, w, h, cc) => px(ctx, cx, cyB, ox * s, oy * s, Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s)), cos, sin, cc);
+    Ld(5 + gait * 2, -2.6, 2, 4, dark); Ld(5 - gait * 2, 2.6, 2, 4, dark);   // front legs
+    Ld(-4 - gait * 2, -2.6, 2, 4, dark); Ld(-4 + gait * 2, 2.6, 2, 4, dark); // back legs
+    B(-6, 0, 4, 2, fur);   // tail
+    B(-1, 0, 12, 6, fur);  // long torso
+    B(0, 0, 6, 5, skin);   // rotting shoulders
+    B(0, 2, 2, 2, dark);   // wound
+    B(6, 0, 5, 5, fur);    // head
+    B(8.6, 0, 3, 3, dark); // snout
+    B(5, -2.4, 2, 2, dark); B(5, 2.4, 2, 2, dark); // ears
+    eye(7.5, -1.2); eye(7.5, 1.2);
+    return;
+  }
+
   if (prone) {
     // Legless, flat, dragging body pulling forward with both arms.
     B(-4, -2, 3, 2, parts.lleg ? cloth2 : STUMP); // trailing leg stumps
@@ -322,7 +344,7 @@ export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts,
 
   // Legs (shuffle bob, planted at the feet); severed legs become stumps and it limps.
   const L = (ox, oy, w, h, c) => px(ctx, cx, cyB, ox * s, oy * s, Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s)), cos, sin, c);
-  const legBob = Math.sin(frame * 1.5) * 1.7 * strideAmp;
+  const legBob = Math.sin(frame * 1.5) * 1.7 * strideAmp * (look.legAmp || 1);
   L(-1 + legBob * 0.35, 3, parts.rleg ? 3 : 2, parts.rleg ? 4 : 2, parts.rleg ? cloth2 : STUMP);
   L(-1 - legBob * 0.35, -3, parts.lleg ? 3 : 2, parts.lleg ? 4 : 2, parts.lleg ? cloth2 : STUMP);
 
@@ -423,6 +445,7 @@ const FURN = {
   car:    { body: "#8a3b33", top: "#b0554b", edge: "#1a1a1e" },
   truck:  { body: "#3f5a6b", top: "#557488", edge: "#1a1a1e" },
   bench:  { body: "#6b4a28", top: "#86633c", edge: "#4a3420" },
+  bush:   { body: "#2f4a24", top: "#3c5c2e", edge: "#213617" },
 };
 
 // Furniture: intact obstacle, or a broken / overturned pile once destroyed.
@@ -464,7 +487,7 @@ export function drawFurniture(ctx, f) {
     if (!vert) ctx.rotate(Math.PI / 2);
     const hw = vert ? f.hw : f.hh, hh = vert ? f.hh : f.hw;
     const CARS = ["#8a3b33", "#c0a040", "#6b6f76", "#7a5230", "#2f6b4a", "#3a5a8a", "#b5b5b8"];
-    const body = f.type === "truck" ? "#3f5a6b" : CARS[(((f.cx * 7 + f.cy * 13) % CARS.length) + CARS.length) % CARS.length];
+    const body = f.burning ? "#2b2622" : f.type === "truck" ? "#3f5a6b" : CARS[(((f.cx * 7 + f.cy * 13) % CARS.length) + CARS.length) % CARS.length];
     ctx.fillStyle = "#111114"; ctx.fillRect(-hw, -hh, hw * 2, hh * 2);              // underbody / tyres
     ctx.fillStyle = body; ctx.fillRect(-hw + 1, -hh + 2, hw * 2 - 2, hh * 2 - 4);   // painted shell
     if (f.type === "truck") {
@@ -485,6 +508,15 @@ export function drawFurniture(ctx, f) {
   if (f.type === "bench") {
     ctx.fillStyle = c.edge; ctx.fillRect(-f.hw, -f.hh, f.hw * 2, f.hh * 2);
     ctx.fillStyle = c.body; for (let i = -1; i <= 1; i++) ctx.fillRect(-f.hw, i * 2 - 0.7, f.hw * 2, 1.4);
+    ctx.restore();
+    return;
+  }
+  if (f.type === "bush") {
+    // A leafy shrub: a few overlapping blobs with a lit top.
+    ctx.fillStyle = c.body;
+    for (const [ox, oy, rr] of [[-4, 0, 6], [4, 1, 6], [0, -3, 6], [0, 2, 7]]) { ctx.beginPath(); ctx.arc(ox, oy, rr, 0, TAU); ctx.fill(); }
+    ctx.fillStyle = c.top;
+    for (const [ox, oy, rr] of [[-3, -2, 3], [3, -1, 3], [0, -1, 3.4]]) { ctx.beginPath(); ctx.arc(ox, oy, rr, 0, TAU); ctx.fill(); }
     ctx.restore();
     return;
   }
@@ -570,6 +602,16 @@ export function drawPickup(ctx, cx, cy, kind, t) {
       ctx.beginPath(); ctx.arc(cx, y + 1, 5, Math.PI, 0); ctx.fill();
       ctx.fillRect(Math.round(cx - 5), Math.round(y + 1), 10, 2);
       ctx.fillStyle = "#4c5a6d"; ctx.fillRect(Math.round(cx - 4), Math.round(y - 3), 8, 2);
+      break;
+    case "grenade": // a fragmentation grenade
+      ctx.fillStyle = "#3a4a2c"; ctx.beginPath(); ctx.arc(cx, y + 1, 4.5, 0, TAU); ctx.fill();
+      ctx.fillStyle = "#2a3620"; ctx.fillRect(Math.round(cx - 4), Math.round(y - 1), 8, 1.5); ctx.fillRect(Math.round(cx - 1), Math.round(y - 3), 2, 6);
+      ctx.fillStyle = "#8a8f6a"; ctx.fillRect(Math.round(cx - 1.5), Math.round(y - 6), 3, 3); // spoon/lever
+      break;
+    case "flare": // a signal flare
+      ctx.fillStyle = "#b03030"; ctx.fillRect(Math.round(cx - 1.5), Math.round(y - 6), 3, 11);
+      ctx.fillStyle = "#e8e0d0"; ctx.fillRect(Math.round(cx - 1.5), Math.round(y - 6), 3, 3);
+      ctx.fillStyle = "#ff7a3a"; ctx.beginPath(); ctx.arc(cx, y - 7, 2.4, 0, TAU); ctx.fill();
       break;
     default: {
       box("#5a4632");
