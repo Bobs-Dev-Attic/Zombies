@@ -1,7 +1,20 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.12.1";
+export const VERSION = "0.13.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.13.0",
+    date: "2026-07-15",
+    title: "Chaos & Carnage",
+    changes: [
+      "Item locations and the horde's spawn fronts are now randomized every wave, and the difficulty ramps harder as waves climb — bigger, faster, tougher hordes.",
+      "Zombies move with more individuality: each swings its arms and strides differently, spitters vary in accuracy, and limbs fly off more readily when you shoot them.",
+      "Zombie dogs! Fast four-legged packs prowl the streets outside.",
+      "New throwables — grenades that blow up on a fuse, and flares that you toss to lure the horde away from you.",
+      "Bazooka and grenade blasts now send out a shockwave that damages and hurls everything: zombies, furniture, and even you get blown back, and nearby windows/doors shatter.",
+      "Fixed the look of fences and trees, added shrubs, and some parked cars and trucks are now wrecked — burning, smoking and smouldering.",
+    ],
+  },
   {
     version: "0.12.1",
     date: "2026-07-13",

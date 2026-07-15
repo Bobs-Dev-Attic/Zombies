@@ -155,6 +155,7 @@ export class Player {
     if (this.cooldown > 0 || this.reloading > 0) return false;
     const w = this.weapon;
     if (w.melee) return true;
+    if (w.throwable) return (this.loadout.ammo[w.ammoType] || 0) > 0;
     const clip = this.loadout.clip[this.loadout.current] ?? 0;
     return clip > 0;
   }
@@ -195,6 +196,8 @@ export const ZOMBIE_TYPES = {
   // Prone crawler: drags itself along the ground with no legs. High base speed
   // so the legless drag still lunges, but slower and more erratic than a walker.
   prone:   { hp: 30,  speed: 118, r: 6, dmg: 10, pattern: "wanderChase", knockResist: 0.15, score: 20, color: "crawler", gore: 0.9, shamble: 0.46, lurch: 0.4, bornProne: true },
+  // Zombie dog: a fast, low four-legged runner that packs the streets outside.
+  dog:     { hp: 26,  speed: 78, r: 6,  dmg: 8,  pattern: "direct",      knockResist: 0.05, score: 18, color: "runner",  gore: 0.7, shamble: 0.14, lurch: 0.12, quad: true },
 };
 
 export class Zombie {
@@ -221,6 +224,8 @@ export class Zombie {
     this.flankSign = chance(0.5) ? 1 : -1;
     this.mass = t.r; // heavier things shove lighter ones in collisions
     this.look = makeZombieLook(type); // per-zombie skin/clothes/hair variety
+    this.quad = !!t.quad;              // four-legged (dog)
+    this.accuracy = rand(0.5, 1);      // some aim their spit far better than others
 
     // Per-zombie gait so they shamble on differing strides and paths, not lines.
     const shamble = t.shamble ?? 0.3, lurch = t.lurch ?? 0.25;
@@ -314,10 +319,12 @@ export class Zombie {
     return { tvx: (hx + px * sway) * s, tvy: (hy + py * sway) * s };
   }
 
-  update(dt, player, world, nav, spawnProjectile) {
+  update(dt, player, world, nav, spawnProjectile, lure) {
     if (this.hurtFlash > 0) this.hurtFlash -= dt;
     if (this.attackCd > 0) this.attackCd -= dt;
     this.gaitT += dt;
+    // A flare on the ground draws the horde toward it instead of the player.
+    this.lured = lure && dist(this.x, this.y, lure.x, lure.y) < 320;
 
     // Mid-leap: fly along the pounce arc, land, and (maybe) maul the player.
     if (this.leaping) {
@@ -345,8 +352,10 @@ export class Zombie {
 
     this.frame += dt * (2 + this.speed * this.speedMul * 0.05) * this.strideRate;
 
-    const seek = this._seek(player, world, nav);
+    const seekTarget = this.lured ? lure : player;
+    const seek = this._seek(seekTarget, world, this.lured ? null : nav);
     const d = seek.d;
+    const pdist = dist(this.x, this.y, player.x, player.y);
     const sees = d < 560;
     // The more wounded (low HP) it is, the slower it moves — on top of dismemberment.
     const hpFrac = clamp(this.hp / this.maxHp, 0, 1);
@@ -354,8 +363,8 @@ export class Zombie {
     const spd = this.speed * this.speedMul * this.woundMul;
     let tvx = 0, tvy = 0;
 
-    // Pounce when in range with a clear line to the player.
-    if (this.canLeap && this.leapCd <= 0 && seek.los && d > 55 && d < 240) {
+    // Pounce when in range with a clear line to the player (not while lured).
+    if (this.canLeap && !this.lured && this.leapCd <= 0 && seek.los && d > 55 && d < 240) {
       this._startLeap(player);
       this.vx = this.leapVX; this.vy = this.leapVY;
       return;
@@ -388,7 +397,9 @@ export class Zombie {
         this.spitCd -= dt;
         if (sees && seek.los && this.spitCd <= 0 && d < 320) {
           this.spitCd = rand(2.2, 3.6);
-          spawnProjectile(this.x, this.y, a + rand(-0.06, 0.06), "spit");
+          // Accuracy varies per zombie — sharp shooters barely miss, sloppy ones spray.
+          const spread = 0.03 + (1 - this.accuracy) * 0.22;
+          spawnProjectile(this.x, this.y, a + rand(-spread, spread), "spit");
         }
         break;
       }
@@ -415,7 +426,7 @@ export class Zombie {
     this.x = res.x; this.y = res.y;
 
     // Melee the player on contact. Fewer arms & heavier wounds => weaker hits.
-    if (d < this.r + player.r + 2 && this.attackCd <= 0) {
+    if (pdist < this.r + player.r + 2 && this.attackCd <= 0) {
       player.hurt(this.def.dmg * this.dmgMul * (0.55 + 0.45 * hpFrac));
       this.attackCd = 0.7;
       const a = angleTo(this.x, this.y, player.x, player.y);
@@ -438,7 +449,7 @@ export class Zombie {
     let severed = null;
     if (this.hp > 0) {
       // Bigger hits and dismembering weapons are likelier to tear a limb off.
-      const p = sever + amount * 0.004;
+      const p = sever + amount * 0.006;
       if (Math.random() < p) severed = this._severRandom();
     } else {
       this.dead = true;
@@ -523,4 +534,43 @@ export class Pickup {
     this.r = 9;
   }
   update(dt) { this.t += dt; }
+}
+
+// ---------------------------------------------------------------- Thrown items
+// Grenades and flares: lobbed on an arc (z = height above ground), bounce off
+// walls, settle, and count down a fuse. The game reads .kind / .fuse to detonate
+// a grenade or keep a flare burning as a lure.
+export class Thrown {
+  constructor(x, y, angle, opts) {
+    this.x = x; this.y = y;
+    this.vx = Math.cos(angle) * opts.speed;
+    this.vy = Math.sin(angle) * opts.speed;
+    this.z = 4; this.vz = 95;          // arc height above the ground
+    this.kind = opts.kind;             // 'grenade' | 'flare'
+    this.fuse = opts.fuse;
+    this.explosive = opts.explosive || 0;
+    this.damage = opts.damage || 0;
+    this.knockback = opts.knockback || 0;
+    this.sever = opts.sever || 0;
+    this.spin = rand(-16, 16);
+    this.angle = angle;
+    this.landed = false;
+    this.dead = false;
+    this.t = 0;
+  }
+  update(dt, world) {
+    this.t += dt; this.fuse -= dt; this.angle += this.spin * dt;
+    if (!this.landed) {
+      this.z += this.vz * dt; this.vz -= 300 * dt;
+      const nx = this.x + this.vx * dt, ny = this.y + this.vy * dt;
+      const res = world.collide(nx, ny, 3);
+      if (Math.abs(res.x - nx) > 0.01 || Math.abs(res.y - ny) > 0.01) { this.vx *= -0.4; this.vy *= -0.4; }
+      this.x = res.x; this.y = res.y;
+      if (this.z <= 0) { this.z = 0; this.landed = true; this.vx *= 0.3; this.vy *= 0.3; this.spin *= 0.25; }
+    } else {
+      this.vx *= Math.pow(0.02, dt); this.vy *= Math.pow(0.02, dt);
+      const res = world.collide(this.x + this.vx * dt, this.y + this.vy * dt, 3);
+      this.x = res.x; this.y = res.y;
+    }
+  }
 }

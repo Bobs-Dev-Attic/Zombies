@@ -306,6 +306,7 @@ export class World {
       const wx = (s.x + 0.5) * TILE, wy = (s.y + 0.5) * TILE;
       const L = truck ? 30 : 22, W = truck ? 13 : 11;
       this._furn(wx, wy, truck ? "truck" : "car", s.vert ? W : L, s.vert ? L : W, truck ? 220 : 160);
+      this.furniture[this.furniture.length - 1].burning = chance(0.22); // some are ablaze
     }
 
     // Player starts at the central intersection; the exit road runs off the
@@ -371,8 +372,12 @@ export class World {
       this._furn((gate + 0.5) * TILE, (y1 - 1 + 0.5) * TILE, chance(0.3) ? "truck" : "car", 11, 20, 160);
     }
 
-    // A tree or two in the front yard.
+    // A tree or two in the front yard, and a shrub by the fence.
     for (let i = 0; i < randInt(0, 2); i++) treeAt(randInt(x0 + 1, x1 - 1), y1 - 1);
+    if (chance(0.6)) {
+      const bxg = chance(0.5) ? x0 + 1 : x1 - 1, byg = y1 - 1;
+      if (this.tileAt(bxg, byg) === T.FLOOR) this._furn((bxg + 0.5) * TILE, (byg + 0.5) * TILE, "bush", 9, 8, 26);
+    }
   }
 
   _generate() {
@@ -635,5 +640,15 @@ export class World {
       if (this.tileAt(cx, cy) === T.FLOOR) return { x: (cx + 0.5) * TILE, y: (cy + 0.5) * TILE };
     }
     return { x: this.spawnPoint.x, y: this.spawnPoint.y };
+  }
+
+  // A random floor tile within `radius` px of a point (for clustered spawns).
+  randomFloorNear(pt, radius) {
+    for (let t = 0; t < 40; t++) {
+      const ang = rand(0, Math.PI * 2), rr = rand(0, radius);
+      const cx = Math.floor((pt.x + Math.cos(ang) * rr) / TILE), cy = Math.floor((pt.y + Math.sin(ang) * rr) / TILE);
+      if (this.tileAt(cx, cy) === T.FLOOR) return { x: (cx + 0.5) * TILE, y: (cy + 0.5) * TILE };
+    }
+    return null;
   }
 }

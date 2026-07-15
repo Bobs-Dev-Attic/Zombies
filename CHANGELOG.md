@@ -7,6 +7,16 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.13.0] — 2026-07-15
+### Chaos & Carnage
+- **Randomized spawns & loot** — item locations are re-scattered every level, and each wave the horde streams in from a fresh set of **randomized origin fronts** (2–4 directions) instead of the same place.
+- **Difficulty ramp** — wave sizes now grow with a quadratic tail (much bigger late waves), spawn faster, scale HP harder, and shift toward tougher foes sooner.
+- **More individual zombies** — per-zombie **arm-swing and stride** amplitude/speed, plus per-zombie **spit accuracy** (some barely miss, others spray). Limbs are **flung off more readily** when shot.
+- **Zombie dogs** — a fast, low, four-legged runner that packs the **streets** outside (from wave 2).
+- **Throwables** — **grenades** (lobbed on an arc, bounce off walls, detonate on a fuse) and **flares** (toss one and the horde flocks to it, drawn away from you). Picked up as loot; thrown with FIRE while selected.
+- **Blast shockwave** — bazooka rockets and grenades now emit an expanding **shockwave** that damages and **knocks back everything** — zombies, furniture (wrecks skid outward), and the player — and shatters nearby windows/doors. A visible ring FX marks the wave.
+- **Streets polish** — cleaner **picket fences**, layered **trees**, new **shrubs**, and some parked **cars/trucks are wrecked** — burning with licking flames and rising smoke.
+
 ## [0.12.1] — 2026-07-13
 ### Blood & Bullets Fixes
 - **Death screen blood width** — the blood is now one **continuous full-width sheet**: the flow below the YOU DIED card matches the flow pouring from the top, instead of a narrower band under the dialog. The card is punched out as a clean, readable window with blood pooling on its top edge and dripping off the bottom.
@@ -146,6 +156,7 @@ _Next: 2b locked doors + key/axe, 2c functional stairs to upper floors, 2d the o
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.13.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.13.0
 [0.12.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.12.1
 [0.12.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.12.0
 [0.11.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.11.0
