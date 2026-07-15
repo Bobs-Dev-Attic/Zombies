@@ -54,6 +54,7 @@ export class Game {
     this.floorLevel = 0;
     this.floorCache = {};
     this.floorCooldown = 0;
+    this._onTransit = false;
     this.world = new World(settingIndex, 0);
     this.player = new Player(this.world.spawnPoint.x, this.world.spawnPoint.y, newLoadout());
     this.zombies = [];
@@ -158,9 +159,11 @@ export class Game {
     }
   }
 
-  // Ascend / descend the staircase. Each floor keeps its own world, decals and
-  // loot cached so it looks the same when you come back.
-  _changeFloor(target) {
+  // Move between a level's two floors (house stairs, or street manholes <-> the
+  // sewers). Each floor keeps its own world, decals and loot cached. arriveIdx
+  // (optional) picks which ladder/manhole you surface at, so the sewers can drop
+  // you off elsewhere in the neighbourhood.
+  _changeFloor(target, arriveIdx) {
     // Stash the current floor's persistent state.
     this.floorCache[this.floorLevel] = {
       world: this.world, bodies: this.bodies, limbs: this.limbs, stains: this.stains,
@@ -177,14 +180,23 @@ export class Game {
       this.bodies = []; this.limbs = []; this.stains = []; this.pickups = []; this.corpses = []; this.gibs = [];
       this._seedLevelLoot();
     }
-    // Land next to the destination staircase; the horde and shots don't follow.
-    this.player.x = this.world.landing.x; this.player.y = this.world.landing.y;
+    // Arrive at the mapped ladder/manhole, else the floor's default landing.
+    let arrive = null;
+    if (arriveIdx != null) {
+      const cells = this.world.isSewers ? this.world.ladders : this.world.isStreets ? this.world.manholes : null;
+      if (cells && cells[arriveIdx]) arrive = cells[arriveIdx];
+    }
+    if (arrive) { this.player.x = (arrive.cx + 0.5) * TILE; this.player.y = (arrive.cy + 0.5) * TILE; }
+    else { this.player.x = this.world.landing.x; this.player.y = this.world.landing.y; }
     this.zombies = []; this.projectiles = []; this.particles = []; this.thrown = []; this.shockwaves = [];
     this.cam.x = this.player.x; this.cam.y = this.player.y;
     this.flow = null; this.flowTimer = 0; // rebuild the flow field for the new grid
-    this.floorCooldown = 1.2; // don't bounce straight back onto the stairs
+    this.floorCooldown = 1.2;
+    this._onTransit = true; // arriving on a ladder/manhole shouldn't instantly re-trigger
     this.hooks.onSetting?.(this.world.setting.name);
-    this._announce(target === 1 ? "Upstairs" : "Ground Floor", target === 1 ? "bedrooms & bath" : "living room");
+    const label = this.world.isSewers ? "The Sewers" : this.world.isHouse ? (target === 1 ? "Upstairs" : "Ground Floor") : "The Streets";
+    const sub = this.world.isSewers ? "find a ladder up" : this.world.isHouse ? (target === 1 ? "bedrooms & bath" : "living room") : "back topside";
+    this._announce(label, sub);
   }
 
   // Wood-chip debris when a door is chopped/shot; a bigger burst when it breaks.
@@ -376,6 +388,20 @@ export class Game {
       const pcx = Math.floor(this.player.x / TILE), pcy = Math.floor(this.player.y / TILE);
       if (this.world.stairsCells.some((s) => s.cx === pcx && s.cy === pcy)) {
         this._changeFloor(this.floorLevel === 0 ? 1 : 0);
+      }
+    }
+    // Manholes (street) / ladders (sewer) — fire on stepping ONTO the cell.
+    if (this.world.isStreets) {
+      const pcx = Math.floor(this.player.x / TILE), pcy = Math.floor(this.player.y / TILE);
+      const cells = this.world.isSewers ? this.world.ladders : this.world.manholes;
+      const idx = cells ? cells.findIndex((c) => c.cx === pcx && c.cy === pcy) : -1;
+      if (idx >= 0) {
+        if (!this._onTransit && this.floorCooldown <= 0) {
+          this._onTransit = true;
+          this._changeFloor(this.world.isSewers ? 0 : 1, idx);
+        }
+      } else {
+        this._onTransit = false;
       }
     }
 
@@ -1224,7 +1250,7 @@ export class Game {
       for (let cx = 0; cx < w.cols; cx++) {
         if (!w.explored[w.idx(cx, cy)]) continue;
         const t = w.tileAt(cx, cy);
-        mc.fillStyle = (t === T.WALL || t === T.PROP) ? "#3c4636" : t === T.FENCE ? "#4a5a3a" : t === T.WINDOW ? "#7fb0c0" : t === T.EXIT ? "#39d353" : t === T.STAIRS ? "#8a6d40" : "#6f7d5e";
+        mc.fillStyle = (t === T.WALL || t === T.PROP) ? "#3c4636" : t === T.FENCE ? "#4a5a3a" : t === T.WINDOW ? "#7fb0c0" : t === T.EXIT ? "#39d353" : t === T.STAIRS ? "#8a6d40" : t === T.MANHOLE ? "#d0c060" : "#6f7d5e";
         mc.fillRect(oxm + cx * scale, oym + cy * scale, scale + 0.6, scale + 0.6);
       }
     }
@@ -1258,7 +1284,15 @@ export class Game {
         const t = w.tileAt(cx, cy);
         const x = cx * TILE, y = cy * TILE;
         if (t === T.WALL) {
-          if (w.isStreets) {
+          if (w.isSewers) {
+            // Grimy concrete tunnel wall with a lit top edge.
+            ctx.fillStyle = "#232a2c"; ctx.fillRect(x, y, TILE, TILE);
+            if (w.tileAt(cx, cy - 1) !== T.WALL && w.tileAt(cx, cy - 1) !== undefined) {
+              ctx.fillStyle = "#33403f"; ctx.fillRect(x, y, TILE, 6);
+              ctx.fillStyle = "rgba(0,0,0,0.32)"; ctx.fillRect(x, y + TILE - 4, TILE, 4);
+            }
+            ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.fillRect(x, y + TILE / 2 - 1, TILE, 2); // grout line
+          } else if (w.isStreets) {
             const border = cx === 0 || cy === 0 || cx === w.cols - 1 || cy === w.rows - 1;
             if (border) {
               // Hedge / tree-line along the edge of the neighbourhood.
@@ -1331,6 +1365,23 @@ export class Game {
             ctx.fillStyle = "#3f2f1a";
             for (let st = 0; st < 4; st++) ctx.fillRect(x + 2, y + 2 + st * 7, TILE - 4, 2.5);
             ctx.fillStyle = "rgba(255,255,255,0.06)"; ctx.fillRect(x + 2, y + 1, TILE - 4, 3);
+          }
+          if (t === T.MANHOLE) {
+            const cxp = x + TILE / 2, cyp = y + TILE / 2;
+            if (w.isSewers) {
+              // A ladder up, lit by a shaft of daylight from the street.
+              ctx.fillStyle = "#3a3a30"; ctx.beginPath(); ctx.arc(cxp, cyp, 11, 0, TAU); ctx.fill();
+              ctx.fillStyle = "rgba(210,220,180,0.28)"; ctx.beginPath(); ctx.arc(cxp, cyp, 8, 0, TAU); ctx.fill();
+              ctx.fillStyle = "#20242a"; for (let i = -1; i <= 1; i++) ctx.fillRect(cxp - 4, cyp + i * 4 - 1, 8, 2);
+              ctx.strokeStyle = "#4a4a3a"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cxp, cyp, 11, 0, TAU); ctx.stroke();
+            } else {
+              // An open manhole in the road: dark shaft, rim, and shoved-aside cover.
+              ctx.fillStyle = "#3a3a3e"; ctx.beginPath(); ctx.arc(cxp + 13, cyp + 3, 7, 0, TAU); ctx.fill(); // cover
+              ctx.fillStyle = "#0a0c0e"; ctx.beginPath(); ctx.arc(cxp, cyp, 10, 0, TAU); ctx.fill();
+              ctx.strokeStyle = "#4a4a4e"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cxp, cyp, 10, 0, TAU); ctx.stroke();
+              ctx.fillStyle = "#20242a"; for (let i = -1; i <= 1; i++) ctx.fillRect(cxp - 3, cyp + i * 4 - 1, 6, 1.6);
+            }
+            ctx.lineWidth = 1;
           }
           if (t === T.PROP) {
             if (w.isStreets) {

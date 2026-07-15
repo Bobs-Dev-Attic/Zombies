@@ -7,6 +7,13 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.14.0] — 2026-07-15
+### Into the Sewers
+- **Open manholes** at four intersections of the streets — step onto one to **drop into the sewers**.
+- **The sewers** are a procedurally generated **maze of 2-wide water tunnels** through concrete (randomized DFS with a few extra loops), with **ladders** back up to the surface, their own murky terrain palette, wall rendering and mini-map.
+- **Surface elsewhere** — each ladder maps to a **different street manhole**, so you can travel underground and come up in another part of the neighborhood (a way to slip past the horde). The transition reuses the floor-cache system, so the streets and the sewers each keep their own layout, loot, blood and bodies.
+- New `MANHOLE` tile (walkable) with distinct open-manhole (street) and lit ladder-shaft (sewer) rendering, and a step-on-to-enter trigger that won't bounce you straight back on arrival.
+
 ## [0.13.0] — 2026-07-15
 ### Chaos & Carnage
 - **Randomized spawns & loot** — item locations are re-scattered every level, and each wave the horde streams in from a fresh set of **randomized origin fronts** (2–4 directions) instead of the same place.
@@ -156,6 +163,7 @@ _Next: 2b locked doors + key/axe, 2c functional stairs to upper floors, 2d the o
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.14.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.14.0
 [0.13.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.13.0
 [0.12.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.12.1
 [0.12.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.12.0
