@@ -194,6 +194,7 @@ export class World {
       { cx: vx + 3, cy: by + 3, kind: "weapon", data: "axe" },
       { cx: vx + 8, cy: hy + 7, kind: "weapon", data: "shotgun" },
       { cx: vx + 4, cy: hy + 8, kind: "ammo", data: { type: "shells", amount: 16 } },
+      { cx: bx + 9, cy: by + 7, kind: "helmet", data: { value: 25, max: 30 } },
     ];
 
     this.spawnPoint = { x: (bx + 7 + 0.5) * TILE, y: (by + 12 + 0.5) * TILE };
@@ -236,6 +237,7 @@ export class World {
       { cx: vx + 3, cy: hy + 6, kind: "weapon", data: "rifle" },
       { cx: vx + 7, cy: hy + 3, kind: "ammo", data: { type: "rounds", amount: 40 } },
       { cx: bx + 10, cy: y1 - 6, kind: "adrenaline" },
+      { cx: vx + 5, cy: by + 6, kind: "armor", data: { value: 40, max: 50 } },
     ];
 
     this.spawnPoint = { x: this.landing.x, y: this.landing.y + TILE };

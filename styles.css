@@ -149,6 +149,9 @@ html, body {
 .bar-fill { height: 100%; width: 100%; transition: width 0.12s linear; }
 .bar-fill.hp { background: linear-gradient(90deg, #7a1d16, var(--hp)); }
 .bar-fill.stamina { background: linear-gradient(90deg, #8a7016, var(--stamina)); }
+.bar-fill.armor { background: linear-gradient(90deg, #2c3642, #5c7093); }
+.bar-fill.helmet { background: linear-gradient(90deg, #33404e, #6f8298); }
+.bar-row.adrenaline .bar-fill.stamina { box-shadow: 0 0 8px rgba(224, 184, 58, 0.9); filter: saturate(1.4) brightness(1.15); }
 
 .hud-stats { text-align: right; text-shadow: 0 1px 2px #000; }
 #wave-label { font-size: 13px; color: var(--accent); letter-spacing: 1px; }

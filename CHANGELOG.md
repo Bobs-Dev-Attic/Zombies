@@ -7,6 +7,14 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.12.0] — 2026-07-13
+### Gear Up
+- **Varied zombies** — every zombie is now generated with its own **jittered skin tone**, **grubby clothing colour** (from a broad palette) and **hairstyle** (short cap, long trailing hair, or bald), all carried through to its fallen-body decal so the horde reads as a crowd of individuals.
+- **More detailed player** — the head gained hair, ears, eyes and a nose tip, and the player now has a **visible idle animation**: they stand and breathe, and the breathing **heaves harder and faster the lower their stamina** (winded → panting).
+- **Body armor & helmets** — new protective pickups in **light and heavy grades**. The **helmet** soaks a slice of every hit; **body armor** soaks the bulk of what's left. Both show as **bars beside your health**, deplete as they absorb damage, and **break and disappear** at zero (with an on-screen callout). They're also rendered on the player (helmet dome + chest plate).
+- **Damage side-flash** — taking a hit now flashes **blood-red bars down the left and right edges** of the screen, scaled to the **severity** of the health lost (armour softens it), fading out as you steady.
+- **Adrenaline rush** — adrenaline now grants a lasting buff: your **stamina drains and refills at half rate** for ~14s, so you can sprint far longer (the stamina bar glows while it's active).
+
 ## [0.11.0] — 2026-07-13
 ### The Neighborhood
 - **The Streets is now an outdoor neighborhood** rather than the old indoor room-and-corridor maze. A dedicated generator lays out a **grid of asphalt roads** with dashed **centre-line markings** and flanking **concrete sidewalks**.
@@ -132,6 +140,7 @@ _Next: 2b locked doors + key/axe, 2c functional stairs to upper floors, 2d the o
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.12.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.12.0
 [0.11.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.11.0
 [0.10.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.10.0
 [0.9.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.9.0

@@ -55,6 +55,8 @@ export function newLoadout() {
     clip: { pistol: WEAPONS.pistol.clip },
     ammo: { shells: 0, rounds: 48, rockets: 0 },
     keys: 0,
+    armor: 0, armorMax: 0,   // body-armour points (absorbs damage, then breaks)
+    helmet: 0, helmetMax: 0, // helmet points
     current: "pistol",
   };
 }

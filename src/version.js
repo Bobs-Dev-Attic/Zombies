@@ -1,7 +1,19 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.11.0";
+export const VERSION = "0.12.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.12.0",
+    date: "2026-07-13",
+    title: "Gear Up",
+    changes: [
+      "The horde is no longer identical — every zombie now has its own skin tone, grubby clothing colour and hairstyle (short, long, or bald), carried through to its corpse.",
+      "The player's head got more detail (hair, ears, eyes, a nose) and now has a visible idle: they stand and breathe, heaving harder and faster the more winded they are.",
+      "Body armor and helmets! Pick them up to soak incoming damage — the helmet takes a slice of every hit, body armor soaks the bulk — shown as bars by your health. When a piece is used up it breaks and falls away. Light and heavy grades exist.",
+      "Taking damage now flashes blood-red bars down the sides of the screen, scaled to how hard you were hit, fading as you recover.",
+      "Adrenaline now gives a lasting rush — your stamina drains (and refills) far more slowly for a while, so you can sprint much longer.",
+    ],
+  },
   {
     version: "0.11.0",
     date: "2026-07-13",

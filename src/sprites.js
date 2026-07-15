@@ -74,16 +74,26 @@ export function drawPlayer(ctx, cx, cy, angle, frame, hurtFlash, weaponKind, pal
   // Gait timing.
   const strideAmp = run ? 8.5 : 6.5;
   const stride = moving ? Math.sin(frame) * strideAmp : 0;      // feet swing fore/aft
-  const bounce = moving ? Math.abs(Math.sin(frame)) * (run ? 3.8 : 2.6) : 0; // body bob
-  const rock = moving ? Math.sin(frame) * (run ? 0.12 : 0.08) : 0;           // side-to-side sway
+  let lift, rock;
+  if (moving) {
+    lift = Math.abs(Math.sin(frame)) * (run ? 3.8 : 2.6);       // body bob
+    rock = Math.sin(frame) * (run ? 0.12 : 0.08);              // side-to-side sway
+  } else {
+    // Idle breathing — heaves harder and faster the more winded you are.
+    const tired = 1 - (action.stamina == null ? 1 : action.stamina);
+    const idleT = action.idleT || 0;
+    const amp = 0.6 + tired * 2.0, rate = 3.0 + tired * 4.6;
+    lift = (Math.sin(idleT * rate) * 0.5 + 0.5) * amp;         // chest rise/fall (>=0)
+    rock = Math.sin(idleT * rate * 0.5) * (0.02 + tired * 0.06);
+  }
 
   // Ground point at local (ox forward, oy sideways) — feet live here (no bob).
   const gpt = (ox, oy) => [cx + c * ox - s * oy, cy + s * ox + c * oy];
   // Bobbed point — hips/body live here.
-  const bpt = (ox, oy) => [cx + c * ox - s * oy, cy - bounce + s * ox + c * oy];
+  const bpt = (ox, oy) => [cx + c * ox - s * oy, cy - lift + s * ox + c * oy];
 
   // --- Shadow (planted; shifts with movement, shrinks as the body bounces).
-  drawShadow(ctx, cx, cy + 6, action.vx || 0, action.vy || 0, 7, 3.4, bounce / 4.2);
+  drawShadow(ctx, cx, cy + 6, action.vx || 0, action.vy || 0, 7, 3.4, lift / 4.2);
 
   // --- Legs & feet: hips (bobbed) down to planted, scissoring boots. The lead
   // foot swings out past the torso so the stride is clearly visible from above.
@@ -98,12 +108,19 @@ export function drawPlayer(ctx, cx, cy, angle, frame, hurtFlash, weaponKind, pal
 
   // --- Upper body (bobbed & rocked), rotated to face `angle`.
   ctx.save();
-  ctx.translate(cx, cy - bounce);
+  ctx.translate(cx, cy - lift);
   ctx.rotate(angle + rock);
   const R = (ox, oy, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(ox - w / 2, oy - h / 2, w, h); };
 
   R(0, 0, 9, 9, palette.shirt);
   R(-2.5, 0, 3, 9, palette.vest); // vest/pack toward the back
+  // Body armour plate over the chest (with shoulder straps) when equipped.
+  if (action.armor) {
+    R(0.3, 0, 8.4, 8.4, "#465264");
+    R(0.3, -3, 8.4, 1.8, "#586576");
+    R(0.3, 3, 8.4, 1.8, "#586576");
+    R(1.6, 0, 3.4, 6.5, "#3a4453");
+  }
 
   // Weapon pose. Guns recoil; the knife has three attacks (one-handed swing,
   // one-handed stab, two-handed lunge); other melee is a two-handed swing.
@@ -146,9 +163,24 @@ export function drawPlayer(ctx, cx, cy, angle, frame, hurtFlash, weaponKind, pal
   drawWeaponLocal(ctx, weaponKind);
   ctx.restore();
 
-  // Head (forward) + hair.
-  R(2, 0, 6, 6, skin);
-  R(3, 0, 2, 5, palette.hair);
+  // Head (faces forward = +x): skin, ears, hair over the crown, brow, eyes and
+  // a nose tip — or a helmet shell over the top when one is equipped.
+  R(2, 0, 6.2, 6, skin);
+  R(2, -3.2, 1.6, 2, skin);   // ears
+  R(2, 3.2, 1.6, 2, skin);
+  if (action.helmet) {
+    R(1.8, 0, 6.6, 6.6, "#3a4657");                 // helmet shell
+    R(0.8, 0, 4.6, 6.6, "#4c5a6d");                 // crown highlight
+    R(4.7, 0, 1.5, 5.2, "#2a333f");                 // front rim / visor
+  } else {
+    R(1.1, 0, 3.2, 6.2, palette.hair);              // hair over crown/back
+    R(0.7, -2.7, 2, 2, palette.hair);
+    R(0.7, 2.7, 2, 2, palette.hair);
+    ctx.fillStyle = "rgba(0,0,0,0.22)"; ctx.fillRect(3.4 - 1, -3, 1.4, 6); // brow shadow
+    R(4.4, -1.5, 1.5, 1.5, "#241c14");              // eyes
+    R(4.4, 1.5, 1.5, 1.5, "#241c14");
+    ctx.fillStyle = skin; ctx.fillRect(5.4 - 0.7, -0.7, 1.4, 1.4);         // nose tip
+  }
 
   ctx.restore();
 }
@@ -198,15 +230,44 @@ const ZOMBIE_PAL = {
 };
 const STUMP = "#7a1414";
 
+// Nudge a hex colour by a random amount per channel (per-zombie variety).
+export function jitterHex(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const j = () => (Math.random() * 2 - 1) * amt;
+  const clip = (v) => (v < 0 ? 0 : v > 255 ? 255 : v) | 0;
+  return `rgb(${clip(((n >> 16) & 255) + j())},${clip(((n >> 8) & 255) + j())},${clip((n & 255) + j())})`;
+}
+
+// A spread of grubby clothing colours and hair shades for the horde.
+const ZCLOTHES = ["#5a5347", "#6b3a3a", "#3f5168", "#4a5a3a", "#6a5a2a", "#5a3a5a", "#7a5236", "#40484f", "#772d2d", "#2f5d54", "#8a8f95", "#3a3f2a"];
+const ZHAIR = ["#20160e", "#3a2a18", "#6a5232", "#b0a060", "#8a8a8a", "#a44a20", "#4a3a2a", "#111111", "#d8d8d0"];
+
+// Build a per-zombie appearance: jittered skin, random clothes and hair style.
+export function makeZombieLook(type) {
+  const base = ZOMBIE_PAL[type] || ZOMBIE_PAL.walker;
+  const cloth = Math.random() < 0.7 ? ZCLOTHES[(Math.random() * ZCLOTHES.length) | 0] : jitterHex(base.cloth, 30);
+  const roll = Math.random();
+  return {
+    skin: jitterHex(base.skin, 26),
+    dark: jitterHex(base.dark, 20),
+    cloth,
+    cloth2: jitterHex(cloth, 24),                 // trousers / accent
+    hair: ZHAIR[(Math.random() * ZHAIR.length) | 0],
+    hairLen: roll < 0.16 ? -1 : roll < 0.62 ? 0 : 1, // -1 bald, 0 short, 1 long
+  };
+}
+
 // Draw a zombie. parts = {larm,rarm,lleg,rleg} (1 attached / 0 severed); prone = dragging.
-export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts, prone, strideAmp, jumpH, vx, vy) {
+export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts, prone, strideAmp, jumpH, vx, vy, look) {
   parts = parts || { larm: 1, rarm: 1, lleg: 1, rleg: 1 };
   strideAmp = strideAmp || 1;
   jumpH = jumpH || 0;
   const pal = ZOMBIE_PAL[type] || ZOMBIE_PAL.walker;
+  look = look || { skin: pal.skin, dark: pal.dark, cloth: pal.cloth, cloth2: pal.dark, hair: "#20160e", hairLen: 0 };
   const cos = Math.cos(angle), sin = Math.sin(angle);
   const perpX = -sin, perpY = cos;
-  const skin = hurtFlash ? "#ffffff" : pal.skin;
+  const skin = hurtFlash ? "#ffffff" : look.skin;
+  const cloth = look.cloth, dark = look.dark, cloth2 = look.cloth2 || look.dark;
   const s = r / 7; // 7 == base radius
   const cyB = cy - jumpH; // body lifts when leaping; shadow stays on the ground
   // Upper body sways side-to-side for a shambling gait; feet stay planted.
@@ -227,24 +288,34 @@ export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts,
     const reach = (longReach ? r * 2.3 : r * 1.7) + Math.sin(frame * 2 + (side < 0 ? 0 : 1.5)) * (r * 0.28);
     const hx = bx + Math.cos(armA) * reach, hy = by + Math.sin(armA) * reach;
     limb(ctx, sx, sy, hx, hy, Math.max(2, Math.round(2.2 * s)), skin);
-    ctx.fillStyle = pal.dark; // clawed hand
+    ctx.fillStyle = dark; // clawed hand
     ctx.fillRect(Math.round(hx - 1), Math.round(hy - 1), Math.max(2, Math.round(2 * s)), Math.max(2, Math.round(2 * s)));
   };
 
   // Dynamic shadow: shifts/stretches with movement, shrinks as it leaps.
   drawShadow(ctx, cx, cy + (prone ? 3 : 6) * s, vx || 0, vy || 0, (prone ? 8 : 7) * s, 3.0 * s, jumpH / 11);
 
+  // Hair painted onto the crown/back of a head centred at forward offset `hx`,
+  // leaving the front (face + eyes) as bare skin. Drawn AFTER the head skin.
+  const hairOn = (hx) => {
+    if (look.hairLen === 0) B(hx - 0.6, 0, 3.4, 5.6, look.hair);            // short cap over the crown
+    else if (look.hairLen === 1) {                                          // long: trails back & down the sides
+      B(hx - 1, 0, 4.6, 6.4, look.hair);
+      B(hx - 0.4, -3, 2.4, 2.8, look.hair); B(hx - 0.4, 3, 2.4, 2.8, look.hair);
+    } else B(hx - 0.2, 0, 1.8, 2.2, look.dark);                            // bald: bare scalp with a scar
+  };
+
   if (prone) {
     // Legless, flat, dragging body pulling forward with both arms.
-    B(-4, -2, 3, 2, parts.lleg ? pal.cloth : STUMP); // trailing leg stumps
-    B(-4, 2, 3, 2, parts.rleg ? pal.cloth : STUMP);
-    B(-1, 0, 10, 7, pal.cloth);   // long torso dragging behind
+    B(-4, -2, 3, 2, parts.lleg ? cloth2 : STUMP); // trailing leg stumps
+    B(-4, 2, 3, 2, parts.rleg ? cloth2 : STUMP);
+    B(-1, 0, 10, 7, cloth);       // long torso dragging behind
     B(2, 0, 6, 6, skin);          // shoulders
-    B(0, 2, 2, 3, pal.dark);      // wound
+    B(0, 2, 2, 3, dark);          // wound
     reachArm(-1, true);
     reachArm(1, true);
     B(7, 0, 5, 5, skin);          // head, low and forward
-    B(7, 0, 2, 4, pal.dark);
+    hairOn(7);
     eye(8, -1.3); eye(8, 1.3);
     return;
   }
@@ -252,20 +323,20 @@ export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts,
   // Legs (shuffle bob, planted at the feet); severed legs become stumps and it limps.
   const L = (ox, oy, w, h, c) => px(ctx, cx, cyB, ox * s, oy * s, Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s)), cos, sin, c);
   const legBob = Math.sin(frame * 1.5) * 1.7 * strideAmp;
-  L(-1 + legBob * 0.35, 3, parts.rleg ? 3 : 2, parts.rleg ? 4 : 2, parts.rleg ? pal.cloth : STUMP);
-  L(-1 - legBob * 0.35, -3, parts.lleg ? 3 : 2, parts.lleg ? 4 : 2, parts.lleg ? pal.cloth : STUMP);
+  L(-1 + legBob * 0.35, 3, parts.rleg ? 3 : 2, parts.rleg ? 4 : 2, parts.rleg ? cloth2 : STUMP);
+  L(-1 - legBob * 0.35, -3, parts.lleg ? 3 : 2, parts.lleg ? 4 : 2, parts.lleg ? cloth2 : STUMP);
 
   // Reaching arms behind the torso so claws read out front.
   reachArm(-1, false);
   reachArm(1, false);
 
   // Torso (tattered) + head, lurched forward.
-  B(0, 0, 9, 9, pal.cloth);
+  B(0, 0, 9, 9, cloth);
   B(-1, 0, 6, 7, skin);
-  B(0, 2, 2, 3, pal.dark); // wound
-  if (type === "brute") { B(0, 0, 12, 11, pal.dark); B(1, 0, 7, 8, skin); }
+  B(0, 2, 2, 3, dark); // wound
+  if (type === "brute") { B(0, 0, 12, 11, dark); B(1, 0, 7, 8, skin); }
   B(2, 0, 6, 6, skin);
-  B(2, 0, 2, 5, pal.dark);
+  hairOn(2);
   eye(4, -1.5); eye(4, 1.5);
 }
 
@@ -279,12 +350,13 @@ function deadTint(hex, k) {
 }
 
 // A dead zombie settled on the ground (permanent decal), lying face-down.
-export function drawBodyDecal(ctx, x, y, angle, type, r, parts) {
+export function drawBodyDecal(ctx, x, y, angle, type, r, parts, look) {
   const pal = ZOMBIE_PAL[type] || ZOMBIE_PAL.walker;
+  look = look || { skin: pal.skin, cloth: pal.cloth, dark: pal.dark, hair: "#20160e" };
   const s = r / 7;
-  const skin = deadTint(pal.skin, 0.82);
-  const cloth = deadTint(pal.cloth || pal.dark, 0.8);
-  const dark = deadTint(pal.dark, 0.68);
+  const skin = deadTint(look.skin, 0.82);
+  const cloth = deadTint(look.cloth || look.dark, 0.8);
+  const dark = deadTint(look.dark, 0.68);
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
@@ -317,7 +389,7 @@ export function drawBodyDecal(ctx, x, y, angle, type, r, parts) {
   // Head, face-down, at the front.
   ctx.fillStyle = skin;
   ctx.beginPath(); ctx.arc(6 * s, 0, 3 * s, 0, TAU); ctx.fill();
-  ctx.fillStyle = deadTint(pal.dark, 0.5);
+  ctx.fillStyle = deadTint(look.hair, 0.5);
   ctx.beginPath(); ctx.arc(6.4 * s, 0, 1.8 * s, 0, TAU); ctx.fill(); // hair/wound
 
   ctx.restore();
@@ -485,6 +557,19 @@ export function drawPickup(ctx, cx, cy, kind, t) {
       ctx.fillRect(Math.round(cx + 4), Math.round(y - 1), 2, 4); // teeth
       ctx.fillStyle = "#3a2c10";
       ctx.beginPath(); ctx.arc(cx - 3, y, 1.2, 0, TAU); ctx.fill();
+      break;
+    case "armor": // a vest / chest plate
+      ctx.fillStyle = "#465264"; ctx.fillRect(Math.round(cx - 5), Math.round(y - 5), 10, 9);
+      ctx.fillStyle = "#586576"; ctx.fillRect(Math.round(cx - 5), Math.round(y - 5), 10, 2);
+      ctx.fillStyle = "#2c3642";
+      ctx.fillRect(Math.round(cx - 1), Math.round(y - 4), 2, 8);
+      ctx.fillRect(Math.round(cx - 5), Math.round(y + 1), 10, 1.5);
+      break;
+    case "helmet": // a domed helmet
+      ctx.fillStyle = "#3a4657";
+      ctx.beginPath(); ctx.arc(cx, y + 1, 5, Math.PI, 0); ctx.fill();
+      ctx.fillRect(Math.round(cx - 5), Math.round(y + 1), 10, 2);
+      ctx.fillStyle = "#4c5a6d"; ctx.fillRect(Math.round(cx - 4), Math.round(y - 3), 8, 2);
       break;
     default: {
       box("#5a4632");

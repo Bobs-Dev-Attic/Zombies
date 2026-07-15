@@ -33,6 +33,14 @@ const game = new Game(canvas, {
     const st = $("stamina-fill");
     st.style.width = (s.stamina * 100).toFixed(1) + "%";
     st.style.opacity = s.exhausted ? "0.5" : "1";
+    // Body armour / helmet bars appear only while you're wearing them.
+    const ar = $("armor-row"), hr = $("helmet-row");
+    ar.classList.toggle("hidden", !s.hasArmor);
+    if (s.hasArmor) $("armor-fill").style.width = (s.armor * 100).toFixed(1) + "%";
+    hr.classList.toggle("hidden", !s.hasHelmet);
+    if (s.hasHelmet) $("helmet-fill").style.width = (s.helmet * 100).toFixed(1) + "%";
+    // Adrenaline highlight on the stamina bar.
+    st.parentElement.parentElement.classList.toggle("adrenaline", !!s.adrenaline);
     $("wave-label").textContent = "WAVE " + s.wave;
     $("score-label").textContent = s.score;
     $("weapon-name").textContent = s.weapon;
