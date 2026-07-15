@@ -1,7 +1,17 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.12.0";
+export const VERSION = "0.12.1";
 
 export const CHANGELOG = [
+  {
+    version: "0.12.1",
+    date: "2026-07-13",
+    title: "Blood & Bullets Fixes",
+    changes: [
+      "Death screen: the blood is now one continuous full-width sheet — the blood dripping below the YOU DIED card matches the blood pouring from the top (no more narrow band under the dialog).",
+      "Death screen: blood now splashes off impacts and the rising pool for a more dynamic, fluid look.",
+      "Fixed invisible bullets — tracers now draw over the fog with a brighter core and a glowing head, so rounds stay clearly visible (including while wearing a helmet).",
+    ],
+  },
   {
     version: "0.12.0",
     date: "2026-07-13",

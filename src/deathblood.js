@@ -16,6 +16,7 @@ export class DeathBlood {
     this.dur = dur;
     this.pool = 0;         // px risen from the bottom
     this.drops = [];       // free-falling droplets
+    this.splashes = [];    // splash particles thrown up on impact
     this.dialog = null;    // {l,t,r,b} of the YOU DIED card in CSS px
     this.dialogDrips = []; // hanging drips along the card's bottom edge
     this._onResize = () => this._resize();
@@ -86,15 +87,14 @@ export class DeathBlood {
     for (let i = 0; i < n; i++) {
       const c = cols[i];
       c.v = Math.min(c.v + c.a * dt, 200);
-      const x = i * cw;
-      const overCard = d && x >= d.l - 2 && x <= d.r + 2;
-      const stopTop = overCard ? d.t : poolTop;
-      c.y = Math.min(c.y + c.v * dt, stopTop);
-      // Blood that pools on the card's top edge re-emerges and drips from below.
-      if (overCard && c.y >= d.t - 0.5) {
-        if (c.uy == null) c.uy = d.b + rnd(0, 4);
-        c.uv = Math.min(c.uv + c.a * dt, 200);
-        c.uy = Math.min(c.uy + c.uv * dt, poolTop);
+      const prevY = c.y;
+      // The curtain flows full-width down the WHOLE screen; the card is punched
+      // out as a clear window afterwards, so the sheet above and below it is the
+      // same continuous width (no separate, narrower under-card band).
+      c.y = Math.min(c.y + c.v * dt, poolTop);
+      // A fast front smacking the rising pool throws up a splash.
+      if (prevY < poolTop && c.y >= poolTop - 0.6 && c.v > 70 && Math.random() < dt * 6) {
+        this._splash(i * cw, poolTop, c.v);
       }
     }
 
@@ -116,7 +116,7 @@ export class DeathBlood {
     for (const dp of this.drops) {
       dp.v += 320 * dt; dp.y += dp.v * dt;
       const floor = (d && dp.x >= d.l && dp.x <= d.r && dp.y < d.b) ? d.t : poolTop;
-      if (dp.y >= floor) dp.dead = true;
+      if (dp.y >= floor) { this._splash(dp.x, floor, dp.v * 0.6); dp.dead = true; }
     }
     this.drops = this.drops.filter((dp) => !dp.dead);
 
@@ -128,12 +128,27 @@ export class DeathBlood {
           if (dr.len >= dr.max) { dr.fall = { y: d.b + dr.len, v: rnd(30, 70) }; dr.len = rnd(4, 8); dr.hang = rnd(1.4, 4); }
         } else {
           dr.fall.v += 300 * dt; dr.fall.y += dr.fall.v * dt;
-          if (dr.fall.y >= poolTop) dr.fall = null;
+          if (dr.fall.y >= poolTop) { this._splash(dr.x, poolTop, dr.fall.v * 0.5); dr.fall = null; }
         }
       }
     }
 
+    // Splash droplets arc up off impacts and rain back down.
+    for (const sp of this.splashes) { sp.vy += 380 * dt; sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.life -= dt; }
+    this.splashes = this.splashes.filter((s) => s.life > 0);
+
     this._draw();
+  }
+
+  // A little burst of blood droplets kicked up where something lands.
+  _splash(x, y, power) {
+    if (this.splashes.length > 260) return;
+    const n = 2 + ((Math.random() * 3) | 0);
+    const sp = clamp(power * 0.5, 24, 150);
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + rnd(-1, 1);
+      this.splashes.push({ x, y, vx: Math.cos(a) * sp * rnd(0.4, 1), vy: Math.sin(a) * sp * rnd(0.6, 1.15), r: rnd(1, 2.8), life: rnd(0.18, 0.5) });
+    }
   }
 
   _draw() {
@@ -172,18 +187,6 @@ export class DeathBlood {
     for (let i = 3; i < n; i += 10) { ctx.beginPath(); ctx.moveTo(i * cw, 0); ctx.lineTo(i * cw, cols[i].y - 3); ctx.stroke(); }
     ctx.restore();
 
-    // ---- UNDER-CARD FRONTS (drips continuing below the card) ----
-    if (d) {
-      ctx.save();
-      ctx.globalAlpha = opa;
-      ctx.fillStyle = curtain;
-      for (let i = 0; i < n; i++) {
-        const c = cols[i]; if (c.uy == null) continue;
-        ctx.fillRect(i * cw - 0.5, d.b, cw + 1, c.uy - d.b);
-      }
-      ctx.restore();
-    }
-
     // ---- BOTTOM POOL ----
     if (this.pool > 0.5) {
       const A = 4 + Math.sin(this.t * 0.7) * 2;
@@ -214,6 +217,9 @@ export class DeathBlood {
     ctx.globalAlpha = opa;
     ctx.fillStyle = "#7a0f0f";
     for (const dp of this.drops) { ctx.beginPath(); ctx.ellipse(dp.x, dp.y, dp.r * 0.7, dp.r * 1.5, 0, 0, TAU); ctx.fill(); }
+    // Splash droplets kicked up from impacts.
+    ctx.fillStyle = "#8f1414";
+    for (const sp of this.splashes) { ctx.beginPath(); ctx.ellipse(sp.x, sp.y, sp.r, sp.r * 1.2, 0, 0, TAU); ctx.fill(); }
     ctx.restore();
 
     // ---- DIALOG: clear window, blood pooled on top, dripping off the bottom ----

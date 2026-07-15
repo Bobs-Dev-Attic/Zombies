@@ -1005,9 +1005,9 @@ export class Game {
     this._drawZombiesBehind(ctx);
     this._drawPlayer(ctx);
     this._drawGibs(ctx);
-    this._drawProjectiles(ctx);
     this._drawParticles(ctx);
     this._drawFog(ctx, -ox, -oy);
+    this._drawProjectiles(ctx); // over the fog so tracers are always crisp
     this._drawBanners(ctx);
     this._drawExitBeacon(ctx);
     ctx.restore();
@@ -1403,13 +1403,16 @@ export class Game {
         ctx.fillRect(Math.round(pr.px - 1), Math.round(pr.py - 1), 2, 2);
         continue;
       }
-      // Bullet tracer.
-      ctx.strokeStyle = "#ffe9a0";
+      // Bullet tracer — a soft glow, a bright core streak, and a hot head dot
+      // so rounds stay clearly visible against any background or fog.
+      ctx.strokeStyle = "rgba(255,220,120,0.5)";
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(pr.px, pr.py); ctx.lineTo(pr.x, pr.y); ctx.stroke();
+      ctx.strokeStyle = "#fff2c0";
       ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.moveTo(pr.px, pr.py);
-      ctx.lineTo(pr.x, pr.y);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(pr.px, pr.py); ctx.lineTo(pr.x, pr.y); ctx.stroke();
+      ctx.fillStyle = "#fff6e0";
+      ctx.beginPath(); ctx.arc(pr.x, pr.y, 1.7, 0, TAU); ctx.fill();
     }
     ctx.lineWidth = 1;
   }
