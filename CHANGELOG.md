@@ -7,6 +7,12 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.12.1] — 2026-07-13
+### Blood & Bullets Fixes
+- **Death screen blood width** — the blood is now one **continuous full-width sheet**: the flow below the YOU DIED card matches the flow pouring from the top, instead of a narrower band under the dialog. The card is punched out as a clean, readable window with blood pooling on its top edge and dripping off the bottom.
+- **More dynamic blood** — blood now **splashes** off the rising pool and off falling drips/drops, for a livelier, more fluid effect.
+- **Fixed invisible bullets** — bullet tracers were being drawn *under* the fog-of-war overlay and getting dimmed out. They now draw **over** the fog with a **brighter core and a glowing head dot**, so rounds are clearly visible against any background (and while wearing a helmet).
+
 ## [0.12.0] — 2026-07-13
 ### Gear Up
 - **Varied zombies** — every zombie is now generated with its own **jittered skin tone**, **grubby clothing colour** (from a broad palette) and **hairstyle** (short cap, long trailing hair, or bald), all carried through to its fallen-body decal so the horde reads as a crowd of individuals.
@@ -140,6 +146,7 @@ _Next: 2b locked doors + key/axe, 2c functional stairs to upper floors, 2d the o
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.12.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.12.1
 [0.12.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.12.0
 [0.11.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.11.0
 [0.10.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.10.0
