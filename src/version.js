@@ -1,7 +1,17 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.15.2";
+export const VERSION = "0.16.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.16.0",
+    date: "2026-07-16",
+    title: "Down the Drain",
+    changes: [
+      "Zombie rats now swarm the sewers — tiny, fast, and weak, but they come in packs.",
+      "The sewer water flows, with darker deep channels running through the tunnels.",
+      "The horde can lurk hidden in the deep water, only becoming visible as it closes in on you — watch the currents.",
+    ],
+  },
   {
     version: "0.15.2",
     date: "2026-07-16",

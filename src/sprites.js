@@ -321,6 +321,22 @@ export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts,
     } else B(hx - 0.2, 0, 1.8, 2.2, look.dark);                            // bald: bare scalp with a scar
   };
 
+  // Zombie rat: tiny, scurrying, long-tailed.
+  if (type === "rat") {
+    const g = Math.sin(frame * 3.4) * strideAmp, fur = dark, belly = skin;
+    const Lr = (ox, oy, ww, hh, cc) => px(ctx, cx, cyB, ox * s, oy * s, Math.max(1, Math.round(ww * s)), Math.max(1, Math.round(hh * s)), cos, sin, cc);
+    Lr(-7, 0, 5, 1, fur); Lr(-9, g * 1.6, 3, 1, fur);          // whippy tail
+    Lr(2 + g, -2, 1.4, 2, fur); Lr(2 - g, 2, 1.4, 2, fur);      // legs
+    Lr(-2 - g, -2, 1.4, 2, fur); Lr(-2 + g, 2, 1.4, 2, fur);
+    B(-1, 0, 8, 5, fur);   // body
+    B(0, 0, 3, 3, belly);  // rotting patch
+    B(4, 0, 4, 4, fur);    // head
+    B(6.4, 0, 2, 2, belly);// snout
+    B(3.4, -2, 1.6, 1.6, fur); B(3.4, 2, 1.6, 1.6, fur); // ears
+    eye(5.4, -1); eye(5.4, 1);
+    return;
+  }
+
   // Zombie dog: a low, mangy four-legged runner.
   if (type === "dog") {
     const fur = cloth, gait = Math.sin(frame * 2.4) * strideAmp;

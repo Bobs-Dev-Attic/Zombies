@@ -34,8 +34,9 @@ export const STREET_TERRAIN = {
 
 // Sewer tunnel terrain — murky water over concrete.
 export const SEWER_TERRAIN = {
-  0: ["#1c2a26", "#213330"], // channel water
+  0: ["#1c2a26", "#213330"], // shallow channel water
   1: ["#2a2f30", "#30383a"], // dry ledge
+  2: ["#132420", "#173028"], // deep flowing water (conceals what's in it)
 };
 
 export class World {
@@ -435,9 +436,15 @@ export class World {
       if (chance(0.5)) carveLink(mx, my, mx + 1, my); else carveLink(mx, my, mx, my + 1);
     }
 
+    // Flag deep-water channels (coarse patches) that partly conceal the horde.
+    for (let cy = 1; cy < rows - 1; cy++) for (let cx = 1; cx < cols - 1; cx++) {
+      if (this.grid[this.idx(cx, cy)] !== T.FLOOR) continue;
+      if ((Math.floor(cx / 3) + Math.floor(cy / 3)) % 3 === 0) this._tint(cx, cy, 2);
+    }
+
     // Ladders up at the four corner cells (match the street's four manholes).
     const corners = [[0, 0], [mCols - 1, 0], [0, mRows - 1], [mCols - 1, mRows - 1]];
-    for (const [mx, my] of corners) { const x = cellX(mx), y = cellY(my); this._set(x, y, T.MANHOLE); this.ladders.push({ cx: x, cy: y }); }
+    for (const [mx, my] of corners) { const x = cellX(mx), y = cellY(my); this._set(x, y, T.MANHOLE); this._tint(x, y, 0); this.ladders.push({ cx: x, cy: y }); }
 
     // Scatter some pipes/debris to smash and a little grime.
     for (let i = 0; i < 10; i++) { const p = this.randomFloor(); this._place(Math.floor(p.x / TILE), Math.floor(p.y / TILE), chance(0.5) ? "barrel" : "crate"); }
