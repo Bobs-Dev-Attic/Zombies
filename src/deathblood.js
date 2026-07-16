@@ -222,9 +222,15 @@ export class DeathBlood {
     for (const sp of this.splashes) { ctx.beginPath(); ctx.ellipse(sp.x, sp.y, sp.r, sp.r * 1.2, 0, 0, TAU); ctx.fill(); }
     ctx.restore();
 
-    // ---- DIALOG: clear window, blood pooled on top, dripping off the bottom ----
+    // ---- DIALOG: clear window (semi-transparent), blood pooled on top & drips ----
     if (d) {
       ctx.clearRect(d.l, d.t, d.r - d.l, d.b - d.t);
+      // A faint blood film over the transparent card so it reads as bloodied.
+      ctx.save();
+      ctx.globalAlpha = clamp(opa * 0.8, 0, 1);
+      ctx.fillStyle = "rgba(120,12,12,0.16)";
+      ctx.fillRect(d.l, d.t, d.r - d.l, d.b - d.t);
+      ctx.restore();
       ctx.save();
       ctx.globalAlpha = opa;
       // A creeping band of blood over the card's top edge.

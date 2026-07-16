@@ -1,5 +1,6 @@
 // Entry point: wires the DOM/UI to the Game instance.
 import { Game } from "./game.js";
+import { WEAPONS } from "./weapons.js";
 import { VERSION, CHANGELOG } from "./version.js";
 
 const $ = (id) => document.getElementById(id);
@@ -45,6 +46,7 @@ const game = new Game(canvas, {
     $("score-label").textContent = s.score;
     $("weapon-name").textContent = s.weapon;
     $("ammo-count").textContent = s.ammo;
+    updateWeaponBar(s);
   },
   onGameOver: ({ score, wave, kills }) => {
     $("final-score").textContent = score;
@@ -55,6 +57,34 @@ const game = new Game(canvas, {
     vibrate([60, 40, 120]);
   },
 });
+
+// ---------------- Weapon bar ----------------
+// One tappable button per owned weapon (rebuilt only when the set changes),
+// highlighting the current weapon and pulsing while it reloads.
+let weaponBarKey = "";
+function updateWeaponBar(s) {
+  const bar = $("weapon-bar");
+  if (!bar || !s.owned) return;
+  const key = s.owned.join(",");
+  if (key !== weaponBarKey) {
+    weaponBarKey = key;
+    bar.innerHTML = "";
+    for (const id of s.owned) {
+      const btn = document.createElement("button");
+      btn.className = "wbtn";
+      btn.dataset.id = id;
+      btn.textContent = (WEAPONS[id] && WEAPONS[id].tag) || id;
+      btn.title = (WEAPONS[id] && WEAPONS[id].name) || id;
+      btn.addEventListener("click", () => game.selectWeapon(id));
+      bar.appendChild(btn);
+    }
+  }
+  for (const btn of bar.children) {
+    const isCur = btn.dataset.id === s.current;
+    btn.classList.toggle("active", isCur);
+    btn.classList.toggle("reloading", isCur && !!s.reloading);
+  }
+}
 
 // ---------------- Screen management ----------------
 const overlays = ["menu", "how", "changelog", "gameover"];

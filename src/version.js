@@ -1,7 +1,21 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.14.0";
+export const VERSION = "0.15.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.15.0",
+    date: "2026-07-15",
+    title: "Arsenal",
+    changes: [
+      "Three pistols — a fast, weak .22, the standard 9mm, and a hard-hitting .357 Magnum — each with its own stopping power, reload time and look.",
+      "Three shotguns — pump, semi-auto, and a two-barrel side-by-side — and three rifles — a bolt-action hunting rifle, a semi-auto battle rifle, and a full-auto assault rifle. Each has distinct graphics.",
+      "New on-screen weapon buttons show every gun you're carrying and let you tap to switch — the cycle button is still there too. The active weapon is highlighted and pulses while reloading.",
+      "A reload cycle indicator now sweeps around the player as you reload.",
+      "Body parts come off more readily, and shots throw off more blood and chunks of flesh and clothing.",
+      "Bullets now fly over low furniture like tables and chairs (tall cover — shelves, crates, cars — still stops them).",
+      "The YOU DIED dialog is now semi-transparent so the carnage shows through it.",
+    ],
+  },
   {
     version: "0.14.0",
     date: "2026-07-15",

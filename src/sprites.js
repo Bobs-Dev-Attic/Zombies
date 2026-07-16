@@ -193,8 +193,19 @@ function drawWeaponLocal(ctx, kind) {
     case "melee_bat": R(-3, 0, 3, 2, "#5a4632"); R(0, 0, 11, 3, "#9c6b3a"); break;
     case "melee_axe": R(-2, 0, 3, 2, "#6a4a2c"); R(1, 0, 8, 2, "#7a5636"); ctx.fillStyle = "#c0c8d0"; ctx.beginPath(); ctx.moveTo(8, -1); ctx.lineTo(12, -4); ctx.lineTo(12, 3); ctx.lineTo(8, 1); ctx.closePath(); ctx.fill(); break;
     case "pistol": R(-1, 1.5, 2, 3, "#20242a"); R(0, 0, 6, 3, "#2c2f33"); break;
+    case "pistol22": R(-1, 1.2, 2, 2.4, "#20242a"); R(0, 0, 5, 2, "#3a3f45"); break; // slim & short
+    case "pistol357": // revolver: wood grip, frame, cylinder bump, longer barrel
+      R(-1, 1.5, 2, 3, "#3a2a18"); R(0, 0, 5, 3, "#4a4e54"); R(2, 0, 3, 4, "#5a5e64"); R(5, 0, 4, 2, "#33373d"); break;
     case "shotgun": R(0, 0, 13, 3, "#3a2f28"); R(11, 0, 4, 2, "#20242a"); break;
+    case "shotgun_semi": // receiver + barrel with an under mag-tube
+      R(-2, 0, 3, 3, "#2a2a2e"); R(0, 0, 12, 3, "#3a2f28"); R(1, 2, 8, 1.6, "#20242a"); R(11, 0, 3, 2, "#20242a"); break;
+    case "shotgun_sxs": // two side-by-side barrels
+      R(-2, 0, 3, 3, "#3a2f28"); R(-1, 0, 2, 4, "#2a2018"); R(0, -1.3, 13, 1.7, "#4a4038"); R(0, 1.3, 13, 1.7, "#4a4038"); break;
     case "rifle": R(-3, 0, 4, 3, "#1a1c1a"); R(0, 0, 15, 2, "#26411f"); break;
+    case "rifle_semi": // battle rifle: stock, barrel, box mag
+      R(-3, 0, 4, 3, "#2a2620"); R(0, 0, 14, 2, "#3a4a2a"); R(2, 2.4, 3, 3, "#141414"); R(3, -1.4, 5, 1.2, "#333"); break;
+    case "rifle_auto": // assault rifle: curved mag, rail, short muzzle
+      R(-3, 0, 4, 3, "#141414"); R(0, 0, 11, 2.4, "#2a2f2a"); R(2, 2.6, 3.6, 4, "#111"); R(1, -1.7, 5, 1.3, "#333"); R(10, 0, 3, 1.6, "#0d0d0d"); break;
     case "smg": R(1, 2, 3, 3, "#1a1a1f"); R(0, 0, 9, 3, "#2a2a2f"); break;
     case "bazooka": R(-3, 0, 3, 3, "#2a331d"); R(-2, 0, 18, 5, "#3d4a2a"); break;
     default: R(0, 0, 6, 3, "#2c2f33");
