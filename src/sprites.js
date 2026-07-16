@@ -265,8 +265,11 @@ export function makeZombieLook(type) {
     cloth2: jitterHex(cloth, 24),                 // trousers / accent
     hair: ZHAIR[(Math.random() * ZHAIR.length) | 0],
     hairLen: roll < 0.16 ? -1 : roll < 0.62 ? 0 : 1, // -1 bald, 0 short, 1 long
-    // Per-individual gait: how big/fast the arms swing and legs stride.
+    // Per-individual gait: how big/fast the arms swing and legs stride, plus
+    // whether it drags a leg (a limp) and which side.
     armAmp: rand(0.55, 1.6), armRate: rand(0.7, 1.6), legAmp: rand(0.7, 1.5),
+    legStyle: Math.random() < 0.3 ? 1 : 0, // ~30% drag a leg
+    dragSide: Math.random() < 0.5 ? -1 : 1,
   };
 }
 
@@ -369,11 +372,22 @@ export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts,
     return;
   }
 
-  // Legs (shuffle bob, planted at the feet); severed legs become stumps and it limps.
-  const L = (ox, oy, w, h, c) => px(ctx, cx, cyB, ox * s, oy * s, Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s)), cos, sin, c);
-  const legBob = Math.sin(frame * 1.5) * 1.7 * strideAmp * (look.legAmp || 1);
-  L(-1 + legBob * 0.35, 3, parts.rleg ? 3 : 2, parts.rleg ? 4 : 2, parts.rleg ? cloth2 : STUMP);
-  L(-1 - legBob * 0.35, -3, parts.lleg ? 3 : 2, parts.lleg ? 4 : 2, parts.lleg ? cloth2 : STUMP);
+  // Legs & feet: a shambling scissor stride with planted feet — the legs step
+  // fore/aft (not just a lateral bob) and each has a chunky foot. Some zombies
+  // drag a leg (a limp); severed legs leave a bloody stump.
+  const stride = Math.sin(frame * 1.5) * (2.9 * strideAmp) * (look.legAmp || 1);
+  const toW = (ox, oy, ax, ay) => [ax + (cos * ox - sin * oy) * s, ay + (sin * ox + cos * oy) * s];
+  const drawLeg = (side) => {
+    const attached = side < 0 ? parts.lleg : parts.rleg;
+    const [hx, hy] = toW(-1.2, side * 2.2, bx, by); // hip on the swaying body
+    if (!attached) { ctx.fillStyle = STUMP; const ss = Math.max(2, Math.round(2.4 * s)); ctx.fillRect(Math.round(hx - ss / 2), Math.round(hy - ss / 2), ss, ss); return; }
+    const drag = look.legStyle === 1 && side === look.dragSide; // this leg drags
+    const fwd = drag ? -2.6 + Math.sin(frame * 1.5) * 0.5 : (side < 0 ? stride : -stride);
+    const [fx, fy] = toW(fwd, side * 3.0, cx, cyB); // planted foot
+    limb(ctx, hx, hy, fx, fy, Math.max(2, Math.round((drag ? 2 : 2.7) * s)), cloth2);
+    px(ctx, fx, fy, 1.1 * s, 0, Math.max(2, Math.round(3.4 * s)), Math.max(1, Math.round(2 * s)), cos, sin, dark); // foot
+  };
+  drawLeg(-1); drawLeg(1);
 
   // Reaching arms behind the torso so claws read out front.
   reachArm(-1, false);

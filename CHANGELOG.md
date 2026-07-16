@@ -7,6 +7,10 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.18.1] — 2026-07-16
+### Walk This Way
+- **Zombie walk cycle** — the shamblers now have proper **legs with feet** that **step fore-and-aft** in a scissoring stride (like the player) instead of a flat lateral shuffle, each planted foot drawn under the body. Per-zombie gait variety carries through, **~30% drag a leg** in a limp, and the legless still **crawl** (prone). Severed legs still leave a bloody stump.
+
 ## [0.18.0] — 2026-07-16
 ### Turn It Up
 - **Sound!** A tiny **Web Audio synth engine** (`src/audio.js`) generates every effect on the fly — no audio files to download. Wired to game events:
@@ -202,6 +206,7 @@ _Next: 2b locked doors + key/axe, 2c functional stairs to upper floors, 2d the o
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.18.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.18.1
 [0.18.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.18.0
 [0.17.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.17.0
 [0.16.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.16.0
