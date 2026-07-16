@@ -1,7 +1,17 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.20.0";
+export const VERSION = "0.21.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.21.0",
+    date: "2026-07-16",
+    title: "Carrion",
+    changes: [
+      "Carrion birds now haunt the neighborhood — crows, blackbirds and vultures glide down to pick at the dead, hopping and pecking at the corpses.",
+      "Come too close and the whole flock scatters into the air, cawing (the vultures screech), then wheels away.",
+      "You can shoot them out of the sky for points — a puff of feathers and they drop — but they never attack you; they're just scavengers.",
+    ],
+  },
   {
     version: "0.20.0",
     date: "2026-07-16",

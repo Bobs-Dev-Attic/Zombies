@@ -70,6 +70,7 @@ export class Game {
     this.thrown = [];  // grenades / flares in flight or on the ground
     this.shockwaves = []; // expanding blast rings
     this.flies = [];   // ambient buzzing fly swarm
+    this.birds = [];   // carrion birds that pick at corpses and flee from you
     this.score = 0;
     this.wave = 0;
     this.waveActive = false;
@@ -108,7 +109,7 @@ export class Game {
     this.player.health = hp; this.player.stamina = sta;
     this.player.kills = kills;
     this.zombies = []; this.projectiles = []; this.particles = []; this.pickups = []; this.stains = []; this.corpses = [];
-    this.bodies = []; this.limbs = []; this.gibs = []; this.thrown = []; this.shockwaves = []; this.flies = [];
+    this.bodies = []; this.limbs = []; this.gibs = []; this.thrown = []; this.shockwaves = []; this.flies = []; this.birds = [];
     this.score = score; this.wave = wave;
     this.waveActive = false; this.spawnQueue = 0; this.waveOrigins = []; this.betweenWaves = 2; this.exitReady = false;
     this.cam.x = this.player.x; this.cam.y = this.player.y;
@@ -192,7 +193,7 @@ export class Game {
     }
     if (arrive) { this.player.x = (arrive.cx + 0.5) * TILE; this.player.y = (arrive.cy + 0.5) * TILE; }
     else { this.player.x = this.world.landing.x; this.player.y = this.world.landing.y; }
-    this.zombies = []; this.projectiles = []; this.particles = []; this.thrown = []; this.shockwaves = []; this.flies = [];
+    this.zombies = []; this.projectiles = []; this.particles = []; this.thrown = []; this.shockwaves = []; this.flies = []; this.birds = [];
     this.cam.x = this.player.x; this.cam.y = this.player.y;
     this.flow = null; this.flowTimer = 0; // rebuild the flow field for the new grid
     this.floorCooldown = 1.2;
@@ -339,6 +340,7 @@ export class Game {
     this._updateThrown(dt);
     this._updateBurning(dt);
     this._updateFlies(dt);
+    this._updateBirds(dt);
     for (const p of this.particles) p.update(dt);
     for (const s of this.stains) s.life -= dt * 0.15;
     for (const pk of this.pickups) pk.update(dt);
@@ -644,6 +646,19 @@ export class Game {
           this._hitGore(z.x, z.y, proj.angle, z);
           if (proj.pierce > 0) proj.pierce--;
           else { proj.dead = true; break; }
+        }
+      }
+      // Carrion birds can be shot out of the air (they never fight back).
+      if (!hitZombie && !proj.dead && this.birds.length) {
+        for (const bird of this.birds) {
+          if (bird.dead) continue;
+          const by = bird.y - bird.alt; // birds are hit where they're drawn
+          if (this._segHitsCircle(proj.px, proj.py, proj.x, proj.y, bird.x, by, bird.r + proj.r + 1)) {
+            this._killBird(bird, proj.angle);
+            if (!proj.explosive && proj.pierce <= 0) { proj.dead = true; }
+            if (proj.pierce > 0) proj.pierce--;
+            break;
+          }
         }
       }
       // Bullet passed no zombie but struck TALL furniture — damage & (usually)
@@ -971,6 +986,148 @@ export class Game {
     }
   }
 
+  // Carrion birds: crows, blackbirds and vultures glide in to peck at the dead
+  // outdoors, scatter into the air when you come near, and can be shot down.
+  // They never attack the player.
+  _updateBirds(dt) {
+    const outdoors = this.world.isStreets && !this.world.isSewers;
+    // Fresh carcasses to feed on (settled bodies, not still-collapsing corpses).
+    const carrion = this.bodies;
+    // Occasionally spawn a bird gliding toward a carcass, up to a small flock.
+    this._birdT = (this._birdT || 0) - dt;
+    if (outdoors && this._birdT <= 0) {
+      this._birdT = rand(1.4, 3.2);
+      if (carrion.length && this.birds.length < 7 && chance(0.7)) this._spawnBird(pick(carrion));
+    }
+    const flee = 96, fleeSq = flee * flee;
+    for (const bird of this.birds) {
+      if (bird.dead) continue;
+      bird.flap += dt * bird.flapRate;
+      const px = this.player.x, py = this.player.y;
+      // Anything close startles feeding/arriving birds into flight.
+      if (bird.state !== "fleeing" && dist2(bird.x, bird.y, px, py) < fleeSq) {
+        bird.state = "fleeing";
+        const a = (dist2(bird.x, bird.y, px, py) < 1) ? rand(0, TAU) : angleTo(px, py, bird.x, bird.y);
+        bird.tx = bird.x + Math.cos(a) * 640; bird.ty = bird.y + Math.sin(a) * 640;
+        bird.flapRate = 26;
+        if (this._birdCawT === undefined || this._birdCawT <= 0) { sfx.play(bird.type === "vulture" ? "screech" : "caw"); this._birdCawT = rand(0.15, 0.4); }
+      }
+      if (this._birdCawT !== undefined) this._birdCawT -= dt;
+      if (bird.state === "arriving") {
+        const d = dist(bird.x, bird.y, bird.tx, bird.ty);
+        const sp = bird.speed;
+        bird.x += (bird.tx - bird.x) / Math.max(d, 1) * sp * dt;
+        bird.y += (bird.ty - bird.y) / Math.max(d, 1) * sp * dt;
+        bird.alt += (2 - bird.alt) * clamp(dt * 1.5, 0, 1); // descend toward the ground
+        if (d < 6) { bird.state = "feeding"; bird.alt = 1.5; bird.flapRate = 0; bird.peckT = rand(0.3, 0.8); }
+      } else if (bird.state === "feeding") {
+        bird.alt += (1.5 - bird.alt) * clamp(dt * 3, 0, 1);
+        bird.peckT -= dt;
+        if (bird.peckT <= 0) { bird.peckT = rand(0.4, 1.1); bird.peck = 0.18; } // bob down to peck
+        bird.peck = Math.max(0, (bird.peck || 0) - dt);
+        // Occasionally hop to a nearby spot on the carcass.
+        if (chance(dt * 0.4)) { bird.x += rand(-6, 6); bird.y += rand(-5, 5); }
+        // If the carcass is gone (culled), take off and drift.
+        if (!carrion.length) { bird.state = "fleeing"; bird.tx = bird.x + rand(-500, 500); bird.ty = bird.y - rand(300, 600); bird.flapRate = 18; }
+      } else { // fleeing
+        const d = dist(bird.x, bird.y, bird.tx, bird.ty);
+        const sp = bird.speed * 2.1;
+        bird.x += (bird.tx - bird.x) / Math.max(d, 1) * sp * dt;
+        bird.y += (bird.ty - bird.y) / Math.max(d, 1) * sp * dt;
+        bird.alt += (16 - bird.alt) * clamp(dt * 1.6, 0, 1); // climb away
+        if (dist2(bird.x, bird.y, px, py) > 560 * 560) bird.dead = true; // gone off-scene
+      }
+    }
+    this.birds = this.birds.filter((b) => !b.dead);
+  }
+
+  _spawnBird(target) {
+    const roll = rand(0, 1);
+    const type = roll < 0.5 ? "crow" : roll < 0.82 ? "blackbird" : "vulture";
+    const cfg = type === "vulture"
+      ? { r: 6, speed: 60, flapRate: 9 }
+      : type === "blackbird"
+      ? { r: 3, speed: 108, flapRate: 20 }
+      : { r: 3.6, speed: 96, flapRate: 17 };
+    const a = rand(0, TAU), r = rand(320, 460);
+    this.birds.push({
+      type, x: this.player.x + Math.cos(a) * r, y: this.player.y + Math.sin(a) * r,
+      tx: target.x + rand(-10, 10), ty: target.y + rand(-8, 8),
+      state: "arriving", alt: 16, flap: rand(0, TAU), peck: 0, peckT: 0,
+      r: cfg.r, speed: cfg.speed, flapRate: cfg.flapRate, dead: false,
+    });
+  }
+
+  _drawBirds(ctx) {
+    for (const bird of this.birds) {
+      const gx = bird.x, gy = bird.y;          // ground point (shadow)
+      const ay = gy - bird.alt - (bird.peck ? -1.5 : 0); // drawn body sits above by altitude
+      // Ground shadow, shrinking with altitude.
+      const sh = clamp(1 - bird.alt / 20, 0.12, 0.5);
+      ctx.fillStyle = `rgba(0,0,0,${(sh * 0.5).toFixed(2)})`;
+      ctx.beginPath(); ctx.ellipse(gx, gy, bird.r * (1.1 - bird.alt / 40), bird.r * 0.5 * (1.1 - bird.alt / 40), 0, 0, TAU); ctx.fill();
+      const flap = Math.sin(bird.flap);
+      const airborne = bird.state !== "feeding";
+      const pal = bird.type === "vulture"
+        ? { body: "#2c241d", wing: "#211a14", head: "#8a6152", beak: "#c9a24a" }
+        : bird.type === "blackbird"
+        ? { body: "#0d0d12", wing: "#050507", head: "#0d0d12", beak: "#e08a2a" }
+        : { body: "#16171d", wing: "#0c0c11", head: "#16171d", beak: "#3a3d44" };
+      const R = bird.r;
+      if (airborne) {
+        // Wings spread as two beating triangles; body a small ellipse between them.
+        const span = R * (bird.type === "vulture" ? 3.4 : 2.6);
+        const lift = flap * R * 1.2;
+        ctx.fillStyle = pal.wing;
+        ctx.beginPath(); ctx.moveTo(gx, ay); ctx.lineTo(gx - span, ay - lift); ctx.lineTo(gx - span * 0.5, ay + R * 0.5); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(gx, ay); ctx.lineTo(gx + span, ay - lift); ctx.lineTo(gx + span * 0.5, ay + R * 0.5); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = pal.body;
+        ctx.beginPath(); ctx.ellipse(gx, ay, R * 0.7, R * 1.1, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = pal.head;
+        ctx.beginPath(); ctx.arc(gx, ay - R * 0.9, R * 0.5, 0, TAU); ctx.fill();
+        ctx.fillStyle = pal.beak;
+        ctx.fillRect(gx - 0.6, ay - R * 1.5, 1.2, 2);
+      } else {
+        // Perched/pecking: folded wings, body over the ground, head dipping down.
+        const dip = bird.peck ? R * 1.1 : 0;
+        ctx.fillStyle = pal.wing;
+        ctx.beginPath(); ctx.ellipse(gx, ay + 0.5, R * 1.05, R * 0.8, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = pal.body;
+        ctx.beginPath(); ctx.ellipse(gx, ay, R * 0.8, R * 0.62, 0, 0, TAU); ctx.fill();
+        // Tail up, head/beak forward-down.
+        ctx.fillStyle = pal.wing;
+        ctx.beginPath(); ctx.moveTo(gx - R * 0.6, ay - R * 0.2); ctx.lineTo(gx - R * 1.7, ay - R * 0.7); ctx.lineTo(gx - R * 0.6, ay + R * 0.3); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = pal.head;
+        ctx.beginPath(); ctx.arc(gx + R * 0.7, ay - R * 0.3 + dip, R * 0.42, 0, TAU); ctx.fill();
+        ctx.fillStyle = pal.beak;
+        ctx.fillRect(gx + R * 0.95, ay - R * 0.3 + dip, R * 0.7, 1.2);
+      }
+    }
+  }
+
+  // Shot out of the air: a puff of feathers, a little blood, and it drops.
+  _killBird(bird, angle) {
+    bird.dead = true;
+    this.score += 5;
+    sfx.play(bird.type === "vulture" ? "screech" : "caw");
+    const feather = bird.type === "blackbird" ? "#0d0d12" : bird.type === "vulture" ? "#2c241d" : "#16171d";
+    const by = bird.y - bird.alt;
+    for (let i = 0; i < (bird.type === "vulture" ? 16 : 10); i++) {
+      const a = rand(0, TAU), s = rand(12, 90);
+      this.particles.push(new Particle(bird.x, by, {
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s - 20, life: rand(0.5, 1.3),
+        color: chance(0.3) ? "#3a2a22" : feather, size: randInt(1, 2), drag: 0.9, gravity: 40,
+      }));
+    }
+    for (let i = 0; i < 4; i++) {
+      const a = angle + rand(-0.6, 0.6), s = rand(20, 70);
+      this.particles.push(new Particle(bird.x, by, { vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.2, 0.5), color: "#7a1414", size: 2, drag: 0.86 }));
+    }
+    // A small carcass mark on the ground where it lands.
+    this.stains.push({ x: bird.x + rand(-3, 3), y: bird.y + rand(-2, 2), r: bird.r * 1.3, life: 8, color: "rgba(20,18,22,0.7)" });
+    this.shake += 1;
+  }
+
   _killZombie(z, angle, headshot = false) {
     this.score += z.def.score + (headshot ? 15 : 0);
     this.player.kills++;
@@ -1264,6 +1421,7 @@ export class Game {
     this._drawGibs(ctx);
     this._drawParticles(ctx);
     this._drawFlies(ctx);
+    this._drawBirds(ctx);
     this._drawShockwaves(ctx);
     this._drawFog(ctx, -ox, -oy);
     this._drawProjectiles(ctx); // over the fog so tracers are always crisp

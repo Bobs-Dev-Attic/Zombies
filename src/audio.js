@@ -63,7 +63,7 @@ export class SFX {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     // Throttle ambient/voice sounds so overlapping enemies don't blare.
-    if ((name === "groan" || name === "hiss") && this._last[name] && t - this._last[name] < 0.22) return;
+    if ((name === "groan" || name === "hiss" || name === "caw" || name === "screech") && this._last[name] && t - this._last[name] < 0.2) return;
     this._last[name] = t;
     switch (name) {
       // --- gunshots (weapon.sound strings) ---
@@ -86,6 +86,8 @@ export class SFX {
       case "click":  this._noise(0.03, 0.14, t, "highpass", 3000, 1, null); break;
       case "glass":  this._noise(0.05, 0.28, t, "highpass", 3000, 1, null); for (let i = 0; i < 6; i++) this._tone("triangle", 1400 + Math.random() * 2000, 500, 0.14, 0.09, t + i * 0.015); break; // crack + tinkle
       case "buzz":   this._tone("sawtooth", 150, 128, 0.26, 0.06, t); this._noise(0.22, 0.02, t, "bandpass", 420, 5, null); break; // flies
+      case "caw":    this._tone("sawtooth", 720, 380, 0.12, 0.13, t); this._tone("square", 900, 500, 0.1, 0.07, t + 0.11); this._noise(0.09, 0.08, t, "bandpass", 1600, 2, 900); break; // crow
+      case "screech":this._tone("sawtooth", 520, 240, 0.3, 0.12, t); this._noise(0.3, 0.09, t, "highpass", 1200, 1.5, 700); break; // vulture
       case "splinter": this._noise(0.12, 0.24, t, "bandpass", 700, 0.7, 250); break;
       case "ui":     this._tone("square", 440, 660, 0.08, 0.2, t); break;
       // --- zombie voices ---
