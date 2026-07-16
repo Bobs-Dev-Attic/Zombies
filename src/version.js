@@ -1,7 +1,17 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.16.0";
+export const VERSION = "0.17.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.17.0",
+    date: "2026-07-16",
+    title: "Home & Away",
+    changes: [
+      "You now start out in your house's front yard when you head out into the neighborhood.",
+      "A neighborhood park with a playground — swings, a slide, a seesaw, benches and a sandpit.",
+      "Push the furniture around! Sofas, dressers, coffee tables and chairs slide when you shove them (heavier pieces budge less), and there are more of them in the house.",
+    ],
+  },
   {
     version: "0.16.0",
     date: "2026-07-16",

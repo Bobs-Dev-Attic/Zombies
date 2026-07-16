@@ -112,7 +112,7 @@ export class Player {
 
     const nx = this.x + this.vx * dt;
     const ny = this.y + this.vy * dt;
-    const res = world.collide(nx, ny, this.r);
+    const res = world.collide(nx, ny, this.r, false, true); // player shoves movable furniture
     this.x = res.x; this.y = res.y;
 
     if (wantMove) this.walkFrame += dt * (sprinting ? 16 : 10);

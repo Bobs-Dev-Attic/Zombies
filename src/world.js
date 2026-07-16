@@ -30,7 +30,12 @@ export const STREET_TERRAIN = {
   4: ["#4a3d29", "#524331"], // dirt driveway
   5: ["#26262b", "#2b2b31"], // vertical road centre-line
   6: ["#26262b", "#2b2b31"], // horizontal road centre-line
+  7: ["#7a6838", "#847043"], // playground sand
 };
+
+// Furniture you can shove around, and how heavy each type is (higher = stiffer).
+const MOVABLE = new Set(["table", "chair", "couch", "dresser"]);
+const FURN_MASS = { chair: 0.25, table: 0.35, couch: 0.68, dresser: 0.85 };
 
 // Sewer tunnel terrain — murky water over concrete.
 export const SEWER_TERRAIN = {
@@ -164,9 +169,10 @@ export class World {
 
   _place(cx, cy, type) {
     if (this.tileAt(cx, cy) !== T.FLOOR) return;
-    const F = { crate: [10, 10, 40], table: [13, 9, 55], chair: [7, 7, 22], barrel: [8, 8, 48], shelf: [13, 7, 60], couch: [15, 9, 72], bed: [13, 9, 60] };
+    const F = { crate: [10, 10, 40], table: [13, 9, 55], chair: [7, 7, 22], barrel: [8, 8, 48], shelf: [13, 7, 60], couch: [15, 9, 72], bed: [13, 9, 60], dresser: [12, 8, 80], swings: [15, 6, 140], slide: [10, 9, 120], seesaw: [13, 4, 60] };
     const d = F[type] || F.crate;
-    this.furniture.push({ cx, cy, x: (cx + 0.5) * TILE, y: (cy + 0.5) * TILE, hw: d[0], hh: d[1], type: type === "bed" ? "couch" : type, hp: d[2], maxHp: d[2], broken: false, overturned: false, angle: rand(-0.05, 0.05), low: this._isLowFurniture(type) });
+    const ft = type === "bed" ? "couch" : type;
+    this.furniture.push({ cx, cy, x: (cx + 0.5) * TILE, y: (cy + 0.5) * TILE, hw: d[0], hh: d[1], type: ft, hp: d[2], maxHp: d[2], broken: false, overturned: false, angle: rand(-0.05, 0.05), low: this._isLowFurniture(ft), movable: MOVABLE.has(ft), mass: FURN_MASS[ft] || 1, vx: 0, vy: 0 });
   }
 
   _fillTint(rx0, ry0, rx1, ry1, tint) {
@@ -199,6 +205,7 @@ export class World {
 
     // Furniture.
     this._place(bx + 6, y1 - 3, "couch"); this._place(bx + 9, y1 - 6, "table"); this._place(bx + 4, by + 8, "shelf");
+    this._place(bx + 2, y1 - 3, "dresser"); this._place(bx + 10, y1 - 3, "chair");
     this._place(x1 - 2, by + 2, "shelf"); this._place(x1 - 5, by + 2, "shelf"); this._place(vx + 2, by + 5, "barrel");
     this._place(vx + 6, hy + 5, "table"); this._place(vx + 4, hy + 5, "chair"); this._place(vx + 8, hy + 5, "chair");
     this._place(vx + 6, hy + 3, "chair"); this._place(vx + 6, hy + 7, "chair");
@@ -244,8 +251,9 @@ export class World {
 
     // Bedroom & bathroom furniture.
     this._place(vx + 3, by + 3, "bed"); this._place(x1 - 3, by + 7, "shelf");
+    this._place(x1 - 2, by + 3, "dresser"); this._place(vx + 7, by + 6, "dresser");
     this._place(vx + 3, hy + 3, "barrel"); this._place(x1 - 3, y1 - 3, "shelf");
-    this._place(bx + 6, y1 - 4, "couch");
+    this._place(bx + 6, y1 - 4, "couch"); this._place(bx + 3, y1 - 6, "table");
 
     this.loot = [
       { cx: vx + 6, cy: by + 4, kind: "medkit" },
@@ -266,6 +274,7 @@ export class World {
     this.furniture.push({
       cx: Math.floor(x / TILE), cy: Math.floor(y / TILE), x, y, hw, hh, type,
       hp, maxHp: hp, broken: false, overturned: false, angle, low: this._isLowFurniture(type),
+      movable: MOVABLE.has(type), mass: FURN_MASS[type] || 1, vx: 0, vy: 0,
     });
   }
 
@@ -304,9 +313,13 @@ export class World {
     // Blocks are the gaps between the road+sidewalk bands.
     const xB = [[1, 6], [12, 21], [26, 36], [41, 46]];
     const yB = [[1, 8], [14, 20], [26, 32], [38, 44]];
-    for (const [x0, x1] of xB) {
-      for (const [y0, y1] of yB) {
-        this._streetBlock(x0, y0, x1, y1);
+    this._homeSpawn = null;
+    for (let bi = 0; bi < xB.length; bi++) {
+      for (let bj = 0; bj < yB.length; bj++) {
+        const opts = {};
+        if (bi === 1 && bj === 1) opts.home = true; // start in this house's front yard
+        if (bi === 2 && bj === 2) opts.park = true; // a neighbourhood park w/ playground
+        this._streetBlock(xB[bi][0], yB[bj][0], xB[bi][1], yB[bj][1], opts);
       }
     }
 
@@ -328,9 +341,9 @@ export class World {
     const holeCells = [[vC[0], hC[0]], [vC[2], hC[0]], [vC[0], hC[2]], [vC[2], hC[2]]];
     for (const [hx, hy] of holeCells) { this._set(hx, hy, T.MANHOLE); this.manholes.push({ cx: hx, cy: hy }); }
 
-    // Player starts at the central intersection; the exit road runs off the
-    // bottom of the map.
-    this.spawnPoint = { x: (vC[1] + 0.5) * TILE, y: (hC[1] + 0.5) * TILE };
+    // Player starts in their house's front yard (falling back to the central
+    // intersection); the exit road runs off the bottom of the map.
+    this.spawnPoint = this._homeSpawn || { x: (vC[1] + 0.5) * TILE, y: (hC[1] + 0.5) * TILE };
     const exCx = vC[1];
     this._set(exCx, rows - 1, T.EXIT); this._tint(exCx, rows - 1, 2);
     this._set(exCx - 1, rows - 1, T.FLOOR); this._tint(exCx - 1, rows - 1, 2);
@@ -341,13 +354,17 @@ export class World {
 
   // Furnish one neighbourhood block: a fenced yard with a house (or a park /
   // empty lot), a driveway, maybe a shed, and some trees.
-  _streetBlock(x0, y0, x1, y1) {
+  _streetBlock(x0, y0, x1, y1, opts) {
+    opts = opts || {};
     const w = x1 - x0 + 1, h = y1 - y0 + 1;
     const roll = Math.random();
     const treeAt = (cx, cy) => { if (this.tileAt(cx, cy) === T.FLOOR && this.floorTint[this.idx(cx, cy)] === 1) this._set(cx, cy, T.PROP); };
 
+    // A dedicated park with a playground.
+    if (opts.park) { this._buildPark(x0, y0, x1, y1); return; }
+
     // Small lots become parks / empty lots: open grass with trees (and a bench).
-    if (w < 5 || h < 5 || roll < 0.22) {
+    if (!opts.home && (w < 5 || h < 5 || roll < 0.22)) {
       const trees = randInt(2, 5);
       for (let i = 0; i < trees; i++) treeAt(randInt(x0, x1), randInt(y0, y1));
       if (w >= 4 && h >= 4 && chance(0.5)) this._furn((x0 + 1.5) * TILE, (y0 + 1.5) * TILE, "bench", 12, 5, 40);
@@ -386,8 +403,8 @@ export class World {
       }
     }
 
-    // A parked car on the driveway now and then.
-    if (chance(0.45) && this.tileAt(gate, y1 - 1) === T.FLOOR && this.tileAt(gate, y1 - 2) === T.FLOOR) {
+    // A parked car on the driveway now and then (never on the start home lot).
+    if (!opts.home && chance(0.45) && this.tileAt(gate, y1 - 1) === T.FLOOR && this.tileAt(gate, y1 - 2) === T.FLOOR) {
       this._furn((gate + 0.5) * TILE, (y1 - 1 + 0.5) * TILE, chance(0.3) ? "truck" : "car", 11, 20, 160);
     }
 
@@ -397,6 +414,24 @@ export class World {
       const bxg = chance(0.5) ? x0 + 1 : x1 - 1, byg = y1 - 1;
       if (this.tileAt(bxg, byg) === T.FLOOR) this._furn((bxg + 0.5) * TILE, (byg + 0.5) * TILE, "bush", 9, 8, 26);
     }
+
+    // Your house: you step out of the front door into this front yard.
+    if (opts.home) this._homeSpawn = { x: (gate + 0.5) * TILE, y: (y1 - 1 + 0.5) * TILE };
+  }
+
+  // A neighbourhood park: open grass, a sandy playground with swings/slide/
+  // seesaw, benches and shade trees.
+  _buildPark(x0, y0, x1, y1) {
+    const cxm = Math.floor((x0 + x1) / 2), cym = Math.floor((y0 + y1) / 2);
+    for (let y = cym - 1; y <= cym + 1; y++) for (let x = cxm - 2; x <= cxm + 2; x++) if (this.tileAt(x, y) === T.FLOOR) this._tint(x, y, 7); // sand
+    const putF = (cx, cy, type, hw, hh, hp) => { if (this.tileAt(cx, cy) === T.FLOOR) this._furn((cx + 0.5) * TILE, (cy + 0.5) * TILE, type, hw, hh, hp); };
+    putF(cxm - 2, y0 + 2, "swings", 15, 6, 140);
+    putF(cxm + 3, cym, "slide", 10, 9, 120);
+    putF(cxm, cym + 2, "seesaw", 13, 4, 60);
+    putF(x0 + 1, cym, "bench", 12, 5, 40);
+    putF(x1 - 1, cym, "bench", 12, 5, 40);
+    for (const [tx, ty] of [[x0 + 1, y0 + 1], [x1 - 1, y0 + 1], [x0 + 1, y1 - 1], [x1 - 1, y1 - 1]]) if (this.tileAt(tx, ty) === T.FLOOR) this._set(tx, ty, T.PROP);
+    this.rooms.push({ name: "park", cx: cxm, cy: cym });
   }
 
   // The sewers: a maze of 2-wide tunnels carved through concrete, with ladders
@@ -545,6 +580,7 @@ export class World {
           cx, cy, x: (cx + 0.5) * TILE, y: (cy + 0.5) * TILE,
           hw: def.hw, hh: def.hh, type, hp: def.hp, maxHp: def.hp,
           broken: false, overturned: false, angle: rand(-0.15, 0.15), low: this._isLowFurniture(type),
+          movable: MOVABLE.has(type), mass: FURN_MASS[type] || 1, vx: 0, vy: 0,
         });
       }
     }
@@ -597,8 +633,22 @@ export class World {
     return this.furnitureAt(x, y) != null;
   }
 
+  // Does furniture piece f fit centred at (x,y) without overlapping solid tiles?
+  furnitureFits(x, y, f) {
+    const solid = (px, py) => {
+      const cx = Math.floor(px / TILE), cy = Math.floor(py / TILE), t = this.tileAt(cx, cy);
+      if (t === T.WALL || t === T.PROP || t === T.FENCE || t === T.WINDOW) return true;
+      if (t === T.DOOR) return !this.doorPassable(this.doorAt(cx, cy));
+      return false;
+    };
+    for (const [px, py] of [[x - f.hw, y - f.hh], [x + f.hw, y - f.hh], [x - f.hw, y + f.hh], [x + f.hw, y + f.hh], [x, y]]) if (solid(px, py)) return false;
+    return true;
+  }
+
   // Circle-vs-tile resolution. throughWindows lets zombies climb through windows.
-  collide(x, y, r, throughWindows) {
+  // pusher = the mover can shove movable furniture (the player) rather than being
+  // hard-stopped by it.
+  collide(x, y, r, throughWindows, pusher) {
     let nx = x, ny = y;
     for (let i = 0; i < 3; i++) {
       const cx = Math.floor(nx / TILE), cy = Math.floor(ny / TILE);
@@ -630,7 +680,16 @@ export class World {
         const d2 = dx * dx + dy * dy;
         if (d2 < r * r && d2 > 0.0001) {
           const d = Math.sqrt(d2), push = (r - d) / d;
-          nx += dx * push; ny += dy * push;
+          if (pusher && f.movable) {
+            // Slide the furniture out of the way (if it clears), only ejecting
+            // the pusher by the stiff remainder — heavier pieces barely budge.
+            const stiff = clamp(f.mass, 0.2, 1);
+            const fx = f.x - dx * push * (1 - stiff), fy = f.y - dy * push * (1 - stiff);
+            if (this.furnitureFits(fx, fy, f)) { f.x = fx; f.y = fy; f.cx = Math.floor(fx / TILE); f.cy = Math.floor(fy / TILE); }
+            nx += dx * push * stiff; ny += dy * push * stiff;
+          } else {
+            nx += dx * push; ny += dy * push;
+          }
         } else if (d2 <= 0.0001) {
           // centre inside: eject along the nearest edge
           const toL = nx - (f.x - f.hw), toR = (f.x + f.hw) - nx;

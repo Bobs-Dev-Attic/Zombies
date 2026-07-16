@@ -473,6 +473,7 @@ const FURN = {
   truck:  { body: "#3f5a6b", top: "#557488", edge: "#1a1a1e" },
   bench:  { body: "#6b4a28", top: "#86633c", edge: "#4a3420" },
   bush:   { body: "#2f4a24", top: "#3c5c2e", edge: "#213617" },
+  dresser:{ body: "#6a4a2a", top: "#835c38", edge: "#472f18" },
 };
 
 // Furniture: intact obstacle, or a broken / overturned pile once destroyed.
@@ -546,6 +547,35 @@ export function drawFurniture(ctx, f) {
     for (const [ox, oy, rr] of [[-3, -2, 3], [3, -1, 3], [0, -1, 3.4]]) { ctx.beginPath(); ctx.arc(ox, oy, rr, 0, TAU); ctx.fill(); }
     ctx.restore();
     return;
+  }
+  if (f.type === "dresser") {
+    ctx.fillStyle = c.edge; ctx.fillRect(-f.hw, -f.hh, f.hw * 2, f.hh * 2);
+    ctx.fillStyle = c.body; ctx.fillRect(-f.hw + 1, -f.hh + 1, f.hw * 2 - 2, f.hh * 2 - 2);
+    ctx.fillStyle = c.edge; ctx.fillRect(-f.hw + 1, -0.6, f.hw * 2 - 2, 1.2); // drawer seam
+    ctx.fillStyle = c.top; for (const sy of [-f.hh * 0.5, f.hh * 0.5]) { ctx.fillRect(-3, sy - 0.8, 2, 1.6); ctx.fillRect(1, sy - 0.8, 2, 1.6); } // handles
+    ctx.restore(); return;
+  }
+  if (f.type === "swings") {
+    ctx.strokeStyle = "#6a6f76"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-f.hw + 2, -f.hh + 1); ctx.lineTo(f.hw - 2, -f.hh + 1); ctx.stroke(); // top bar
+    for (const sx of [-f.hw + 3, f.hw - 3]) { ctx.beginPath(); ctx.moveTo(sx - 3, f.hh - 1); ctx.lineTo(sx, -f.hh + 1); ctx.lineTo(sx + 3, f.hh - 1); ctx.stroke(); } // A-frames
+    ctx.strokeStyle = "#8a8f96"; ctx.lineWidth = 1;
+    for (const sx of [-4, 4]) { ctx.beginPath(); ctx.moveTo(sx, -f.hh + 1); ctx.lineTo(sx, f.hh - 3); ctx.stroke(); ctx.fillStyle = "#c0392b"; ctx.fillRect(sx - 2.5, f.hh - 4, 5, 2); }
+    ctx.lineWidth = 1; ctx.restore(); return;
+  }
+  if (f.type === "slide") {
+    ctx.fillStyle = "#5a7a58"; ctx.fillRect(-f.hw, -f.hh, f.hw * 0.8, f.hh * 2); // platform
+    ctx.fillStyle = "#9aa7b5"; ctx.fillRect(-f.hw * 0.2, -3, f.hw * 1.2, 6);      // metal chute
+    ctx.fillStyle = "#c4d0dd"; ctx.fillRect(-f.hw * 0.2, -1.5, f.hw * 1.2, 1.5);  // shine
+    ctx.fillStyle = "#6a6f76"; for (let i = -1; i <= 1; i++) ctx.fillRect(-f.hw + 1, i * 3 - 0.7, f.hw * 0.8 - 2, 1.4); // ladder rungs
+    ctx.restore(); return;
+  }
+  if (f.type === "seesaw") {
+    ctx.fillStyle = "#8a5a30"; ctx.fillRect(-f.hw, -1.6, f.hw * 2, 3.2); // plank
+    ctx.fillStyle = "#c0392b"; ctx.fillRect(-f.hw, -2, 3, 4);
+    ctx.fillStyle = "#2f6b4a"; ctx.fillRect(f.hw - 3, -2, 3, 4);          // seats
+    ctx.fillStyle = "#4a4e54"; ctx.fillRect(-2, -2.5, 4, 5);              // pivot
+    ctx.restore(); return;
   }
 
   ctx.fillStyle = c.edge;

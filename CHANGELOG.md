@@ -7,6 +7,12 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.17.0] — 2026-07-16
+### Home & Away
+- **Front-yard start** — heading out into the neighborhood now drops you in **your house's fenced front yard** (on the path by the gate) instead of the middle of the road.
+- **A park with a playground** — one neighborhood block is now a proper **park**: a sandy playground with **swings, a slide, and a seesaw**, plus benches and shade trees (open, no fence).
+- **Pushable furniture** — **sofas, dressers, coffee tables and chairs** now **slide when you shove into them** (heavier pieces resist more; they won't slide into walls), and the house is more furnished (added dressers, a chair, and an upstairs coffee table). Tall pieces still stop bullets; low ones you shoot over; everything still blocks movement and can be smashed.
+
 ## [0.16.0] — 2026-07-16
 ### Down the Drain
 - **Zombie rats** — a tiny, fast, weak new enemy that **swarms the sewers** in scurrying packs (rendered as little four-legged critters, weighted heavily in the underground spawn table).
@@ -188,6 +194,7 @@ _Next: 2b locked doors + key/axe, 2c functional stairs to upper floors, 2d the o
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.17.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.17.0
 [0.16.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.16.0
 [0.15.2]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.15.2
 [0.15.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.15.1

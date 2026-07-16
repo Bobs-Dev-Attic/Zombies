@@ -788,7 +788,7 @@ export class Game {
     }
     // Keep everyone out of walls after the shove.
     for (const z of zs) { const r = w.collide(z.x, z.y, z.r, true); z.x = r.x; z.y = r.y; }
-    const pr = w.collide(p.x, p.y, p.r); p.x = pr.x; p.y = pr.y;
+    const pr = w.collide(p.x, p.y, p.r, false, true); p.x = pr.x; p.y = pr.y;
   }
 
   _damageZombie(z, dmg, angle, force, sever = 0, hs = 0) {
