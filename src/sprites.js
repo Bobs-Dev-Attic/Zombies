@@ -403,76 +403,133 @@ export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts,
   eye(4, -1.5); eye(4, 1.5);
 }
 
-// Desaturate + darken a hex colour for a "dead" look.
+// Slightly darken/mute a hex colour for a "dead" look, but keep enough of the
+// original hue that a corpse is recognisably the same zombie that fell.
 function deadTint(hex, k) {
   const n = parseInt(hex.slice(1), 16);
   let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
   const gray = (r + g + b) / 3;
-  r = (r * 0.55 + gray * 0.45) * k; g = (g * 0.55 + gray * 0.45) * k; b = (b * 0.55 + gray * 0.45) * k;
+  r = (r * 0.74 + gray * 0.26) * k; g = (g * 0.74 + gray * 0.26) * k; b = (b * 0.74 + gray * 0.26) * k;
   return `rgb(${r | 0},${g | 0},${b | 0})`;
 }
 
 // A dead zombie settled on the ground (permanent decal), lying face-down.
 export function drawBodyDecal(ctx, x, y, angle, type, r, parts, look) {
   const pal = ZOMBIE_PAL[type] || ZOMBIE_PAL.walker;
-  look = look || { skin: pal.skin, cloth: pal.cloth, dark: pal.dark, hair: "#20160e" };
+  look = look || { skin: pal.skin, cloth: pal.cloth, dark: pal.dark, cloth2: pal.dark, hair: "#20160e", hairLen: 0 };
+  parts = parts || { larm: 1, rarm: 1, lleg: 1, rleg: 1 };
   const s = r / 7;
-  const skin = deadTint(look.skin, 0.82);
-  const cloth = deadTint(look.cloth || look.dark, 0.8);
-  const dark = deadTint(look.dark, 0.68);
+  const skin = deadTint(look.skin, 0.9);
+  const cloth = deadTint(look.cloth || look.dark, 0.86);
+  const cloth2 = deadTint(look.cloth2 || look.cloth || look.dark, 0.82);
+  const dark = deadTint(look.dark, 0.76);
+  const hair = deadTint(look.hair || "#20160e", 0.72);
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
 
-  // Layered, irregular blood pool.
+  // Layered, irregular blood pool (larger for a brute).
+  const pool = type === "brute" ? 1.4 : 1;
   ctx.fillStyle = "rgba(70,8,10,0.5)";
-  ctx.beginPath(); ctx.ellipse(-1 * s, 0, 11 * s, 7 * s, 0.3, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-1 * s, 0, 12 * s * pool, 7.5 * s * pool, 0.3, 0, TAU); ctx.fill();
   ctx.fillStyle = "rgba(40,4,6,0.55)";
-  ctx.beginPath(); ctx.ellipse(2 * s, 1 * s, 6 * s, 4 * s, -0.4, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(3 * s, 1 * s, 6.5 * s * pool, 4.2 * s * pool, -0.4, 0, TAU); ctx.fill();
 
+  // --- Rat carcass: tiny, on its side, tail trailing. ---
+  if (type === "rat") {
+    ctx.fillStyle = cloth; ctx.beginPath(); ctx.ellipse(0, 0, 6 * s, 3.4 * s, 0, 0, TAU); ctx.fill();       // body
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.ellipse(1 * s, 0.6 * s, 3 * s, 1.8 * s, 0, 0, TAU); ctx.fill(); // belly
+    ctx.fillStyle = dark; for (const [ox, oy] of [[1, -3], [-1.5, -3.2], [1, 3], [-1.5, 3.2]]) ctx.fillRect((ox - 0.7) * s, (oy - 0.7) * s, 1.6 * s, 1.6 * s); // splayed legs
+    ctx.fillStyle = cloth; ctx.beginPath(); ctx.arc(4.6 * s, 0, 2.4 * s, 0, TAU); ctx.fill();                // head
+    ctx.strokeStyle = cloth; ctx.lineWidth = Math.max(1, 1.2 * s);                                            // tail
+    ctx.beginPath(); ctx.moveTo(-5 * s, 0); ctx.quadraticCurveTo(-9 * s, -1 * s, -11 * s, 2 * s); ctx.stroke(); ctx.lineWidth = 1;
+    ctx.restore(); return;
+  }
+
+  // --- Dog carcass: bigger, four legs splayed, snout forward. ---
+  if (type === "dog") {
+    ctx.fillStyle = cloth; ctx.beginPath(); ctx.ellipse(-8 * s, 0, 3 * s, 1.5 * s, 0, 0, TAU); ctx.fill();     // tail base
+    ctx.fillStyle = dark; for (const [ox, oy] of [[4, -4], [4.5, 4], [-4, -4], [-3.5, 4]]) ctx.fillRect((ox - 1) * s, (oy - 2.5) * s, 2 * s, 5 * s); // splayed legs
+    ctx.fillStyle = cloth; ctx.beginPath(); ctx.ellipse(-0.5 * s, 0, 10 * s, 4.4 * s, 0, 0, TAU); ctx.fill();  // torso
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.ellipse(1 * s, 0.5 * s, 4.5 * s, 2.6 * s, 0, 0, TAU); ctx.fill(); // rotting shoulders
+    ctx.fillStyle = cloth; ctx.beginPath(); ctx.arc(7 * s, 0, 3.4 * s, 0, TAU); ctx.fill();                    // head
+    ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(9.6 * s, 0, 1.8 * s, 0, TAU); ctx.fill();                   // snout
+    ctx.restore(); return;
+  }
+
+  // --- Humanoid corpse: splayed on its back, torn open, face up. ---
+  const bigT = type === "brute" ? 1.32 : 1;
   const limb = (ang, x0, len, wide, col, ok) => {
-    if (!ok) return;
     ctx.save(); ctx.rotate(ang);
+    if (!ok) { ctx.fillStyle = STUMP; ctx.beginPath(); ctx.arc(x0 + 1, 0, wide * 1.05, 0, TAU); ctx.fill(); ctx.restore(); return; }
     ctx.fillStyle = col;
     ctx.beginPath(); ctx.ellipse(x0 + len / 2, 0, len / 2 + 0.6, wide, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0,0.12)"; // shading toward the extremity
+    ctx.beginPath(); ctx.ellipse(x0 + len * 0.76, 0, len * 0.26, wide * 0.85, 0, 0, TAU); ctx.fill();
     ctx.restore();
   };
-  // Legs trail behind, arms out to the sides — a slumped, face-down sprawl.
-  limb(Math.PI - 0.35, 2 * s, 7 * s, 1.7 * s, cloth, parts.rleg);
-  limb(Math.PI + 0.35, 2 * s, 7 * s, 1.7 * s, cloth, parts.lleg);
-  limb(-1.15, 2.2 * s, 6 * s, 1.5 * s, skin, parts.rarm);
-  limb(1.15, 2.2 * s, 6 * s, 1.5 * s, skin, parts.larm);
+  // Legs (trousers = cloth2) trail back, arms (skin) fling out to the sides.
+  limb(Math.PI - 0.30, 2 * s, 7.5 * s, 1.8 * s * bigT, cloth2, parts.rleg);
+  limb(Math.PI + 0.30, 2 * s, 7.5 * s, 1.8 * s * bigT, cloth2, parts.lleg);
+  limb(-1.05, 2.2 * s, 6 * s, 1.5 * s * bigT, skin, parts.rarm);
+  limb(1.05, 2.2 * s, 6 * s, 1.5 * s * bigT, skin, parts.larm);
 
-  // Torso (tattered shirt) then a hint of exposed back.
+  // Torso (same shirt colour it wore).
   ctx.fillStyle = cloth;
-  ctx.beginPath(); ctx.ellipse(0, 0, 7 * s, 4.6 * s, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = dark;
-  ctx.beginPath(); ctx.ellipse(-0.5 * s, 0, 4.5 * s, 3 * s, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, 0, 7 * s * bigT, 4.8 * s * bigT, 0, 0, TAU); ctx.fill();
+  // Torn-open belly showing viscera (organs) and a couple of exposed ribs.
+  ctx.fillStyle = "#5a1414";
+  ctx.beginPath(); ctx.ellipse(-1 * s, 0, 3.4 * s, 2.4 * s, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = "#8a3a3a";
+  for (const [ox, oy] of [[-1.6, -0.8], [-0.4, 0.6], [-2.2, 0.5]]) { ctx.beginPath(); ctx.arc(ox * s, oy * s, 1.1 * s, 0, TAU); ctx.fill(); }
+  ctx.fillStyle = "rgba(210,190,150,0.5)";
+  ctx.fillRect(-3 * s, -2 * s, 4 * s, 0.7 * s); ctx.fillRect(-3 * s, 1.4 * s, 4 * s, 0.7 * s);
 
-  // Head, face-down, at the front.
+  // Head (same skin), hair drawn to match the zombie's style/length, face up.
+  const hr = 3.2 * s * (type === "brute" ? 1.12 : 1);
   ctx.fillStyle = skin;
-  ctx.beginPath(); ctx.arc(6 * s, 0, 3 * s, 0, TAU); ctx.fill();
-  ctx.fillStyle = deadTint(look.hair, 0.5);
-  ctx.beginPath(); ctx.arc(6.4 * s, 0, 1.8 * s, 0, TAU); ctx.fill(); // hair/wound
+  ctx.beginPath(); ctx.arc(6 * s, 0, hr, 0, TAU); ctx.fill();
+  if (look.hairLen === -1) { ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(6.4 * s, 0, 1.7 * s, 0, TAU); ctx.fill(); } // bald: bare scalp/scar
+  else if (look.hairLen === 1) { ctx.fillStyle = hair; ctx.beginPath(); ctx.ellipse(4.4 * s, 0, 2.8 * s, 3.6 * s, 0, 0, TAU); ctx.fill(); } // long, trailing back
+  else { ctx.fillStyle = hair; ctx.beginPath(); ctx.arc(4.8 * s, 0, 2.5 * s, 0, TAU); ctx.fill(); }                    // short cap on the crown
+  ctx.fillStyle = "#20140c"; // slack, shut eyes
+  ctx.fillRect(6.5 * s, -1.3 * s, 1.4 * s, 0.7 * s); ctx.fillRect(6.5 * s, 0.6 * s, 1.4 * s, 0.7 * s);
 
   ctx.restore();
 }
 
 // A severed limb lying on the ground (or, when zHeight>0, tumbling in the air).
 export function drawGroundLimb(ctx, x, y, angle, part, color, zHeight) {
+  const big = part === "head" || part === "torso" || part === "gut";
   const len = part && part.endsWith("leg") ? 8 : 6;
   if (zHeight > 0) {
     ctx.fillStyle = "rgba(0,0,0,0.25)";
-    ctx.beginPath(); ctx.ellipse(x, y, len * 0.5, 2, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, y, (big ? 4.5 : len * 0.5), 2, 0, 0, TAU); ctx.fill();
   }
   ctx.save();
   ctx.translate(x, y - (zHeight || 0));
   ctx.rotate(angle);
-  if (!zHeight) { ctx.fillStyle = "rgba(60,10,10,0.4)"; ctx.beginPath(); ctx.ellipse(0, 0, len * 0.7, 3, 0, 0, TAU); ctx.fill(); }
-  ctx.fillStyle = color || "#72a83a";
-  ctx.fillRect(-len / 2, -1.6, len, 3.2);
-  ctx.fillStyle = "#5a1010"; // bloody torn end
-  ctx.fillRect(len / 2 - 1.6, -1.6, 1.6, 3.2);
+  if (!zHeight) { ctx.fillStyle = "rgba(60,10,10,0.4)"; ctx.beginPath(); ctx.ellipse(0, 0, (big ? 5 : len * 0.7), 3, 0, 0, TAU); ctx.fill(); }
+  if (part === "head") {
+    ctx.fillStyle = color || "#d9a066"; ctx.beginPath(); ctx.arc(0, 0, 3.4, 0, TAU); ctx.fill();
+    ctx.fillStyle = "#3a2a1a"; ctx.beginPath(); ctx.arc(-1.5, 0, 2.3, 0, TAU); ctx.fill();          // hair on the back
+    ctx.fillStyle = "#20140c"; ctx.fillRect(1, -1.4, 1.5, 0.8); ctx.fillRect(1, 0.6, 1.5, 0.8);     // shut eyes
+    ctx.fillStyle = "#5a1010"; ctx.beginPath(); ctx.arc(-3, 0, 1.4, 0, TAU); ctx.fill();            // torn neck
+  } else if (part === "torso") {
+    ctx.fillStyle = color || "#3b5a8c"; ctx.beginPath(); ctx.ellipse(0, 0, 5.5, 3.7, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = "#5a1414"; ctx.beginPath(); ctx.ellipse(0.5, 0, 2.7, 1.9, 0, 0, TAU); ctx.fill(); // ripped-open cavity
+    ctx.fillStyle = "#8a3a3a"; ctx.beginPath(); ctx.arc(0, -0.6, 1, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(1, 0.7, 0.9, 0, TAU); ctx.fill();
+    ctx.fillStyle = "rgba(210,190,150,0.6)"; ctx.fillRect(-4, -2.3, 3, 0.7); ctx.fillRect(-4, 1.6, 3, 0.7); // ribs
+  } else if (part === "gut") {
+    ctx.fillStyle = color || "#9c3a4a";
+    for (const [ox, oy] of [[0, 0], [1.4, 0.4], [-1.2, 0.6], [0.4, -1]]) { ctx.beginPath(); ctx.arc(ox, oy, 1.5, 0, TAU); ctx.fill(); }
+    ctx.fillStyle = "#7a2030"; ctx.beginPath(); ctx.arc(0.4, 0.2, 0.9, 0, TAU); ctx.fill();
+  } else {
+    ctx.fillStyle = color || "#72a83a";
+    ctx.fillRect(-len / 2, -1.6, len, 3.2);
+    ctx.fillStyle = "#5a1010"; // bloody torn end
+    ctx.fillRect(len / 2 - 1.6, -1.6, 1.6, 3.2);
+  }
   ctx.restore();
 }
 

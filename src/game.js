@@ -1358,8 +1358,54 @@ export class Game {
     this.player.deadPose = true;
     this.death = { t: 0, dur: 60, dialogShown: false };
     this.blood = new DeathBlood(this.death.dur);
-    this.shake += 6;
-    this.hooks.vibrate?.([80, 50, 160]);
+    // The horde tears the player apart: body parts, organs and blood everywhere.
+    this._dismemberPlayer();
+    this.hooks.vibrate?.([120, 40, 200]);
+  }
+
+  // The player is ripped limb-from-limb: fling the head, arms, legs and torso as
+  // tumbling gibs, spill organs, and spray blood across the whole area.
+  _dismemberPlayer() {
+    const px = this.player.x, py = this.player.y, P = PLAYER_PAL;
+    this.player.torn = true;
+    sfx.play("gib");
+    // Body parts, flung out and tumbling; they settle as ground decals.
+    const parts = [
+      ["head", P.skin], ["larm", P.skin], ["rarm", P.skin],
+      ["lleg", P.pants], ["rleg", P.pants], ["torso", P.shirt],
+    ];
+    for (const [part, color] of parts) {
+      const a = rand(0, TAU), s = rand(80, 220);
+      this.gibs.push({
+        x: px + rand(-3, 3), y: py - 5 + rand(-3, 3),
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s - 40,
+        z: 6, vz: rand(80, 160), angle: rand(0, TAU), spin: rand(-16, 16),
+        part, limbColor: color,
+      });
+    }
+    // Organs / guts spill and skitter out.
+    for (let i = 0; i < 7; i++) {
+      const a = rand(0, TAU), s = rand(50, 170);
+      this.gibs.push({
+        x: px, y: py - 4, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 30,
+        z: 5, vz: rand(50, 120), angle: rand(0, TAU), spin: rand(-12, 12),
+        part: "gut", limbColor: pick(["#9c3a4a", "#7a2030", "#b04a54", "#8a2a3a"]),
+      });
+    }
+    // A huge spray of blood and viscera flying everywhere.
+    for (let i = 0; i < 64; i++) {
+      const a = rand(0, TAU), s = rand(60, 280);
+      this.particles.push(new Particle(px, py, {
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s - 20, life: rand(0.6, 1.7),
+        color: pick(["#a01818", "#7a1010", "#8a2a1a", "#c02828", "#611", "#9c3a4a", "#d98c9c", "#6a1414"]),
+        size: randInt(2, 4), drag: 0.82, gravity: 130, stain: true,
+      }));
+    }
+    // ...settling into a wide, gore-soaked pool.
+    for (let i = 0; i < 28; i++) {
+      this.stains.push({ x: px + rand(-28, 28), y: py + rand(-24, 24), r: rand(3, 9), life: rand(14, 24), color: pick(["#4a0c0c", "#5a1020", "#3a0808"]) });
+    }
+    this.shake += 14;
   }
 
   // The bleed-out: the scene lingers (zombies feed over the corpse) while the
@@ -1982,6 +2028,21 @@ export class Game {
   _drawPlayer(ctx) {
     const p = this.player;
     if (p.deadPose) {
+      if (p.torn) {
+        // Ripped apart — nothing left at the spot but a gore-soaked patch with a
+        // bit of spine and shattered ribs; the rest is scattered as gibs/limbs.
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.fillStyle = "rgba(60,8,10,0.5)"; ctx.beginPath(); ctx.ellipse(0, 0, 15, 11, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = "rgba(40,4,6,0.55)"; ctx.beginPath(); ctx.ellipse(4, 2, 9, 6, -0.4, 0, TAU); ctx.fill();
+        ctx.fillStyle = "#5a1414"; ctx.beginPath(); ctx.ellipse(0, 0, 5, 3.4, 0.3, 0, TAU); ctx.fill(); // pelvic cavity
+        ctx.fillStyle = "rgba(210,190,150,0.6)"; // spine + snapped ribs
+        ctx.fillRect(-1, -5, 2, 10);
+        for (let i = -4; i <= 4; i += 2) ctx.fillRect(-4, i, 3.5, 0.8);
+        ctx.fillStyle = "#8a3a3a"; ctx.beginPath(); ctx.arc(1.5, -0.5, 1.1, 0, TAU); ctx.fill(); // stray viscera
+        ctx.restore();
+        return;
+      }
       // Collapsed on the floor: tip the figure over and let it lie still.
       ctx.save();
       ctx.globalAlpha = 0.92;
