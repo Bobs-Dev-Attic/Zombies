@@ -7,6 +7,14 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.18.0] — 2026-07-16
+### Turn It Up
+- **Sound!** A tiny **Web Audio synth engine** (`src/audio.js`) generates every effect on the fly — no audio files to download. Wired to game events:
+  - **Per-weapon fire** — the pistols' *pop*, the shotgun/`.357` *boom*, the rifle *crack*, the SMG/assault-rifle *rattle*, the bazooka *launch*, plus melee *swipe / thud / chop* and the grenade *clink*.
+  - **Feedback** — explosions, reload, taking a hit, medkit/pickup blips, glass smashing, wood splintering, weapon-swap/UI clicks.
+  - **The horde** — zombie **groans** on spawn and spitter **hisses**.
+- **Sound toggle** — a **Sound: On/Off** button on the menu; your choice is saved (localStorage). Audio starts on your first tap/click (browser autoplay rules).
+
 ## [0.17.0] — 2026-07-16
 ### Home & Away
 - **Front-yard start** — heading out into the neighborhood now drops you in **your house's fenced front yard** (on the path by the gate) instead of the middle of the road.
@@ -194,6 +202,7 @@ _Next: 2b locked doors + key/axe, 2c functional stairs to upper floors, 2d the o
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.18.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.18.0
 [0.17.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.17.0
 [0.16.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.16.0
 [0.15.2]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.15.2

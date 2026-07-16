@@ -6,6 +6,7 @@ import { Player, Zombie, Projectile, Particle, Pickup, Thrown, ZOMBIE_TYPES } fr
 import { WEAPONS, WEAPON_ORDER, newLoadout } from "./weapons.js";
 import { drawPlayer, drawZombie, drawPickup, drawMuzzle, drawFurniture, drawBodyDecal, drawGroundLimb } from "./sprites.js";
 import { DeathBlood } from "./deathblood.js";
+import { sfx } from "./audio.js";
 
 const PLAYER_PAL = { skin: "#d9a066", hair: "#3a2a1a", shirt: "#3b5a8c", vest: "#2c3e52", pants: "#2a2a33" };
 const ZOMBIE_LIMB = { walker: "#72a83a", runner: "#8fb84a", crawler: "#a0c15a", brute: "#5c7a2e", spitter: "#9ab84a", leaper: "#8fb84a", prone: "#a0c15a", dog: "#8a9a52", rat: "#7a8a44" };
@@ -203,6 +204,7 @@ export class Game {
 
   // Wood-chip debris when a door is chopped/shot; a bigger burst when it breaks.
   _splinter(x, y, big) {
+    sfx.play("splinter");
     const n = big ? 14 : 5;
     for (let i = 0; i < n; i++) {
       const a = rand(0, TAU), s = rand(30, big ? 170 : 90);
@@ -277,6 +279,7 @@ export class Game {
     for (const [k, wgt] of table) { if ((r -= wgt) <= 0) { type = k; break; } }
     const hpScale = 1 + (w - 1) * 0.16; // tougher each wave
     this.zombies.push(new Zombie(p.x, p.y, type, hpScale));
+    if (chance(0.4)) sfx.play("groan");
   }
 
   // ------------------------------------------------------- Loop
@@ -312,7 +315,7 @@ export class Game {
     this._waterT = (this._waterT || 0) + dt; // drives the flowing-water ripples
 
     if (actions.swap) this._swapWeapon();
-    if (actions.reload) { if (this.player.startReload()) this._announce("Reloading…"); }
+    if (actions.reload) { if (this.player.startReload()) { this._announce("Reloading…"); sfx.play("reload"); } }
     if (actions.interact) this._interact();
     if (inp.firing) this._tryFire();
 
@@ -423,7 +426,7 @@ export class Game {
     // Damage side-flash: intensity scales with the health actually lost this
     // frame (so armour soaking a hit yields a smaller flash), then fades.
     const drop = this._prevHp - this.player.health;
-    if (drop > 0.5) this.sideFlash = Math.max(this.sideFlash, clamp(drop / 22, 0.28, 1));
+    if (drop > 0.5) { this.sideFlash = Math.max(this.sideFlash, clamp(drop / 22, 0.28, 1)); sfx.play("hurt"); }
     this._prevHp = this.player.health;
     if (this.sideFlash > 0) this.sideFlash = Math.max(0, this.sideFlash - dt * 1.6);
     // Announce armour breaking as it happens.
@@ -525,6 +528,7 @@ export class Game {
     this.player.loadout.current = owned[(i + 1) % owned.length];
     this.player.reloading = 0;
     this._announce(this.player.weapon.name);
+    sfx.play("click");
   }
 
   // Directly equip a weapon (from the on-screen weapon buttons).
@@ -535,13 +539,14 @@ export class Game {
     this.player.reloading = 0;
     this._announce(WEAPONS[id].name);
     this.hooks.vibrate?.(10);
+    sfx.play("click");
   }
 
   _tryFire() {
     const p = this.player, w = p.weapon;
     if (!p.canFire()) {
       // Auto-reload when the clip runs dry.
-      if (!w.melee && (p.loadout.clip[p.loadout.current] ?? 0) <= 0 && p.reloading <= 0) p.startReload();
+      if (!w.melee && !w.throwable && (p.loadout.clip[p.loadout.current] ?? 0) <= 0 && p.reloading <= 0 && p.startReload()) sfx.play("reload");
       return;
     }
     p.cooldown = 1 / w.fireRate;
@@ -568,11 +573,13 @@ export class Game {
     this.shake += w.explosive ? 8 : w.pellets > 1 ? 4 : 2;
     this._ejectCasing(p);
     this._muzzleSmoke(p);
+    sfx.play(w.sound || "pop");
     if (w.explosive || w.pellets > 1) this.hooks.vibrate?.(30);
   }
 
   _meleeSwing(w, variant) {
     const p = this.player;
+    sfx.play(w.sound || "swipe");
     // Stab/lunge reach a little further and narrower; swing is a wide arc.
     const thrust = variant === "lunge" ? 12 : variant === "stab" ? 8 : 0;
     const arc = variant === "swing" ? w.arc : w.arc * 0.55;
@@ -710,6 +717,7 @@ export class Game {
     }
     this.shake += 16;
     this.hooks.vibrate?.(60);
+    sfx.play("explode");
   }
 
   // ------------------------------------------------------- Throwables
@@ -721,6 +729,7 @@ export class Game {
       explosive: w.explosive || 0, damage: w.damage || 0, knockback: w.knockback || 0, sever: w.sever || 0,
     }));
     this._announce(w.name, "thrown");
+    sfx.play(w.sound || "clink");
     this.shake += 1;
   }
 
@@ -867,6 +876,7 @@ export class Game {
   }
 
   _glass(x, y) {
+    sfx.play("glass");
     for (let i = 0; i < 10; i++) {
       const a = rand(0, TAU), s = rand(30, 110);
       this.particles.push(new Particle(x, y, {
@@ -952,6 +962,7 @@ export class Game {
       this.projectiles.push(new Projectile(x, y, angle, {
         speed: 190, damage: 10, range: 340, hostile: true, kind: "spit", r: 2.4,
       }));
+      sfx.play("hiss");
     }
   }
 
@@ -1069,6 +1080,7 @@ export class Game {
 
   _grab(pk) {
     const p = this.player, l = p.loadout;
+    sfx.play(pk.kind === "medkit" || pk.kind === "adrenaline" ? "heal" : "pickup");
     switch (pk.kind) {
       case "weapon": {
         const id = pk.data;

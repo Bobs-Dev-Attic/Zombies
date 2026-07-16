@@ -1,6 +1,7 @@
 // Entry point: wires the DOM/UI to the Game instance.
 import { Game } from "./game.js";
 import { WEAPONS } from "./weapons.js";
+import { sfx } from "./audio.js";
 import { VERSION, CHANGELOG } from "./version.js";
 
 const $ = (id) => document.getElementById(id);
@@ -96,18 +97,34 @@ function showGameUI() { $("hud").classList.remove("hidden"); $("touch-ui").class
 function hideGameUI() { $("touch-ui").classList.add("hidden"); }
 
 function beginGame() {
+  sfx.resume();
   hideOverlays();
   showGameUI();
   game.start(0);
 }
 
+// ---------------- Sound ----------------
+sfx.enabled = localStorage.getItem("z_sound") !== "off";
+function updateMuteBtn() { const b = $("mute-btn"); if (b) b.textContent = sfx.enabled ? "🔊 Sound: On" : "🔇 Sound: Off"; }
+$("mute-btn")?.addEventListener("click", () => {
+  sfx.setEnabled(!sfx.enabled);
+  localStorage.setItem("z_sound", sfx.enabled ? "on" : "off");
+  updateMuteBtn();
+  if (sfx.enabled) { sfx.resume(); sfx.play("ui"); }
+});
+updateMuteBtn();
+// The AudioContext can only start from a user gesture — wake it on first input.
+const wake = () => sfx.resume();
+window.addEventListener("pointerdown", wake, { once: true });
+window.addEventListener("keydown", wake, { once: true });
+
 // ---------------- Buttons ----------------
 $("start-btn").addEventListener("click", beginGame);
 $("retry-btn").addEventListener("click", beginGame);
-$("how-btn").addEventListener("click", () => show("how"));
-$("changelog-btn").addEventListener("click", () => { renderChangelog(); show("changelog"); });
+$("how-btn").addEventListener("click", () => { sfx.play("ui"); show("how"); });
+$("changelog-btn").addEventListener("click", () => { sfx.play("ui"); renderChangelog(); show("changelog"); });
 for (const btn of document.querySelectorAll(".close-overlay")) {
-  btn.addEventListener("click", () => { hideOverlays(); if (btn.dataset.target !== undefined) $("menu").classList.remove("hidden"); });
+  btn.addEventListener("click", () => { sfx.play("ui"); hideOverlays(); if (btn.dataset.target !== undefined) $("menu").classList.remove("hidden"); });
 }
 
 // ---------------- Changelog rendering ----------------

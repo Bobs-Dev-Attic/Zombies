@@ -1,7 +1,16 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.17.0";
+export const VERSION = "0.18.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.18.0",
+    date: "2026-07-16",
+    title: "Turn It Up",
+    changes: [
+      "Sound! Every weapon has its own gunshot or swing, plus explosions, reloads, glass smashing, wood splintering, pickups, taking a hit, zombie groans and spitter hisses — all generated live (no downloads).",
+      "A Sound: On/Off toggle on the menu (your choice is remembered).",
+    ],
+  },
   {
     version: "0.17.0",
     date: "2026-07-16",
