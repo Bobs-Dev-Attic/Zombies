@@ -204,6 +204,8 @@ export const ZOMBIE_TYPES = {
   prone:   { hp: 30,  speed: 118, r: 6, dmg: 10, pattern: "wanderChase", knockResist: 0.15, score: 20, color: "crawler", gore: 0.9, shamble: 0.46, lurch: 0.4, bornProne: true },
   // Zombie dog: a fast, low four-legged runner that packs the streets outside.
   dog:     { hp: 26,  speed: 78, r: 6,  dmg: 8,  pattern: "direct",      knockResist: 0.05, score: 18, color: "runner",  gore: 0.7, shamble: 0.14, lurch: 0.12, quad: true },
+  // Zombie rat: tiny, fast, weak — swarms the sewers in scurrying packs.
+  rat:     { hp: 12,  speed: 96, r: 4,  dmg: 4,  pattern: "direct",      knockResist: 0,    score: 8,  color: "crawler", gore: 0.4, shamble: 0.1,  lurch: 0.08, quad: true },
 };
 
 export class Zombie {

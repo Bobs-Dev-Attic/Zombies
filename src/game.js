@@ -8,7 +8,7 @@ import { drawPlayer, drawZombie, drawPickup, drawMuzzle, drawFurniture, drawBody
 import { DeathBlood } from "./deathblood.js";
 
 const PLAYER_PAL = { skin: "#d9a066", hair: "#3a2a1a", shirt: "#3b5a8c", vest: "#2c3e52", pants: "#2a2a33" };
-const ZOMBIE_LIMB = { walker: "#72a83a", runner: "#8fb84a", crawler: "#a0c15a", brute: "#5c7a2e", spitter: "#9ab84a", leaper: "#8fb84a", prone: "#a0c15a", dog: "#8a9a52" };
+const ZOMBIE_LIMB = { walker: "#72a83a", runner: "#8fb84a", crawler: "#a0c15a", brute: "#5c7a2e", spitter: "#9ab84a", leaper: "#8fb84a", prone: "#a0c15a", dog: "#8a9a52", rat: "#7a8a44" };
 const MIN_BUFFER = 220; // logical px on the short screen axis
 
 export class Game {
@@ -270,7 +270,8 @@ export class Game {
     if (w >= 3) table.push(["leaper", 2]); // pouncers
     if (w >= 4) table.push(["spitter", 2]);
     if (w >= 5) table.push(["brute", 1 + Math.floor(w / 5)]);
-    if (this.world.isStreets && w >= 2) table.push(["dog", 2 + Math.floor(w / 4)]); // packs outside
+    if (this.world.isSewers) table.push(["rat", 7 + w]);                              // swarms underground
+    else if (this.world.isStreets && w >= 2) table.push(["dog", 2 + Math.floor(w / 4)]); // packs outside
     const total = table.reduce((s, t) => s + t[1], 0);
     let r = rand(0, total), type = "walker";
     for (const [k, wgt] of table) { if ((r -= wgt) <= 0) { type = k; break; } }
@@ -308,6 +309,7 @@ export class Game {
 
     this.player.update(dt, inp, this.world);
     this.world.update(dt);
+    this._waterT = (this._waterT || 0) + dt; // drives the flowing-water ripples
 
     if (actions.swap) this._swapWeapon();
     if (actions.reload) { if (this.player.startReload()) this._announce("Reloading…"); }
@@ -1392,10 +1394,18 @@ export class Game {
           if (rp) { fc0 = rp[0]; fc1 = rp[1]; }
           ctx.fillStyle = ((cx + cy) & 1) ? fc0 : fc1;
           ctx.fillRect(x, y, TILE, TILE);
-          if (w.isStreets) {
+          if (w.isStreets && !w.isSewers) {
             const rid = w.floorTint[w.idx(cx, cy)];
             if (rid === 5 && (cy & 1)) { ctx.fillStyle = "rgba(210,190,80,0.7)"; ctx.fillRect(x + TILE / 2 - 1, y + 4, 2, TILE - 8); }
             else if (rid === 6 && (cx & 1)) { ctx.fillStyle = "rgba(210,190,80,0.7)"; ctx.fillRect(x + 4, y + TILE / 2 - 1, TILE - 8, 2); }
+          }
+          if (w.isSewers && t === T.FLOOR) {
+            // Flowing water: scrolling ripple lines; deep channels are darker.
+            const deep = w.floorTint[w.idx(cx, cy)] === 2;
+            if (deep) { ctx.fillStyle = "rgba(0,0,0,0.14)"; ctx.fillRect(x, y, TILE, TILE); }
+            const flow = (this._waterT || 0) * 11;
+            ctx.fillStyle = deep ? "rgba(80,150,140,0.11)" : "rgba(150,190,170,0.07)";
+            for (let k = 0; k < 4; k++) { const yy = y + ((k * 8 + flow) % TILE); ctx.fillRect(x + 1, yy, TILE - 2, 1.4); }
           }
           if (t === T.STAIRS) {
             ctx.fillStyle = "#5f4a2c"; ctx.fillRect(x + 2, y + 1, TILE - 4, TILE - 2);
@@ -1614,8 +1624,22 @@ export class Game {
 
   _drawZombiesBehind(ctx) {
     // Sort by y for pseudo-depth.
+    const w = this.world, p = this.player;
     const sorted = this.zombies.slice().sort((a, b) => a.y - b.y);
-    for (const z of sorted) drawZombie(ctx, z.x, z.y, z.angle, z.frame, z.type, z.r, z.hurtFlash > 0, z.parts, z.prone, z.strideAmp, z.jumpH, z.vx, z.vy, z.look);
+    for (const z of sorted) {
+      let alpha = 1;
+      // Deep sewer water conceals the horde — they only surface into view as
+      // they close in on you.
+      if (w.isSewers) {
+        const cx = Math.floor(z.x / TILE), cy = Math.floor(z.y / TILE);
+        if (w.tileAt(cx, cy) === T.FLOOR && w.floorTint[w.idx(cx, cy)] === 2) {
+          alpha = clamp(1 - (dist(z.x, z.y, p.x, p.y) - 40) / 120, 0.25, 1);
+        }
+      }
+      if (alpha < 1) ctx.globalAlpha = alpha;
+      drawZombie(ctx, z.x, z.y, z.angle, z.frame, z.type, z.r, z.hurtFlash > 0, z.parts, z.prone, z.strideAmp, z.jumpH, z.vx, z.vy, z.look);
+      if (alpha < 1) ctx.globalAlpha = 1;
+    }
   }
 
   _drawPlayer(ctx) {

@@ -7,6 +7,12 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.16.0] — 2026-07-16
+### Down the Drain
+- **Zombie rats** — a tiny, fast, weak new enemy that **swarms the sewers** in scurrying packs (rendered as little four-legged critters, weighted heavily in the underground spawn table).
+- **Flowing water** — the sewer tunnels now render **animated, scrolling water ripples**, with **deep channels** (darker, coarse patches carved through the maze) among the shallow water.
+- **Concealed horde** — zombies (and rats) standing in **deep water are hidden**, fading into view only as they **close in on you** — so the currents can hide an ambush. (Deep water is still fully walkable; it's a visual concealment, not a wall.)
+
 ## [0.15.2] — 2026-07-16
 ### Second Wind
 - **More stamina** (max raised from 100 to 140) that **drains more slowly** while sprinting (base sprint cost cut from 34/s to 24/s) — so a sprint lasts roughly twice as long.
@@ -182,6 +188,7 @@ _Next: 2b locked doors + key/axe, 2c functional stairs to upper floors, 2d the o
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.16.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.16.0
 [0.15.2]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.15.2
 [0.15.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.15.1
 [0.15.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.15.0
