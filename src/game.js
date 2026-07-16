@@ -579,9 +579,15 @@ export class Game {
     for (const z of this.zombies) {
       const d = dist(p.x, p.y, z.x, z.y);
       if (d > range + z.r) continue;
+      // Anything pressed right up against you is hit regardless of facing — at
+      // point-blank a small lateral offset is a huge angle, so small/fast foes
+      // (dogs, crawlers, runners) would otherwise slip a strict arc.
       const a = angleTo(p.x, p.y, z.x, z.y);
-      let da = Math.abs(((a - p.angle + Math.PI) % TAU) - Math.PI);
-      if (da <= arc / 2) {
+      // Robust angular difference (correct for any facing, incl. near ±π).
+      const da = Math.abs(((a - p.angle + Math.PI * 3) % TAU) - Math.PI);
+      // Point-blank widens the reach to a broad front/side cone (not the rear).
+      const contact = d <= p.r + z.r + 9 && da <= 2.0;
+      if (contact || da <= arc / 2) {
         const dmg = w.damage * (variant === "lunge" ? 1.3 : 1);
         this._damageZombie(z, dmg, p.angle, w.knockback, w.sever || 0, w.hs || 0);
         this._hitGore(z.x, z.y, p.angle, z);

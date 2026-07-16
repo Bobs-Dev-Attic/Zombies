@@ -1,7 +1,15 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.15.0";
+export const VERSION = "0.15.1";
 
 export const CHANGELOG = [
+  {
+    version: "0.15.1",
+    date: "2026-07-16",
+    title: "Melee Fix",
+    changes: [
+      "Fixed knives and axes missing small zombies and dogs — up close, a small side offset became a big angle that slipped the narrow swing arc. Melee now reliably connects with anything pressed against you from the front or sides (and a facing-angle rounding bug was fixed too).",
+    ],
+  },
   {
     version: "0.15.0",
     date: "2026-07-15",
