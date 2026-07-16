@@ -1,7 +1,15 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.18.0";
+export const VERSION = "0.18.1";
 
 export const CHANGELOG = [
+  {
+    version: "0.18.1",
+    date: "2026-07-16",
+    title: "Walk This Way",
+    changes: [
+      "Zombies now walk on proper legs with feet, stepping fore-and-aft in a shambling stride like the player instead of just shuffling. About a third of them drag a leg in a limp, and the legless still crawl.",
+    ],
+  },
   {
     version: "0.18.0",
     date: "2026-07-16",
