@@ -7,6 +7,14 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.19.0] — 2026-07-16
+### Atmosphere & Broken Glass
+- **Furniture push tires you** — shoving a piece of furniture now **drains stamina in proportion to its mass**, so heaving a **dresser** costs far more than nudging a **chair** (surfaced from `world.collide` via a new `lastPushMass` read by the player each frame).
+- **Melee hits all-around** — knives and axes now reliably damage **every zombie and dog in contact**, from **any direction** (the point-blank contact rule no longer requires the target to be within the narrow facing arc), so small, fast enemies can't slip the swing.
+- **Flies** — a drifting swarm of tiny flies gathers around **fresh bodies, blood pools and burning wrecks** for atmosphere, and **buzzes audibly** (throttled) when it strays near you (`_updateFlies` / `_drawFlies`, new `buzz` SFX).
+- **Burning-vehicle smoke** — wrecked/burning vehicles outside now emit **thick, dark rising smoke plumes** and embers on top of the flames.
+- **Redesigned windows + breakage** — windows are now **framed, reflective glass panes** (sky-tinted gradient, diagonal sheen, cross muntins). Smashing one plays a **cracking, tinkling** sound and showers **falling glass shards**, leaving **broken glass litter** on the ground.
+
 ## [0.18.1] — 2026-07-16
 ### Walk This Way
 - **Zombie walk cycle** — the shamblers now have proper **legs with feet** that **step fore-and-aft** in a scissoring stride (like the player) instead of a flat lateral shuffle, each planted foot drawn under the body. Per-zombie gait variety carries through, **~30% drag a leg** in a limp, and the legless still **crawl** (prone). Severed legs still leave a bloody stump.

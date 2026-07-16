@@ -69,6 +69,7 @@ export class Game {
     this.gibs = [];    // limbs mid-flight before they settle
     this.thrown = [];  // grenades / flares in flight or on the ground
     this.shockwaves = []; // expanding blast rings
+    this.flies = [];   // ambient buzzing fly swarm
     this.score = 0;
     this.wave = 0;
     this.waveActive = false;
@@ -107,7 +108,7 @@ export class Game {
     this.player.health = hp; this.player.stamina = sta;
     this.player.kills = kills;
     this.zombies = []; this.projectiles = []; this.particles = []; this.pickups = []; this.stains = []; this.corpses = [];
-    this.bodies = []; this.limbs = []; this.gibs = []; this.thrown = []; this.shockwaves = [];
+    this.bodies = []; this.limbs = []; this.gibs = []; this.thrown = []; this.shockwaves = []; this.flies = [];
     this.score = score; this.wave = wave;
     this.waveActive = false; this.spawnQueue = 0; this.waveOrigins = []; this.betweenWaves = 2; this.exitReady = false;
     this.cam.x = this.player.x; this.cam.y = this.player.y;
@@ -191,7 +192,7 @@ export class Game {
     }
     if (arrive) { this.player.x = (arrive.cx + 0.5) * TILE; this.player.y = (arrive.cy + 0.5) * TILE; }
     else { this.player.x = this.world.landing.x; this.player.y = this.world.landing.y; }
-    this.zombies = []; this.projectiles = []; this.particles = []; this.thrown = []; this.shockwaves = [];
+    this.zombies = []; this.projectiles = []; this.particles = []; this.thrown = []; this.shockwaves = []; this.flies = [];
     this.cam.x = this.player.x; this.cam.y = this.player.y;
     this.flow = null; this.flowTimer = 0; // rebuild the flow field for the new grid
     this.floorCooldown = 1.2;
@@ -337,6 +338,7 @@ export class Game {
     this._updateProjectiles(dt);
     this._updateThrown(dt);
     this._updateBurning(dt);
+    this._updateFlies(dt);
     for (const p of this.particles) p.update(dt);
     for (const s of this.stains) s.life -= dt * 0.15;
     for (const pk of this.pickups) pk.update(dt);
@@ -594,8 +596,10 @@ export class Game {
       const a = angleTo(p.x, p.y, z.x, z.y);
       // Robust angular difference (correct for any facing, incl. near ±π).
       const da = Math.abs(((a - p.angle + Math.PI * 3) % TAU) - Math.PI);
-      // Point-blank widens the reach to a broad front/side cone (not the rear).
-      const contact = d <= p.r + z.r + 9 && da <= 2.0;
+      // Anything pressed right up against you is hit on any swing, in ANY
+      // direction — so when you're swarmed, every adjacent zombie/dog takes the
+      // hit (small/fast foes stop nearer and would otherwise slip the arc).
+      const contact = d <= p.r + z.r + 9;
       if (contact || da <= arc / 2) {
         const dmg = w.damage * (variant === "lunge" ? 1.3 : 1);
         this._damageZombie(z, dmg, p.angle, w.knockback, w.sever || 0, w.hs || 0);
@@ -877,13 +881,16 @@ export class Game {
 
   _glass(x, y) {
     sfx.play("glass");
-    for (let i = 0; i < 10; i++) {
-      const a = rand(0, TAU), s = rand(30, 110);
-      this.particles.push(new Particle(x, y, {
-        vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.25, 0.6),
-        color: pick(["#bcd8e0", "#9fc4cf", "#e0f0f4", "#8aa8b0"]), size: randInt(1, 2), drag: 0.85,
+    // Shards burst out and rain down under gravity...
+    for (let i = 0; i < 15; i++) {
+      const a = rand(0, TAU), s = rand(40, 150);
+      this.particles.push(new Particle(x, y - 2, {
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s - 30, life: rand(0.4, 0.95),
+        color: pick(["#bcd8e0", "#9fc4cf", "#e0f0f4", "#8aa8b0"]), size: randInt(1, 2), drag: 0.86, gravity: 190,
       }));
     }
+    // ...leaving broken glass littered on the ground.
+    for (let i = 0; i < 5; i++) this.stains.push({ x: x + rand(-9, 9), y: y + rand(-9, 9), r: rand(1, 2.2), life: rand(6, 12), color: "#9fc4cf" });
     this.shake += 2;
   }
 
@@ -896,21 +903,71 @@ export class Game {
     }
   }
 
-  // Wrecked vehicles smoulder: licking flames and rising smoke.
+  // Wrecked vehicles smoulder: licking flames and a rising column of smoke.
   _updateBurning(dt) {
     for (const f of this.world.furniture) {
       if (!f.burning || f.broken) continue;
       f._emberT = (f._emberT || 0) - dt;
       if (f._emberT > 0) continue;
-      f._emberT = rand(0.05, 0.14);
+      f._emberT = rand(0.04, 0.1);
+      // flames
       this.particles.push(new Particle(f.x + rand(-f.hw * 0.6, f.hw * 0.6), f.y + rand(-f.hh * 0.5, f.hh * 0.5), {
-        vx: rand(-8, 8), vy: rand(-46, -16), life: rand(0.3, 0.7),
+        vx: rand(-8, 8), vy: rand(-50, -18), life: rand(0.3, 0.7),
         color: pick(["#ff9030", "#ffce54", "#ff5a2a", "#c0341a"]), size: randInt(2, 3), drag: 0.86, gravity: -26,
       }));
-      if (chance(0.6)) this.particles.push(new Particle(f.x + rand(-6, 6), f.y - 6, {
-        vx: rand(-10, 10), vy: rand(-30, -12), life: rand(0.7, 1.3),
-        color: pick(["rgba(60,60,60,0.5)", "rgba(90,90,90,0.4)", "rgba(40,40,40,0.5)"]), size: randInt(3, 5), drag: 0.9,
+      // a fat, dark, rising plume of smoke (bigger and longer-lived than before)
+      this.particles.push(new Particle(f.x + rand(-7, 7), f.y - 6, {
+        vx: rand(-12, 12), vy: rand(-42, -20), life: rand(1.4, 2.6),
+        color: pick(["rgba(50,50,50,0.55)", "rgba(80,80,80,0.45)", "rgba(30,30,30,0.55)", "rgba(64,60,58,0.5)"]),
+        size: randInt(5, 9), drag: 0.94, gravity: -8,
       }));
+      // a few embers drifting up with the column
+      if (chance(0.4)) this.particles.push(new Particle(f.x + rand(-5, 5), f.y - 8, {
+        vx: rand(-10, 10), vy: rand(-60, -30), life: rand(0.8, 1.6),
+        color: pick(["#ffb040", "#ff7a2a", "#ffce54"]), size: 1, drag: 0.92, gravity: -14,
+      }));
+    }
+  }
+
+  // Ambient flies: a loose swarm that drifts around, gathering on corpses,
+  // blood and burning wrecks, and buzzes when it's near you.
+  _updateFlies(dt) {
+    if (!this.flies.length) {
+      for (let i = 0; i < 40; i++) {
+        const a = rand(0, TAU), r = rand(30, 300);
+        this.flies.push({ x: this.player.x + Math.cos(a) * r, y: this.player.y + Math.sin(a) * r, ax: 0, ay: 0, t: rand(0, TAU), p: rand(0, TAU), rt: rand(0, 3) });
+      }
+    }
+    // Anchor points the flies are drawn to: recent corpses, blood, burning cars.
+    const anchors = [];
+    for (const b of this.bodies.slice(-6)) anchors.push({ x: b.x, y: b.y });
+    for (const s of this.stains) if (s.r > 4 && chance(0.02)) anchors.push({ x: s.x, y: s.y });
+    for (const f of this.world.furniture) if (f.burning && !f.broken) anchors.push({ x: f.x, y: f.y });
+
+    let nearest = 1e9;
+    for (const fly of this.flies) {
+      fly.t += dt;
+      fly.rt -= dt;
+      if (fly.rt <= 0) {
+        fly.rt = rand(1.2, 3.5);
+        if (anchors.length && chance(0.6)) { const a = pick(anchors); fly.ax = a.x + rand(-14, 14); fly.ay = a.y + rand(-14, 14); }
+        else { fly.ax = this.player.x + rand(-280, 280); fly.ay = this.player.y + rand(-280, 280); }
+      }
+      fly.x += (fly.ax - fly.x) * clamp(dt * 1.3, 0, 1) + Math.sin(fly.t * 24 + fly.p) * 0.7;
+      fly.y += (fly.ay - fly.y) * clamp(dt * 1.3, 0, 1) + Math.cos(fly.t * 21 + fly.p) * 0.7;
+      const d = dist2(fly.x, fly.y, this.player.x, this.player.y);
+      if (d < nearest) nearest = d;
+    }
+    // Buzzing when flies are close to the player.
+    this._buzzT = (this._buzzT || 0) - dt;
+    if (nearest < 70 * 70 && this._buzzT <= 0) { sfx.play("buzz"); this._buzzT = rand(0.5, 0.9); }
+  }
+
+  _drawFlies(ctx) {
+    ctx.fillStyle = "#161410";
+    for (const fly of this.flies) {
+      const jx = Math.sin(fly.t * 40 + fly.p) * 0.8, jy = Math.cos(fly.t * 37) * 0.8;
+      ctx.fillRect(Math.round(fly.x + jx), Math.round(fly.y + jy), 1, 1);
     }
   }
 
@@ -1206,6 +1263,7 @@ export class Game {
     this._drawPlayer(ctx);
     this._drawGibs(ctx);
     this._drawParticles(ctx);
+    this._drawFlies(ctx);
     this._drawShockwaves(ctx);
     this._drawFog(ctx, -ox, -oy);
     this._drawProjectiles(ctx); // over the fog so tracers are always crisp
@@ -1390,13 +1448,22 @@ export class Game {
             for (let py = 2; py < TILE; py += 7) { ctx.fillStyle = wood; ctx.fillRect(x + TILE / 2 - 8, y + py, 15, 3); ctx.fillStyle = woodTop; ctx.fillRect(x + TILE / 2 - 8, y + py, 2, 3); }
           }
         } else if (t === T.WINDOW) {
-          // Wall with a glass pane the horde can smash through.
+          // Framed window: wall, recessed sill, a reflective glass pane with a
+          // sky gradient and sheen, and cross muntins. Zombies/bullets smash it.
           ctx.fillStyle = set.wall; ctx.fillRect(x, y, TILE, TILE);
           ctx.fillStyle = set.wallTop; ctx.fillRect(x, y, TILE, 6);
-          ctx.fillStyle = "rgba(150,205,220,0.5)"; ctx.fillRect(x + 5, y + 8, TILE - 10, TILE - 15);
-          ctx.strokeStyle = "#241a12"; ctx.lineWidth = 1.5;
-          ctx.strokeRect(x + 5, y + 8, TILE - 10, TILE - 15);
-          ctx.beginPath(); ctx.moveTo(x + TILE / 2, y + 8); ctx.lineTo(x + TILE / 2, y + TILE - 7); ctx.stroke();
+          const gx0 = x + 5, gy0 = y + 7, gw = TILE - 10, gh = TILE - 13;
+          ctx.fillStyle = "#2a1f16"; ctx.fillRect(gx0 - 2, gy0 - 1, gw + 4, gh + 3); // frame + sill
+          const g = ctx.createLinearGradient(gx0, gy0, gx0 + gw, gy0 + gh);
+          g.addColorStop(0, "#a6d4e2"); g.addColorStop(0.5, "#6ea6ba"); g.addColorStop(1, "#8fbccc");
+          ctx.fillStyle = g; ctx.fillRect(gx0, gy0, gw, gh);
+          ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.lineWidth = 1.4; // diagonal sheen
+          ctx.beginPath(); ctx.moveTo(gx0 + 1.5, gy0 + gh - 2); ctx.lineTo(gx0 + gw * 0.55, gy0 + 1.5); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(gx0 + gw * 0.5, gy0 + gh - 1.5); ctx.lineTo(gx0 + gw - 1.5, gy0 + gh * 0.45); ctx.stroke();
+          ctx.strokeStyle = "#241a12"; ctx.lineWidth = 1.5; // muntins
+          ctx.strokeRect(gx0, gy0, gw, gh);
+          ctx.beginPath(); ctx.moveTo(x + TILE / 2, gy0); ctx.lineTo(x + TILE / 2, gy0 + gh); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(gx0, y + TILE / 2); ctx.lineTo(gx0 + gw, y + TILE / 2); ctx.stroke();
           ctx.lineWidth = 1;
         } else {
           // floor with a subtle checker (tinted by room in the house, by
