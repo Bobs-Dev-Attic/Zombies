@@ -7,6 +7,10 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.15.1] — 2026-07-16
+### Melee Fix
+- **Knives and axes now hit small zombies and dogs.** At point-blank the target sits so close that a small lateral offset becomes a large angle, which slipped the melee's narrow swing arc — so smaller/faster foes (dogs, crawlers, runners) that stop nearer the player were being missed. Melee now connects with anything **pressed against you from the front or sides**, regardless of the strict arc (rear attacks still don't count). Also fixed an angle-difference rounding bug that could drop hits when facing near due-left/right.
+
 ## [0.15.0] — 2026-07-15
 ### Arsenal
 - **Pistol family** — a fast, weak **.22**, the standard **9mm**, and a hard-hitting **.357 Magnum**, each with its own damage/fire-rate/magazine, **reload time**, and distinct pixel graphics (the .357 is a revolver).
@@ -173,6 +177,7 @@ _Next: 2b locked doors + key/axe, 2c functional stairs to upper floors, 2d the o
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.15.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.15.1
 [0.15.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.15.0
 [0.14.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.14.0
 [0.13.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.13.0
