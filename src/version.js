@@ -1,7 +1,16 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.21.0";
+export const VERSION = "0.22.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.22.0",
+    date: "2026-07-16",
+    title: "Torn Apart",
+    changes: [
+      "Dead zombies on the ground now actually look like the zombie that fell — the corpse keeps its skin tone, the clothes it wore and its hairstyle, and lies torn open with its guts spilling out. Dogs and rats leave proper four-legged and tiny carcasses instead of a generic body, brutes leave a bigger one, and severed limbs show as stumps.",
+      "When you die, the horde rips you limb from limb: your head, arms, legs and torso are torn off and flung tumbling across the ground, your organs spill out, and blood sprays everywhere before the screen floods red.",
+    ],
+  },
   {
     version: "0.21.0",
     date: "2026-07-16",

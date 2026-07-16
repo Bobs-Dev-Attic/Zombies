@@ -7,6 +7,11 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.22.0] — 2026-07-16
+### Torn Apart
+- **Corpses match the fallen zombie** — the ground body decal (`drawBodyDecal`) now mirrors the zombie that died: it keeps that individual's **skin tone, clothing colour and hairstyle** (short / long / bald), and lies **torn open with viscera and exposed ribs**. It's **type-aware** — dogs leave a four-legged carcass, rats a tiny one, brutes a bigger body with a wider blood pool, and severed limbs render as **stumps**. The "dead tint" was softened so a corpse stays recognisably the same enemy instead of washing out to grey.
+- **The player is ripped apart on death** — dying now triggers `_dismemberPlayer`: your **head, both arms, both legs and torso** are torn off and flung as tumbling gibs that settle on the ground, your **organs spill out**, and a huge spray of **blood and viscera** flies everywhere into a wide gore pool before the death-blood sheet floods the screen. `drawGroundLimb` gained head / torso / gut renderings and a new wet `gib` sound plays on the tear.
+
 ## [0.21.0] — 2026-07-16
 ### Carrion
 - **Carrion birds** — crows, blackbirds and vultures now glide into the outdoor neighborhood to feed on the dead (`this.birds`, `_updateBirds` / `_drawBirds`). They spawn gliding in from off-screen toward settled carcasses, descend, and hop/peck at the bodies. Each type has its own size, speed, flap rate and colouring (crows near-black, blackbirds with an orange beak, big brown bald-headed vultures).
