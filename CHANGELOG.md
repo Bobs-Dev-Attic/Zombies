@@ -7,6 +7,16 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.15.0] — 2026-07-15
+### Arsenal
+- **Pistol family** — a fast, weak **.22**, the standard **9mm**, and a hard-hitting **.357 Magnum**, each with its own damage/fire-rate/magazine, **reload time**, and distinct pixel graphics (the .357 is a revolver).
+- **Shotgun family** — **pump**, **semi-auto**, and a two-barrel **side-by-side** (fires both fast, only two shells); **rifle family** — a bolt-action **hunting rifle**, a semi-auto **battle rifle**, and a full-auto **assault rifle**. All drawn distinctly.
+- **Weapon buttons** — a new on-screen bar shows a button for **every weapon you're carrying** (added as you pick them up) and lets you **tap to switch**; the cycle button remains. The current weapon is highlighted and **pulses while reloading**.
+- **Reload cycle indicator** — an arc sweeps around the player as the weapon reloads.
+- **More carnage** — a base per-hit dismemberment chance (on top of weapon/damage scaling) so **limbs come off more readily**, and every hit sprays more blood plus **chunks of flesh and torn clothing**.
+- **Shoot over low furniture** — bullets now fly over **tables, chairs, couches and benches**; tall cover (shelves, crates, barrels, cars, bushes) still stops them. Movement still collides with everything.
+- **Semi-transparent YOU DIED dialog** — the death card is now translucent (with a faint blood film) so the carnage shows through.
+
 ## [0.14.0] — 2026-07-15
 ### Into the Sewers
 - **Open manholes** at four intersections of the streets — step onto one to **drop into the sewers**.
@@ -163,6 +173,7 @@ _Next: 2b locked doors + key/axe, 2c functional stairs to upper floors, 2d the o
 - Wave survival with escalating hordes; reach the **EXIT** to move to the next setting (Streets → Mall → Hospital → Woods).
 - Score, wave and kill tracking; in-game version tag and changelog.
 
+[0.15.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.15.0
 [0.14.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.14.0
 [0.13.0]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.13.0
 [0.12.1]: https://github.com/Bobs-Dev-Attic/Zombies/releases/tag/v0.12.1

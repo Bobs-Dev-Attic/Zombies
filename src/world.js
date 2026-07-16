@@ -112,16 +112,21 @@ export class World {
     return null;
   }
 
-  // Furniture whose intact AABB the segment (ax,ay)->(bx,by) crosses.
-  furnitureHitBySegment(ax, ay, bx, by) {
+  // Furniture whose intact AABB the segment (ax,ay)->(bx,by) crosses. With
+  // skipLow, low pieces (tables/chairs/couches) are ignored so bullets fly over
+  // them — only tall cover (shelves, crates, barrels, cars, bushes) stops rounds.
+  furnitureHitBySegment(ax, ay, bx, by, skipLow) {
     const steps = Math.max(2, Math.ceil(Math.hypot(bx - ax, by - ay) / 4));
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
       const f = this.furnitureAt(ax + (bx - ax) * t, ay + (by - ay) * t);
-      if (f) return f;
+      if (f && !(skipLow && f.low)) return f;
     }
     return null;
   }
+
+  // Low furniture you can shoot over (still blocks movement).
+  _isLowFurniture(type) { return type === "table" || type === "chair" || type === "couch" || type === "bench" || type === "bed"; }
 
   idx(cx, cy) { return cy * this.cols + cx; }
   inBounds(cx, cy) { return cx >= 0 && cy >= 0 && cx < this.cols && cy < this.rows; }
@@ -160,7 +165,7 @@ export class World {
     if (this.tileAt(cx, cy) !== T.FLOOR) return;
     const F = { crate: [10, 10, 40], table: [13, 9, 55], chair: [7, 7, 22], barrel: [8, 8, 48], shelf: [13, 7, 60], couch: [15, 9, 72], bed: [13, 9, 60] };
     const d = F[type] || F.crate;
-    this.furniture.push({ cx, cy, x: (cx + 0.5) * TILE, y: (cy + 0.5) * TILE, hw: d[0], hh: d[1], type: type === "bed" ? "couch" : type, hp: d[2], maxHp: d[2], broken: false, overturned: false, angle: rand(-0.05, 0.05) });
+    this.furniture.push({ cx, cy, x: (cx + 0.5) * TILE, y: (cy + 0.5) * TILE, hw: d[0], hh: d[1], type: type === "bed" ? "couch" : type, hp: d[2], maxHp: d[2], broken: false, overturned: false, angle: rand(-0.05, 0.05), low: this._isLowFurniture(type) });
   }
 
   _fillTint(rx0, ry0, rx1, ry1, tint) {
@@ -259,7 +264,7 @@ export class World {
   _furn(x, y, type, hw, hh, hp, angle = 0) {
     this.furniture.push({
       cx: Math.floor(x / TILE), cy: Math.floor(y / TILE), x, y, hw, hh, type,
-      hp, maxHp: hp, broken: false, overturned: false, angle,
+      hp, maxHp: hp, broken: false, overturned: false, angle, low: this._isLowFurniture(type),
     });
   }
 
@@ -532,7 +537,7 @@ export class World {
         this.furniture.push({
           cx, cy, x: (cx + 0.5) * TILE, y: (cy + 0.5) * TILE,
           hw: def.hw, hh: def.hh, type, hp: def.hp, maxHp: def.hp,
-          broken: false, overturned: false, angle: rand(-0.15, 0.15),
+          broken: false, overturned: false, angle: rand(-0.15, 0.15), low: this._isLowFurniture(type),
         });
       }
     }

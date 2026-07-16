@@ -448,8 +448,9 @@ export class Zombie {
     if (force) this.applyKnockback(angle, force);
     let severed = null;
     if (this.hp > 0) {
-      // Bigger hits and dismembering weapons are likelier to tear a limb off.
-      const p = sever + amount * 0.006;
+      // Bigger hits and dismembering weapons are likelier to tear a limb off —
+      // now with a base chance on every hit, so bits come off readily.
+      const p = 0.02 + sever + amount * 0.009;
       if (Math.random() < p) severed = this._severRandom();
     } else {
       this.dead = true;

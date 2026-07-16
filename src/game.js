@@ -119,7 +119,9 @@ export class Game {
     // The house hand-places its loot (key, axe, room rewards) via world.loot.
     if (this.world.loot) { this._seedHouseLoot(); return; }
     // Scatter weapon crates, ammo, and medkits across the map.
-    const weaponPool = ["bat", "shotgun", "smg", "rifle", "bazooka"];
+    const weaponPool = ["bat", "axe", "pistol22", "pistol357", "smg",
+      "shotgun", "shotgun_semi", "shotgun_sxs",
+      "rifle", "rifle_semi", "rifle_auto", "bazooka"];
     const crates = randInt(3, 5);
     for (let i = 0; i < crates; i++) {
       const p = this.world.randomFloorFar(this.player.x, this.player.y, 120);
@@ -457,6 +459,9 @@ export class Game {
       score: this.score,
       weapon: w.name + (this.player.reloading > 0 ? " …" : ""),
       ammo: ammoStr,
+      owned: WEAPON_ORDER.filter((k) => l.owned[k]),
+      current: l.current,
+      reloading: this.player.reloading > 0,
     };
   }
 
@@ -520,6 +525,16 @@ export class Game {
     this._announce(this.player.weapon.name);
   }
 
+  // Directly equip a weapon (from the on-screen weapon buttons).
+  selectWeapon(id) {
+    const l = this.player.loadout;
+    if (!l.owned[id] || l.current === id) return;
+    l.current = id;
+    this.player.reloading = 0;
+    this._announce(WEAPONS[id].name);
+    this.hooks.vibrate?.(10);
+  }
+
   _tryFire() {
     const p = this.player, w = p.weapon;
     if (!p.canFire()) {
@@ -569,7 +584,7 @@ export class Game {
       if (da <= arc / 2) {
         const dmg = w.damage * (variant === "lunge" ? 1.3 : 1);
         this._damageZombie(z, dmg, p.angle, w.knockback, w.sever || 0, w.hs || 0);
-        this._blood(z.x, z.y, p.angle, 6);
+        this._hitGore(z.x, z.y, p.angle, z);
         hit = true;
       }
     }
@@ -607,14 +622,15 @@ export class Game {
           hitZombie = true;
           if (proj.explosive) { this._explode(z.x, z.y, proj); proj.dead = true; break; }
           this._damageZombie(z, proj.damage, proj.angle, proj.knockback, proj.sever || 0, proj.hs || 0);
-          this._blood(z.x, z.y, proj.angle, 5);
+          this._hitGore(z.x, z.y, proj.angle, z);
           if (proj.pierce > 0) proj.pierce--;
           else { proj.dead = true; break; }
         }
       }
-      // Bullet passed no zombie but struck furniture — damage & (usually) stop it.
+      // Bullet passed no zombie but struck TALL furniture — damage & (usually)
+      // stop it. Low pieces (tables/chairs/couches) are shot clean over.
       if (!hitZombie && !proj.explosive && proj.kind === "bullet") {
-        const f = this.world.furnitureHitBySegment(proj.px, proj.py, proj.x, proj.y);
+        const f = this.world.furnitureHitBySegment(proj.px, proj.py, proj.x, proj.y, true);
         if (f) { this._damageFurniture(f, proj.damage, proj.angle, proj.knockback); if (proj.pierce > 0) proj.pierce--; else proj.dead = true; }
       }
       if (proj.dead && proj.explosive) this._explode(proj.x, proj.y, proj);
@@ -951,6 +967,21 @@ export class Game {
       }));
     }
     if (chance(0.6)) this.stains.push({ x: x + rand(-3, 3), y: y + rand(-3, 3), r: rand(2, 5), life: rand(6, 12), color: "#5a0f0f" });
+  }
+
+  // A wet hit: blood spray plus chunks of flesh & torn clothing that fly off.
+  _hitGore(x, y, angle, z) {
+    this._blood(x, y, angle, 7);
+    const cloth = z && z.look ? z.look.cloth : "#5a5347";
+    const n = randInt(3, 5);
+    for (let i = 0; i < n; i++) {
+      const a = angle + rand(-1.1, 1.1), s = rand(40, 160);
+      this.particles.push(new Particle(x, y, {
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.4, 1.0),
+        color: chance(0.5) ? cloth : pick(["#7a1010", "#8a2a1a", "#6a8a2a", "#a01818"]),
+        size: randInt(1, 3), drag: 0.82, stain: true,
+      }));
+    }
   }
 
   _gore(x, y, angle, amount) {
@@ -1604,6 +1635,16 @@ export class Game {
     if (p.invuln > 0 && Math.floor(p.invuln * 12) % 2 === 0) {
       ctx.strokeStyle = "rgba(224,184,58,0.7)";
       ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, TAU); ctx.stroke();
+    }
+    // Reload cycle indicator: an arc sweeping around the player as it reloads.
+    if (p.reloading > 0 && p.weapon.reload) {
+      const prog = clamp(1 - p.reloading / p.weapon.reload, 0, 1);
+      ctx.lineWidth = 2.4;
+      ctx.strokeStyle = "rgba(0,0,0,0.45)";
+      ctx.beginPath(); ctx.arc(p.x, p.y, 13, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = "#ffd24a";
+      ctx.beginPath(); ctx.arc(p.x, p.y, 13, -Math.PI / 2, -Math.PI / 2 + prog * TAU); ctx.stroke();
+      ctx.lineWidth = 1;
     }
   }
 
