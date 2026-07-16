@@ -7,6 +7,12 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.21.0] — 2026-07-16
+### Carrion
+- **Carrion birds** — crows, blackbirds and vultures now glide into the outdoor neighborhood to feed on the dead (`this.birds`, `_updateBirds` / `_drawBirds`). They spawn gliding in from off-screen toward settled carcasses, descend, and hop/peck at the bodies. Each type has its own size, speed, flap rate and colouring (crows near-black, blackbirds with an orange beak, big brown bald-headed vultures).
+- **They scatter when you approach** — coming within ~96px startles a feeding bird into flight: it takes off, climbs, and wheels away off-scene, cawing (vultures screech). They only ever flee — **they never attack the player**.
+- **Shootable** — bullets can drop a bird out of the air for +5 points, throwing a puff of feathers and a little blood and leaving a small carcass mark. New `caw` / `screech` synthesized calls (throttled).
+
 ## [0.20.0] — 2026-07-16
 ### Home Furnishings
 - **Varied flooring** — house rooms now render distinct surfacing materials over the base floor checker (`FLOOR_MAT` keyed by `floorTint`, drawn deterministically in `_drawFloorMat` so it never shimmers): **hardwood planks** (staggered board seams), **ceramic tile** (grout grid + edge highlight), **poured cement** (expansion joints, mottling and a hairline crack on some cells), a **brick foyer** (running-bond courses with mortar) just inside the front door, and soft **flecked carpet**. Rooms were re-surfaced accordingly — carpet living room & bedroom, tile kitchen & bath, hardwood dining, cement upstairs landing.
