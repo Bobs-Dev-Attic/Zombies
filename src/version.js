@@ -1,7 +1,19 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.18.1";
+export const VERSION = "0.19.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.19.0",
+    date: "2026-07-16",
+    title: "Atmosphere & Broken Glass",
+    changes: [
+      "Shoving furniture now tires you out — the bigger and heavier the piece, the more it drains your stamina to push it.",
+      "Knives and axes now reliably damage every zombie and dog pressed against you, from any direction — no more small enemies slipping the swing.",
+      "Flies! Swarms of tiny flies drift around bodies, blood and burning wrecks for atmosphere, and buzz audibly when they get near you.",
+      "Burning vehicles outside now belch thick rising smoke plumes and embers.",
+      "Redesigned windows as framed, reflective glass panes — and they smash with a cracking, tinkling sound, showering falling shards and leaving broken glass on the ground.",
+    ],
+  },
   {
     version: "0.18.1",
     date: "2026-07-16",

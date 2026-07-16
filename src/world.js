@@ -650,6 +650,7 @@ export class World {
   // hard-stopped by it.
   collide(x, y, r, throughWindows, pusher) {
     let nx = x, ny = y;
+    this.lastPushMass = 0; // heaviest movable piece actually shoved this call
     for (let i = 0; i < 3; i++) {
       const cx = Math.floor(nx / TILE), cy = Math.floor(ny / TILE);
       for (let gy = cy - 1; gy <= cy + 1; gy++) {
@@ -685,7 +686,7 @@ export class World {
             // the pusher by the stiff remainder — heavier pieces barely budge.
             const stiff = clamp(f.mass, 0.2, 1);
             const fx = f.x - dx * push * (1 - stiff), fy = f.y - dy * push * (1 - stiff);
-            if (this.furnitureFits(fx, fy, f)) { f.x = fx; f.y = fy; f.cx = Math.floor(fx / TILE); f.cy = Math.floor(fy / TILE); }
+            if (this.furnitureFits(fx, fy, f)) { f.x = fx; f.y = fy; f.cx = Math.floor(fx / TILE); f.cy = Math.floor(fy / TILE); this.lastPushMass = Math.max(this.lastPushMass, f.mass); }
             nx += dx * push * stiff; ny += dy * push * stiff;
           } else {
             nx += dx * push; ny += dy * push;

@@ -114,6 +114,11 @@ export class Player {
     const ny = this.y + this.vy * dt;
     const res = world.collide(nx, ny, this.r, false, true); // player shoves movable furniture
     this.x = res.x; this.y = res.y;
+    // Shoving furniture is hard work — bigger/heavier pieces drain more stamina.
+    if (world.lastPushMass) {
+      this.stamina = clamp(this.stamina - world.lastPushMass * 26 * dt, 0, this.maxStamina);
+      if (this.stamina <= 0) this.exhausted = true;
+    }
 
     if (wantMove) this.walkFrame += dt * (sprinting ? 16 : 10);
 
