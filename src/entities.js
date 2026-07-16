@@ -12,8 +12,8 @@ export class Player {
     this.angle = 0;
     this.maxHealth = 100;
     this.health = 100;
-    this.maxStamina = 100;
-    this.stamina = 100;
+    this.maxStamina = 140;
+    this.stamina = 140;
     this.baseSpeed = 118;
     this.loadout = loadout;
     this.cooldown = 0;
@@ -83,15 +83,21 @@ export class Player {
     // Stamina drain / regen. Adrenaline slows BOTH the drain and the regen, so
     // you can sprint far longer (but it also refills more gently).
     const rate = this.adrenaline > 0 ? 0.5 : 1;
+    // Sprinting tires you faster the more hurt you are and the more gear you
+    // haul (a helmet and body armour each add a little weight).
+    const l = this.loadout;
+    let drainMul = 1 + (1 - this.health / this.maxHealth) * 0.5;
+    if (l && (l.helmet || 0) > 0) drainMul += 0.12;
+    if (l && (l.armor || 0) > 0) drainMul += 0.2;
     if (sprinting && !this.exhausted && this.stamina > 0) {
-      this.stamina = clamp(this.stamina - 34 * dt * rate, 0, this.maxStamina);
+      this.stamina = clamp(this.stamina - 24 * dt * rate * drainMul, 0, this.maxStamina);
       if (this.stamina <= 0) this.exhausted = true;
     } else if (!wantMove) {
       this.stamina = clamp(this.stamina + 26 * dt * rate, 0, this.maxStamina);
     } else {
       this.stamina = clamp(this.stamina + 12 * dt * rate, 0, this.maxStamina);
     }
-    if (this.exhausted && this.stamina > 35) this.exhausted = false;
+    if (this.exhausted && this.stamina > this.maxStamina * 0.25) this.exhausted = false;
 
     // Expose gait state for the walk/run animation.
     this.moving = wantMove;

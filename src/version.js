@@ -1,7 +1,16 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.15.1";
+export const VERSION = "0.15.2";
 
 export const CHANGELOG = [
+  {
+    version: "0.15.2",
+    date: "2026-07-16",
+    title: "Second Wind",
+    changes: [
+      "More stamina and it drains more slowly, so you can sprint about twice as long.",
+      "Carrying a helmet or body armor tires you a little faster, and sprinting drains faster the more hurt you are.",
+    ],
+  },
   {
     version: "0.15.1",
     date: "2026-07-16",
