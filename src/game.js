@@ -1,7 +1,7 @@
 // Core game: loop, camera, rendering, waves, combat resolution and HUD.
 import { clamp, rand, randInt, chance, pick, angleTo, angleLerp, dist, dist2, TAU } from "./util.js";
 import { Input } from "./input.js";
-import { World, TILE, T, SETTINGS } from "./world.js";
+import { World, TILE, T, SETTINGS, FLOOR_MAT } from "./world.js";
 import { Player, Zombie, Projectile, Particle, Pickup, Thrown, ZOMBIE_TYPES } from "./entities.js";
 import { WEAPONS, WEAPON_ORDER, newLoadout } from "./weapons.js";
 import { drawPlayer, drawZombie, drawPickup, drawMuzzle, drawFurniture, drawBodyDecal, drawGroundLimb } from "./sprites.js";
@@ -1473,6 +1473,11 @@ export class Game {
           if (rp) { fc0 = rp[0]; fc1 = rp[1]; }
           ctx.fillStyle = ((cx + cy) & 1) ? fc0 : fc1;
           ctx.fillRect(x, y, TILE, TILE);
+          // Indoor flooring gets a material texture: plank seams, tile grout,
+          // brick courses, cement joints, or a flecked carpet weave.
+          if (w.isHouse && (t === T.FLOOR || t === T.DOOR)) {
+            this._drawFloorMat(ctx, x, y, cx, cy, FLOOR_MAT[w.floorTint[w.idx(cx, cy)]]);
+          }
           if (w.isStreets && !w.isSewers) {
             const rid = w.floorTint[w.idx(cx, cy)];
             if (rid === 5 && (cy & 1)) { ctx.fillStyle = "rgba(210,190,80,0.7)"; ctx.fillRect(x + TILE / 2 - 1, y + 4, 2, TILE - 8); }
@@ -1586,6 +1591,101 @@ export class Game {
           }
         }
       }
+    }
+    if (w.rugs && w.rugs.length) this._drawRugs(ctx);
+  }
+
+  // Material texture drawn over a house floor tile. Deterministic in (cx,cy)
+  // so it never shimmers as the camera scrolls.
+  _drawFloorMat(ctx, x, y, cx, cy, mat) {
+    if (mat === "wood") {
+      // Long horizontal planks: a dark seam between boards plus staggered end-joints.
+      ctx.fillStyle = "rgba(0,0,0,0.18)";
+      for (let py = 0; py < TILE; py += 8) ctx.fillRect(x, y + py, TILE, 1);
+      ctx.fillStyle = "rgba(255,255,255,0.05)";
+      for (let py = 1; py < TILE; py += 8) ctx.fillRect(x, y + py, TILE, 1);
+      ctx.fillStyle = "rgba(0,0,0,0.22)";
+      const jog = (cy & 1) ? TILE / 2 : 0; // brick-lay the board ends per row
+      ctx.fillRect(x + jog, y, 1, 8); ctx.fillRect(x + ((jog + TILE / 2) % TILE), y + 16, 1, 8);
+    } else if (mat === "tile") {
+      // Ceramic grout grid: 2×2 tiles per cell with a bright edge highlight.
+      ctx.strokeStyle = "rgba(0,0,0,0.28)"; ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
+      ctx.beginPath();
+      ctx.moveTo(x + TILE / 2, y); ctx.lineTo(x + TILE / 2, y + TILE);
+      ctx.moveTo(x, y + TILE / 2); ctx.lineTo(x + TILE, y + TILE / 2);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.06)";
+      ctx.fillRect(x + 1, y + 1, TILE / 2 - 2, 1); ctx.fillRect(x + TILE / 2 + 1, y + 1, TILE / 2 - 2, 1);
+    } else if (mat === "brick") {
+      // Running-bond brick courses with mortar joints, offset every other row.
+      ctx.fillStyle = "rgba(0,0,0,0.3)";
+      for (let py = 0; py <= TILE; py += 8) ctx.fillRect(x, y + py - 0.5, TILE, 1);
+      for (let r = 0; r < 4; r++) {
+        const oy = y + r * 8, off = (r & 1) ? TILE / 2 : 0;
+        ctx.fillRect(x + off, oy, 1, 8);
+        ctx.fillRect(x + ((off + TILE / 2) % TILE), oy, 1, 8);
+      }
+      ctx.fillStyle = "rgba(255,255,255,0.04)"; // top-lit brick faces
+      for (let py = 1; py < TILE; py += 8) ctx.fillRect(x + 1, y + py, TILE - 2, 1);
+    } else if (mat === "cement") {
+      // Poured slab: faint expansion joints and a hairline crack on some cells.
+      ctx.fillStyle = "rgba(0,0,0,0.14)";
+      ctx.fillRect(x, y + TILE - 1, TILE, 1); ctx.fillRect(x + TILE - 1, y, 1, TILE);
+      const h = ((cx * 73856093) ^ (cy * 19349663)) >>> 0;
+      ctx.fillStyle = "rgba(255,255,255,0.03)"; ctx.fillRect(x + (h % 20) + 4, y + (h >> 5) % 20 + 4, 3, 3); // mottle
+      if (h % 7 === 0) {
+        ctx.strokeStyle = "rgba(0,0,0,0.2)"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x + 4, y + 6); ctx.lineTo(x + 12, y + 15); ctx.lineTo(x + 9, y + 24); ctx.stroke();
+      }
+    } else if (mat === "carpet") {
+      // Woven pile: a fine deterministic fleck of lighter/darker tufts.
+      let h = ((cx * 374761393) ^ (cy * 668265263)) >>> 0;
+      for (let i = 0; i < 10; i++) {
+        h = (h * 1103515245 + 12345) >>> 0;
+        const px = x + (h % TILE), py = y + ((h >> 8) % TILE);
+        ctx.fillStyle = (h & 1) ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.12)";
+        ctx.fillRect(px, py, 1, 1);
+      }
+    }
+  }
+
+  // Decorative area rugs, drawn over the floor and under furniture/actors.
+  _drawRugs(ctx) {
+    for (const r of this.world.rugs) {
+      const x = r.x0 * TILE + 3, y = r.y0 * TILE + 3;
+      const wd = (r.x1 - r.x0 + 1) * TILE - 6, ht = (r.y1 - r.y0 + 1) * TILE - 6;
+      const pal = r.style === "modern"
+        ? { field: "#3d4a52", border: "#2a333a", motif: "#6b7f88", accent: "#546670" }
+        : r.style === "runner"
+        ? { field: "#5c2f2c", border: "#8a6a34", motif: "#caa25a", accent: "#3f2020" }
+        : { field: "#6e2f2c", border: "#b6893f", motif: "#d8b063", accent: "#3c1a18" }; // persian
+      // Soft drop shadow, then the rug body and a woven border.
+      ctx.fillStyle = "rgba(0,0,0,0.22)"; ctx.fillRect(x + 2, y + 3, wd, ht);
+      ctx.fillStyle = pal.field; ctx.fillRect(x, y, wd, ht);
+      ctx.fillStyle = pal.border; ctx.fillRect(x, y, wd, 3); ctx.fillRect(x, y + ht - 3, wd, 3); ctx.fillRect(x, y, 3, ht); ctx.fillRect(x + wd - 3, y, 3, ht);
+      ctx.strokeStyle = pal.accent; ctx.lineWidth = 1; ctx.strokeRect(x + 4.5, y + 4.5, wd - 9, ht - 9);
+      const cxp = x + wd / 2, cyp = y + ht / 2;
+      if (r.style === "modern") {
+        ctx.fillStyle = pal.motif; // parallel stripes
+        for (let sy = y + 8; sy < y + ht - 6; sy += 6) ctx.fillRect(x + 6, sy, wd - 12, 1.5);
+      } else if (r.style === "runner") {
+        ctx.fillStyle = pal.motif; // repeating diamonds down the runner
+        for (let dy = y + 10; dy < y + ht - 8; dy += 12) {
+          ctx.beginPath(); ctx.moveTo(cxp, dy - 4); ctx.lineTo(cxp + 5, dy); ctx.lineTo(cxp, dy + 4); ctx.lineTo(cxp - 5, dy); ctx.closePath(); ctx.fill();
+        }
+      } else {
+        // Persian: a central medallion with corner accents.
+        ctx.fillStyle = pal.motif;
+        ctx.beginPath(); ctx.moveTo(cxp, cyp - 9); ctx.lineTo(cxp + 12, cyp); ctx.lineTo(cxp, cyp + 9); ctx.lineTo(cxp - 12, cyp); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = pal.accent;
+        ctx.beginPath(); ctx.moveTo(cxp, cyp - 4); ctx.lineTo(cxp + 6, cyp); ctx.lineTo(cxp, cyp + 4); ctx.lineTo(cxp - 6, cyp); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = pal.motif;
+        for (const [sx, sy] of [[x + 8, y + 8], [x + wd - 8, y + 8], [x + 8, y + ht - 8], [x + wd - 8, y + ht - 8]]) ctx.fillRect(sx - 1.5, sy - 1.5, 3, 3);
+      }
+      // Fringe tassels on the short ends.
+      ctx.fillStyle = pal.border;
+      for (let fx = x + 3; fx < x + wd - 3; fx += 4) { ctx.fillRect(fx, y - 2, 1.5, 2); ctx.fillRect(fx, y + ht, 1.5, 2); }
     }
   }
 

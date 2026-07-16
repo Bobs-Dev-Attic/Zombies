@@ -1,7 +1,16 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.19.0";
+export const VERSION = "0.20.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.20.0",
+    date: "2026-07-16",
+    title: "Home Furnishings",
+    changes: [
+      "Varied flooring in the house — each room now has its own surface: hardwood planks with visible seams, ceramic tile with grout, poured cement with hairline cracks, a brick foyer inside the front door, and soft flecked carpet.",
+      "Area rugs! Rooms are dressed with rugs — a medallioned Persian in the living room and bedroom, a striped modern rug under the dining table, and a diamond-patterned runner down the upstairs hall, each with a woven border and fringe.",
+    ],
+  },
   {
     version: "0.19.0",
     date: "2026-07-16",

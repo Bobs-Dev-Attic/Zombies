@@ -15,10 +15,22 @@ export const SETTINGS = [
 // Per-room floor colours (checker pairs), keyed by floorTint value.
 export const ROOM_FLOOR = {
   0: ["#22381b", "#284020"], // yard / grass
-  1: ["#54402c", "#5b452f"], // living room
-  2: ["#3b4147", "#42484f"], // kitchen tile
-  3: ["#5a4632", "#604b36"], // dining room
-  4: ["#403830", "#463e35"], // hall / landing
+  1: ["#6a4f3c", "#725643"], // carpet (living room, bedroom)
+  2: ["#3b4147", "#42484f"], // ceramic tile (kitchen, bathroom)
+  3: ["#6b4e30", "#755636"], // hardwood planks (dining)
+  4: ["#464a4e", "#4d5155"], // poured cement (landing / hall)
+  5: ["#6e4133", "#764636"], // brick (foyer / hearth)
+};
+
+// The surfacing material for each ROOM_FLOOR id — drives the floor texture
+// (plank seams, grout, mortar courses, carpet fleck) drawn over the checker.
+export const FLOOR_MAT = {
+  0: "grass",
+  1: "carpet",
+  2: "tile",
+  3: "wood",
+  4: "cement",
+  5: "brick",
 };
 
 // Outdoor "streets" terrain colours (checker pairs), keyed by floorTint value.
@@ -59,6 +71,7 @@ export class World {
     this.floorTint = new Uint8Array(this.cols * this.rows); // per-tile room colour id
     this.doors = []; // {cx, cy, open, openT, locked, hp, maxHp, broken}
     this.props = []; // decorative, non-blocking-ish
+    this.rugs = []; // decorative floor rugs (tile-rects drawn over the floor)
     this.furniture = []; // smashable / knock-over objects
     this.rooms = [];
     this.stairsCells = []; // tiles that move the player between floors
@@ -193,9 +206,16 @@ export class World {
     this._doorway(fdx, y1);                     // front door
     this._addWindows(bx, by, x1, y1, fdx);
 
-    this._fillTint(bx + 1, by + 1, vx - 1, y1 - 1, 1); // living
-    this._fillTint(vx + 1, by + 1, x1 - 1, hy - 1, 2); // kitchen
-    this._fillTint(vx + 1, hy + 1, x1 - 1, y1 - 1, 3); // dining
+    this._fillTint(bx + 1, by + 1, vx - 1, y1 - 1, 1); // living (carpet)
+    this._fillTint(vx + 1, by + 1, x1 - 1, hy - 1, 2); // kitchen (tile)
+    this._fillTint(vx + 1, hy + 1, x1 - 1, y1 - 1, 3); // dining (hardwood)
+    this._fillTint(fdx - 1, y1 - 2, fdx + 1, y1 - 1, 5); // brick foyer inside the front door
+
+    // Area rugs over the carpet/wood.
+    this.rugs = [
+      { x0: bx + 4, y0: y1 - 7, x1: bx + 10, y1: y1 - 2, style: "persian" },
+      { x0: vx + 3, y0: hy + 2, x1: vx + 9, y1: hy + 8, style: "modern" },
+    ];
 
     this.rooms = [{ name: "living", cx: bx + 7, cy: by + 10 }, { name: "kitchen", cx: vx + 5, cy: by + 5 }, { name: "dining", cx: vx + 5, cy: hy + 5 }];
 
@@ -239,9 +259,15 @@ export class World {
     this._doorway(bx + 10, y1 - 5, { open: false }); // a closet door in the hall (closed)
     this._addWindows(bx, by, x1, y1, null);
 
-    this._fillTint(bx + 1, by + 1, vx - 1, y1 - 1, 4); // landing / hall
+    this._fillTint(bx + 1, by + 1, vx - 1, y1 - 1, 4); // landing / hall (cement)
     this._fillTint(vx + 1, by + 1, x1 - 1, hy - 1, 1); // bedroom 1 (carpet)
     this._fillTint(vx + 1, hy + 1, x1 - 1, y1 - 1, 2); // bathroom (tile)
+
+    // A hall runner down the cement landing and a rug beside the bed.
+    this.rugs = [
+      { x0: bx + 4, y0: by + 6, x1: bx + 6, y1: y1 - 3, style: "runner" },
+      { x0: vx + 4, y0: by + 4, x1: x1 - 2, y1: by + 8, style: "persian" },
+    ];
 
     this.rooms = [{ name: "landing", cx: bx + 5, cy: by + 5 }, { name: "bedroom", cx: vx + 5, cy: by + 5 }, { name: "bathroom", cx: vx + 5, cy: hy + 5 }];
 

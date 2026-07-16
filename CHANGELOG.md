@@ -7,6 +7,11 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.20.0] — 2026-07-16
+### Home Furnishings
+- **Varied flooring** — house rooms now render distinct surfacing materials over the base floor checker (`FLOOR_MAT` keyed by `floorTint`, drawn deterministically in `_drawFloorMat` so it never shimmers): **hardwood planks** (staggered board seams), **ceramic tile** (grout grid + edge highlight), **poured cement** (expansion joints, mottling and a hairline crack on some cells), a **brick foyer** (running-bond courses with mortar) just inside the front door, and soft **flecked carpet**. Rooms were re-surfaced accordingly — carpet living room & bedroom, tile kitchen & bath, hardwood dining, cement upstairs landing.
+- **Area rugs** — rooms are dressed with decorative rugs (`world.rugs`, drawn in `_drawRugs` over the floor and under furniture/actors): a medallioned **Persian** in the living room and bedroom, a striped **modern** rug under the dining table, and a diamond **runner** down the upstairs hall — each with a woven border, a drop shadow, and end fringe.
+
 ## [0.19.0] — 2026-07-16
 ### Atmosphere & Broken Glass
 - **Furniture push tires you** — shoving a piece of furniture now **drains stamina in proportion to its mass**, so heaving a **dresser** costs far more than nudging a **chair** (surfaced from `world.collide` via a new `lastPushMass` read by the player each frame).
