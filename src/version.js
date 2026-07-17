@@ -1,7 +1,17 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.29.0";
+export const VERSION = "0.30.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.30.0",
+    date: "2026-07-17",
+    title: "Crawl & Splatter",
+    changes: [
+      "New Dragger zombie — a heavy, legless torso that hauls itself along the ground on its arms: slow, tanky and hard to shove, a relentless prone crawl toward you.",
+      "Spitters no longer lob green goo — they now hurl tumbling bloody body parts (chunks, torn limbs and bones) that splatter into a red mess on impact.",
+      "Some spitters now have jagged bones jutting out of their torsos.",
+    ],
+  },
   {
     version: "0.29.0",
     date: "2026-07-17",

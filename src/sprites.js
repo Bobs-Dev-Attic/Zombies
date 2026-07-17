@@ -363,6 +363,8 @@ export function makeZombieLook(type) {
     dragSide: Math.random() < 0.5 ? -1 : 1,
     // ~30% drag a torn scrap of clothing/sheet snagged behind them.
     dragCloth: Math.random() < 0.3 ? { col: ZCLOTHES[(Math.random() * ZCLOTHES.length) | 0], len: rand(6, 12) } : null,
+    // Over half of spitters have jagged bones jutting out of their ravaged bodies.
+    bonesOut: type === "spitter" && Math.random() < 0.55,
   };
 }
 
@@ -503,6 +505,12 @@ export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts,
   B(0, 0, 9, 9, cloth);
   B(-1, 0, 6, 7, skin);
   B(0, 2, 2, 3, dark); // wound
+  if (look.bonesOut) {
+    // Jagged bone shards punched out through the ravaged flesh, bloody at the root.
+    B(-1.6, -3, 1.8, 1.8, "#7a1414"); B(-3.6, -3.6, 4, 1.3, "#e8e2d0"); // rib jutting back-left
+    B(-1.6, 3, 1.8, 1.8, "#7a1414");  B(-3.6, 3.6, 4, 1.3, "#ded6c0");  // rib jutting back-right
+    B(1.2, -0.4, 1.7, 1.7, "#8a1a10"); B(1.6, -3.6, 1.3, 3.2, "#efe9d8"); // shard poking up from the shoulder
+  }
   if (type === "brute") { B(0, 0, 12, 11, dark); B(1, 0, 7, 8, skin); }
   B(2, 0, 6, 6, skin);
   hairOn(2);

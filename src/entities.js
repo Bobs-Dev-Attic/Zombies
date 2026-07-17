@@ -219,6 +219,9 @@ export const ZOMBIE_TYPES = {
   // Prone crawler: drags itself along the ground with no legs. High base speed
   // so the legless drag still lunges, but slower and more erratic than a walker.
   prone:   { hp: 30,  speed: 118, r: 6, dmg: 10, pattern: "wanderChase", knockResist: 0.15, score: 20, color: "crawler", gore: 0.9, shamble: 0.46, lurch: 0.4, bornProne: true },
+  // Dragger: a heavy, legless torso that hauls itself slowly and deliberately
+  // across the ground with its arms — tanky and hard to shove, a relentless crawl.
+  dragger: { hp: 70,  speed: 26,  r: 8, dmg: 14, pattern: "direct",      knockResist: 0.5,  score: 26, color: "crawler", gore: 1.2, shamble: 0.3,  lurch: 0.55, bornProne: true },
   // Zombie dog: a fast, low four-legged runner that packs the streets outside.
   dog:     { hp: 26,  speed: 78, r: 6,  dmg: 8,  pattern: "direct",      knockResist: 0.05, score: 18, color: "runner",  gore: 0.7, shamble: 0.14, lurch: 0.12, quad: true },
   // Zombie rat: tiny, fast, weak — swarms the sewers in scurrying packs.
