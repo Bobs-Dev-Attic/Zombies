@@ -323,6 +323,8 @@ export function makeZombieLook(type) {
     armAmp: rand(0.55, 1.6), armRate: rand(0.7, 1.6), legAmp: rand(0.7, 1.5),
     legStyle: Math.random() < 0.3 ? 1 : 0, // ~30% drag a leg
     dragSide: Math.random() < 0.5 ? -1 : 1,
+    // ~30% drag a torn scrap of clothing/sheet snagged behind them.
+    dragCloth: Math.random() < 0.3 ? { col: ZCLOTHES[(Math.random() * ZCLOTHES.length) | 0], len: rand(6, 12) } : null,
   };
 }
 
@@ -366,6 +368,19 @@ export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts,
 
   // Dynamic shadow: shifts/stretches with movement, shrinks as it leaps.
   drawShadow(ctx, cx, cy + (prone ? 3 : 6) * s, vx || 0, vy || 0, (prone ? 8 : 7) * s, 3.0 * s, jumpH / 11);
+
+  // A torn scrap of cloth snagged and dragging behind (drawn under the body).
+  if (look.dragCloth && type !== "rat" && type !== "dog") {
+    const dc = look.dragCloth;
+    let ax = cx - cos * (r * 0.5), ay = cyB - sin * (r * 0.5);
+    for (let i = 1; i <= 3; i++) {
+      const back = r * 0.5 + dc.len * s * (i / 3);
+      const sway = Math.sin(frame * 1.1 + i) * (1.6 * s) * i;
+      const nx = cx - cos * back - sin * sway, ny = cyB - sin * back + cos * sway;
+      limb(ctx, ax, ay, nx, ny, Math.max(1.5, (2.7 - i * 0.6) * s), dc.col);
+      ax = nx; ay = ny;
+    }
+  }
 
   // Hair painted onto the crown/back of a head centred at forward offset `hx`,
   // leaving the front (face + eyes) as bare skin. Drawn AFTER the head skin.

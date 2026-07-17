@@ -72,6 +72,9 @@ export class World {
     this.doors = []; // {cx, cy, open, openT, locked, hp, maxHp, broken}
     this.props = []; // decorative, non-blocking-ish
     this.rugs = []; // decorative floor rugs (tile-rects drawn over the floor)
+    this.decor = []; // static ground clutter: grime, debris, trash, garbage piles
+    this.lamps = []; // light sources that cast a (flickering) warm glow
+    this.ambient = 0; // baseline darkness veil for this floor (0 = daylight)
     this.furniture = []; // smashable / knock-over objects
     this.rooms = [];
     this.stairsCells = []; // tiles that move the player between floors
@@ -84,6 +87,33 @@ export class World {
     if (this.isHouse) { if (floorLevel === 1) this._houseUpper(); else this._houseGround(); }
     else if (this.isStreets) { if (floorLevel === 1) this._sewers(); else this._streets(); }
     else this._generate();
+    this._decorate();
+  }
+
+  // Sprinkle static atmosphere across the floor: floor grime, scattered debris,
+  // trash, and heavier garbage piles; set the ambient darkness and lamp glows.
+  _decorate() {
+    const area = this.cols * this.rows;
+    const R = (a, b) => rand(a, b);
+    const cellFloor = () => { const p = this.randomFloor(); return p; };
+    // How much clutter, and how dark, depends on the setting.
+    let grime, debris, trash, garbage;
+    if (this.isSewers) { this.ambient = 0.52; grime = area * 0.05; debris = area * 0.03; trash = area * 0.02; garbage = area * 0.006; }
+    else if (this.isHouse) { this.ambient = 0.30; grime = area * 0.035; debris = area * 0.02; trash = area * 0.014; garbage = area * 0.003; }
+    else { this.ambient = 0.06; grime = area * 0.02; debris = area * 0.02; trash = area * 0.016; garbage = area * 0.004; } // streets: near-daylight
+    const push = (kind, extra) => { const p = cellFloor(); if (p) this.decor.push({ x: p.x + R(-12, 12), y: p.y + R(-12, 12), kind, seed: (Math.random() * 1e9) | 0, rot: R(-Math.PI, Math.PI), ...extra }); };
+    for (let i = 0; i < grime; i++) push("grime", { r: R(6, 16), tone: pick(["#171a12", "#1c160f", "#141414", "#181c1e"]) });
+    for (let i = 0; i < debris; i++) push("debris");
+    for (let i = 0; i < trash; i++) push("trash");
+    for (let i = 0; i < garbage; i++) push("garbage");
+
+    // Light sources. Interiors get flickery ceiling lamps; sewers a few grimy
+    // bulbs; streets stay lit by daylight (no lamps, tiny ambient).
+    if (this.isHouse) {
+      for (const rm of this.rooms) this.lamps.push({ x: (rm.cx + 0.5) * TILE, y: (rm.cy + 0.5) * TILE, r: R(150, 190), warm: "#ffd9a0", flick: R(0.6, 1), phase: R(0, 6.28) });
+    } else if (this.isSewers) {
+      for (let i = 0; i < 5; i++) { const p = this.randomFloor(); if (p) this.lamps.push({ x: p.x, y: p.y, r: R(90, 130), warm: "#c8d8a0", flick: R(0.3, 0.8), phase: R(0, 6.28) }); }
+    }
   }
 
   // Floor checker-pair for a tile, tinted by terrain (house rooms / streets / sewers).
@@ -185,7 +215,10 @@ export class World {
     const F = { crate: [10, 10, 40], table: [13, 9, 55], chair: [7, 7, 22], barrel: [8, 8, 48], shelf: [13, 7, 60], couch: [15, 9, 72], bed: [13, 9, 60], dresser: [12, 8, 80], swings: [15, 6, 140], slide: [10, 9, 120], seesaw: [13, 4, 60] };
     const d = F[type] || F.crate;
     const ft = type === "bed" ? "couch" : type;
-    this.furniture.push({ cx, cy, x: (cx + 0.5) * TILE, y: (cy + 0.5) * TILE, hw: d[0], hh: d[1], type: ft, hp: d[2], maxHp: d[2], broken: false, overturned: false, angle: rand(-0.05, 0.05), low: this._isLowFurniture(ft), movable: MOVABLE.has(ft), mass: FURN_MASS[ft] || 1, vx: 0, vy: 0 });
+    const f = { cx, cy, x: (cx + 0.5) * TILE, y: (cy + 0.5) * TILE, hw: d[0], hh: d[1], type: ft, hp: d[2], maxHp: d[2], broken: false, overturned: false, angle: rand(-0.05, 0.05), low: this._isLowFurniture(ft), movable: MOVABLE.has(ft), mass: FURN_MASS[ft] || 1, vx: 0, vy: 0 };
+    // Some pieces are already wrecked when you arrive — smashed or tipped over.
+    if (ft !== "swings" && ft !== "slide" && ft !== "seesaw" && chance(0.16)) { f.broken = true; f.overturned = chance(0.5); f.hp = 0; f.angle = rand(-0.6, 0.6); }
+    this.furniture.push(f);
   }
 
   _fillTint(rx0, ry0, rx1, ry1, tint) {

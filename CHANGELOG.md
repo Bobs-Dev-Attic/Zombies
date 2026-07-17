@@ -7,6 +7,15 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.24.0] — 2026-07-17
+### Squalor
+- **Random floor clutter** — every floor is now strewn with static decor generated at build time (`world.decor`, drawn in `_drawDecor`): dark **grime stains**, scattered **debris/rubble**, **trash** (crumpled paper, wrappers, cans) and heaped **garbage bags**, weighted heaviest in the sewers. Some **furniture spawns already broken** (smashed or tipped over, ~16%).
+- **Torn curtains** — most house windows now hang a ragged valance and two frayed side panels of cloth over the glass.
+- **Zombies drag cloth** — ~30% of the horde drags a snagged scrap of clothing/sheet trailing behind them (`look.dragCloth`, rendered as a swaying ribbon under the body).
+- **Bloody footprints & trails** — walking through fresh blood coats your boots and you leave a fading trail of **boot prints** (`this.prints`), alternating left/right and fading as the blood wears off; **crawlers drag a bloody smear** behind them. Prints persist per floor and land on floors, tile and rugs alike.
+- **Dim lighting** — interiors and the sewers get a **darkness veil** (`world.ambient`) lit by warm, **flickering lamps** (`world.lamps`, occasional bad-bulb dips) and a soft **torch around the player** (`_drawLighting`); streets stay near-daylight.
+- **Gentler fog** — the fog of war now feathers with a wider **smoothstep** falloff plus a player-centred radial gradient, so sight fades in a gradual gradient instead of a hard blocky edge.
+
 ## [0.23.0] — 2026-07-17
 ### From the Hip
 - **Hip-fired shotgun** — the shotgun family is now held at the **waist** instead of raised centre-line: the stock is tucked at the player's right hip and the barrel angles across to the aim line, so from the top-down view the gun visibly **swings out to the left or right** as you turn. Rendered by a dedicated `drawShotgunLocal` with per-variant bodies (pump barrel + mag tube, semi-auto, side-by-side twin barrels) and both hands posed on the grip and fore-end.
