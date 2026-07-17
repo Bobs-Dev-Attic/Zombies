@@ -298,7 +298,8 @@ export class Game {
     // Weighted type table that shifts toward tougher foes over time.
     const w = this.wave;
     const table = [["walker", 5]];
-    table.push(["prone", w >= 2 ? 4 : 2]); // draggers from the very first wave
+    table.push(["prone", w >= 2 ? 4 : 2]); // fast lunging crawlers from wave 1
+    if (w >= 2) table.push(["dragger", 3]); // slow, hulking torsos hauling themselves along
     if (w >= 2) table.push(["runner", 3]);
     if (w >= 2) table.push(["crawler", 3]);
     if (w >= 3) table.push(["leaper", 2]); // pouncers
@@ -743,10 +744,11 @@ export class Game {
         if (chance(0.7)) this.particles.push(new Particle(rx, ry, { vx: Math.cos(back) * rand(10, 40), vy: Math.sin(back) * rand(10, 40), life: rand(0.4, 0.95), color: pick(["rgba(90,90,90,0.5)", "rgba(60,60,60,0.45)", "rgba(120,120,120,0.4)"]), size: randInt(2, 4), drag: 0.9 }));
       }
       if (proj.hostile) {
-        // Enemy spit: only hits player.
+        // Enemy spit (a hurled body part): only hits the player, with a wet splat.
         if (dist(proj.x, proj.y, this.player.x, this.player.y) < this.player.r + proj.r + 1) {
           this.player.hurt(proj.damage);
-          this._blood(proj.x, proj.y, proj.angle, 3, "#8fbf3a");
+          this._blood(proj.x, proj.y, proj.angle, 5, "#7a1010");
+          this.stains.push({ x: proj.x + rand(-3, 3), y: proj.y + rand(-3, 3), r: rand(2, 4), life: rand(6, 12), color: "#5a0f0f" });
           proj.dead = true;
         }
         continue;
@@ -1638,9 +1640,14 @@ export class Game {
 
   _spawnHostile(x, y, angle, kind) {
     if (kind === "spit") {
-      this.projectiles.push(new Projectile(x, y, angle, {
-        speed: 190, damage: 10, range: 340, hostile: true, kind: "spit", r: 2.4,
-      }));
+      // The "spitter" actually hurls a torn-off, bloody body part — a wet chunk
+      // of flesh, a severed bit of limb, or a splintered bone — tumbling at you.
+      const proj = new Projectile(x, y, angle, {
+        speed: 175, damage: 10, range: 340, hostile: true, kind: "spit", r: 3,
+      });
+      proj.goreKind = pick(["chunk", "chunk", "limb", "bone"]);
+      proj.spinPhase = rand(0, TAU);
+      this.projectiles.push(proj);
       sfx.play("hiss");
     }
   }
@@ -2709,7 +2716,29 @@ export class Game {
 
   _drawProjectiles(ctx) {
     for (const pr of this.projectiles) {
-      if (pr.kind === "spit") { ctx.fillStyle = "#8fbf3a"; ctx.beginPath(); ctx.arc(pr.x, pr.y, 2.4, 0, TAU); ctx.fill(); continue; }
+      if (pr.kind === "spit") {
+        // A tumbling, bloody body part flung by a spitter.
+        ctx.save();
+        ctx.translate(pr.x, pr.y);
+        ctx.rotate((pr.spinPhase || 0) + pr.traveled * 0.14);
+        if (pr.goreKind === "bone") {
+          ctx.fillStyle = "#e8e2d0"; ctx.fillRect(-3, -0.9, 6, 1.8);
+          for (const ex of [-3, 3]) { ctx.beginPath(); ctx.arc(ex, -0.7, 1.1, 0, TAU); ctx.arc(ex, 0.7, 1.1, 0, TAU); ctx.fill(); }
+          ctx.fillStyle = "#7a1414"; ctx.beginPath(); ctx.arc(3, 0, 1.1, 0, TAU); ctx.fill();
+        } else if (pr.goreKind === "limb") {
+          ctx.fillStyle = "#7a8f3a"; ctx.beginPath(); ctx.ellipse(0, 0, 4, 1.8, 0, 0, TAU); ctx.fill(); // rotting flesh
+          ctx.fillStyle = "#5a1010"; ctx.beginPath(); ctx.arc(3.4, 0, 1.4, 0, TAU); ctx.fill();          // torn, bloody end
+          ctx.fillStyle = "#e8e2d0"; ctx.fillRect(3.2, -0.5, 1.4, 1); // bit of bone poking out
+        } else { // chunk of gore
+          ctx.fillStyle = "#8a1414"; ctx.beginPath(); ctx.arc(0, 0, 2.6, 0, TAU); ctx.fill();
+          ctx.fillStyle = "#a01818"; ctx.beginPath(); ctx.arc(-0.8, -0.6, 1.5, 0, TAU); ctx.fill();
+          ctx.fillStyle = "#6a1a10"; ctx.beginPath(); ctx.arc(1, 0.8, 1.1, 0, TAU); ctx.fill();
+        }
+        ctx.restore();
+        // a few drips shedding off it in flight
+        if (chance(0.35)) this.particles.push(new Particle(pr.x, pr.y, { vx: rand(-12, 12), vy: rand(-6, 14), life: rand(0.2, 0.5), color: "#7a1010", size: 1, drag: 0.86, stain: true }));
+        continue;
+      }
       if (pr.kind === "rocket") {
         // A finned missile with a hot exhaust flame flaring out the back.
         ctx.save();

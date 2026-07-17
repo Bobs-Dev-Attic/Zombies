@@ -7,6 +7,12 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.30.0] — 2026-07-17
+### Crawl & Splatter
+- **Dragger zombie** — a new `dragger` type (`bornProne: true`, `hp: 70`, slow `speed: 26`, high `knockResist: 0.5`, `dmg: 14`): a heavy legless torso that hauls itself deliberately across the ground on its arms, tanky and hard to shove. Distinct from the fast lunging `prone` crawler. Enters the spawn table from wave 2 onward.
+- **Gore spit** — spitter projectiles (`kind: "spit"`) are no longer green goo. They now fling a tumbling bloody body part chosen from a `goreKind` (`chunk`, torn `limb`, or `bone`) that spins as it flies (`spinPhase` + travel-based rotation), sheds drips, and bursts into a dark-red splatter with a lingering blood stain on impact. Hit mechanics are unchanged.
+- **Bones sticking out** — some spitters (`look.bonesOut`) now render jagged ivory bone shards jutting from their torsos.
+
 ## [0.29.0] — 2026-07-17
 ### Pew Pew
 - **Laser Pistol** — a new energy weapon (`kind: "laserpistol"`, `beam: true`, new `cells` ammo) that fires an **instant hitscan beam** (`_fireBeam`) rather than a projectile. The beam is raycast to the first wall/solid and **pierces every zombie along the line in one shot**, boring a **cauterised, smoking hole** through each (`_laserBurn`: smoke wisps, sparks, a spot of blood, and a charred mark).
