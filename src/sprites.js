@@ -82,7 +82,8 @@ export function drawPlayer(ctx, cx, cy, angle, frame, hurtFlash, weaponKind, pal
     // Idle breathing — heaves harder and faster the more winded you are.
     const tired = 1 - (action.stamina == null ? 1 : action.stamina);
     const idleT = action.idleT || 0;
-    const amp = 0.6 + tired * 2.0, rate = 3.0 + tired * 4.6;
+    // Slow, natural cadence: ~13 breaths/min resting up to ~36/min when winded.
+    const amp = 0.6 + tired * 2.0, rate = 1.4 + tired * 2.4;
     lift = (Math.sin(idleT * rate) * 0.5 + 0.5) * amp;         // chest rise/fall (>=0)
     rock = Math.sin(idleT * rate * 0.5) * (0.02 + tired * 0.06);
   }
