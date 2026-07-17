@@ -944,10 +944,12 @@ const FURN = {
   truck:  { body: "#3f5a6b", top: "#557488", edge: "#1a1a1e" },
   bench:  { body: "#6b4a28", top: "#86633c", edge: "#4a3420" },
   bush:   { body: "#2f4a24", top: "#3c5c2e", edge: "#213617" },
+  shrub:  { body: "#37502a", top: "#4a6636", edge: "#243a1c" },
   dresser:{ body: "#6a4a2a", top: "#835c38", edge: "#472f18" },
   boulder:{ body: "#6a6e72", top: "#888c92", edge: "#43474b" },
   rock:   { body: "#71757a", top: "#8e9298", edge: "#4a4e52" },
   log:    { body: "#5a3f26", top: "#74542f", edge: "#3a2818" },
+  plane:  { body: "#c8ccd2", top: "#e4e8ee", edge: "#8a8f98" },
 };
 
 // Furniture: intact obstacle, or a broken / overturned pile once destroyed.
@@ -1007,18 +1009,42 @@ export function drawFurniture(ctx, f) {
     ctx.restore();
     return;
   }
+  if (f.type === "plane") {
+    // A top-down airliner: nose toward +x. Swept wings & tailplane, engine pods,
+    // a fin, cockpit glass and a cabin window line.
+    const L = f.hw, W = f.hh;
+    ctx.fillStyle = c.edge; // swept wings
+    ctx.beginPath(); ctx.moveTo(2, -W * 0.6); ctx.lineTo(-L * 0.5, -W * 2.6); ctx.lineTo(-L * 0.78, -W * 2.6); ctx.lineTo(-4, W * 0.1); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(2, W * 0.6); ctx.lineTo(-L * 0.5, W * 2.6); ctx.lineTo(-L * 0.78, W * 2.6); ctx.lineTo(-4, -W * 0.1); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#42464c"; // engine pods slung under the wings
+    ctx.fillRect(-L * 0.36, -W * 2.0, W * 1.1, W * 0.8); ctx.fillRect(-L * 0.36, W * 1.2, W * 1.1, W * 0.8);
+    ctx.fillStyle = c.edge; // tailplane
+    ctx.beginPath(); ctx.moveTo(-L + 3, -W * 0.4); ctx.lineTo(-L - 3, -W * 1.5); ctx.lineTo(-L - 5, -W * 1.5); ctx.lineTo(-L - 1, W * 0.1); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-L + 3, W * 0.4); ctx.lineTo(-L - 3, W * 1.5); ctx.lineTo(-L - 5, W * 1.5); ctx.lineTo(-L - 1, -W * 0.1); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = c.body; ctx.beginPath(); ctx.ellipse(0, 0, L, W, 0, 0, TAU); ctx.fill();        // fuselage
+    ctx.fillStyle = c.body; ctx.beginPath(); ctx.ellipse(L * 0.72, 0, L * 0.4, W * 0.82, 0, 0, TAU); ctx.fill(); // nose
+    ctx.fillStyle = c.top; ctx.fillRect(-L * 0.82, -W * 0.5, L * 1.55, W * 0.5);                     // top highlight
+    ctx.fillStyle = c.edge; ctx.beginPath(); ctx.moveTo(-L * 0.72, 0); ctx.lineTo(-L * 1.18, -W * 0.22); ctx.lineTo(-L * 0.86, W * 0.22); ctx.closePath(); ctx.fill(); // fin
+    ctx.fillStyle = "#26333d"; ctx.beginPath(); ctx.ellipse(L * 0.66, 0, W * 0.55, W * 0.5, 0, 0, TAU); ctx.fill(); // cockpit glass
+    ctx.fillStyle = "rgba(40,55,66,0.75)"; for (let wx = -L * 0.62; wx < L * 0.5; wx += 4) ctx.fillRect(wx, -1, 2, 2); // cabin windows
+    ctx.restore();
+    return;
+  }
   if (f.type === "bench") {
     ctx.fillStyle = c.edge; ctx.fillRect(-f.hw, -f.hh, f.hw * 2, f.hh * 2);
     ctx.fillStyle = c.body; for (let i = -1; i <= 1; i++) ctx.fillRect(-f.hw, i * 2 - 0.7, f.hw * 2, 1.4);
     ctx.restore();
     return;
   }
-  if (f.type === "bush") {
-    // A leafy shrub: a few overlapping blobs with a lit top.
+  if (f.type === "bush" || f.type === "shrub") {
+    // A leafy shrub: a few overlapping blobs with a lit top. Shrubs are a touch
+    // smaller and scrubbier, with a couple of dry twigs poking out.
+    const sc = f.type === "shrub" ? 0.82 : 1;
     ctx.fillStyle = c.body;
-    for (const [ox, oy, rr] of [[-4, 0, 6], [4, 1, 6], [0, -3, 6], [0, 2, 7]]) { ctx.beginPath(); ctx.arc(ox, oy, rr, 0, TAU); ctx.fill(); }
+    for (const [ox, oy, rr] of [[-4, 0, 6], [4, 1, 6], [0, -3, 6], [0, 2, 7]]) { ctx.beginPath(); ctx.arc(ox * sc, oy * sc, rr * sc, 0, TAU); ctx.fill(); }
     ctx.fillStyle = c.top;
-    for (const [ox, oy, rr] of [[-3, -2, 3], [3, -1, 3], [0, -1, 3.4]]) { ctx.beginPath(); ctx.arc(ox, oy, rr, 0, TAU); ctx.fill(); }
+    for (const [ox, oy, rr] of [[-3, -2, 3], [3, -1, 3], [0, -1, 3.4]]) { ctx.beginPath(); ctx.arc(ox * sc, oy * sc, rr * sc, 0, TAU); ctx.fill(); }
+    if (f.type === "shrub") { ctx.strokeStyle = c.edge; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-3, 2); ctx.lineTo(-5, -3); ctx.moveTo(3, 2); ctx.lineTo(5, -2); ctx.stroke(); ctx.lineWidth = 1; }
     ctx.restore();
     return;
   }

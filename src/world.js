@@ -11,6 +11,7 @@ export const SETTINGS = [
   { id: "hospital", name: "St. Mercy Hospital", floor: "#28343a", floor2: "#2e3c43", wall: "#3a5058", wallTop: "#48626c", accent: "#324248" },
   { id: "forest", name: "Blackpine Woods", floor: "#1f2a1c", floor2: "#243021", wall: "#2c3a22", wallTop: "#38492c", accent: "#26331e" },
   { id: "city", name: "Downtown", floor: "#26282d", floor2: "#2c2f34", wall: "#474b53", wallTop: "#5c616b", accent: "#383c43" },
+  { id: "airport", name: "Ashford Airport", floor: "#3a3d42", floor2: "#40434a", wall: "#565b63", wallTop: "#6b7178", accent: "#44484f" },
 ];
 
 // Per-room floor colours (checker pairs), keyed by floorTint value.
@@ -66,6 +67,18 @@ export const CITY_TERRAIN = {
   9: ["#5a5c60", "#606268"], // crosswalk / lobby tile
 };
 
+// Ashford Airport terrain colours (checker pairs), keyed by floorTint value.
+export const AIRPORT_TERRAIN = {
+  0: ["#3a4a2a", "#41522f"], // airfield grass
+  1: ["#3a4a2a", "#41522f"], // grass
+  2: ["#2a2d33", "#2f333a"], // runway / taxiway asphalt
+  3: ["#494d55", "#4f535b"], // apron / tarmac concrete
+  4: ["#2a2d33", "#2f333a"], // runway centre (asphalt; dashes drawn over)
+  5: ["#54585f", "#5b5f67"], // terminal tile
+  6: ["#2a2d33", "#2f333a"], // taxi line base (yellow drawn over)
+  7: ["#2a2d33", "#2f333a"], // runway edge stripe base (white line drawn over)
+};
+
 // Blackpine Woods terrain colours (checker pairs), keyed by floorTint value.
 export const FOREST_TERRAIN = {
   0: ["#1f2e1a", "#243620"], // mossy forest floor
@@ -91,10 +104,11 @@ export class World {
     this.isStreets = this.setting.id === "streets";
     this.isCity = this.setting.id === "city";
     this.isForest = this.setting.id === "forest";
+    this.isAirport = this.setting.id === "airport";
     this.isSewers = this.isStreets && floorLevel === 1; // sewer maze beneath the streets
     this.floorLevel = floorLevel; // 0 = ground/street, 1 = upstairs/sewers
-    this.cols = this.isHouse ? 40 : this.isStreets ? 48 : this.isCity ? 54 : this.isForest ? 54 : randInt(40, 52);
-    this.rows = this.isHouse ? 38 : this.isStreets ? 46 : this.isCity ? 52 : this.isForest ? 52 : randInt(40, 52);
+    this.cols = this.isHouse ? 40 : this.isStreets ? 48 : this.isCity ? 54 : this.isForest ? 66 : this.isAirport ? 72 : randInt(40, 52);
+    this.rows = this.isHouse ? 38 : this.isStreets ? 46 : this.isCity ? 52 : this.isForest ? 62 : this.isAirport ? 56 : randInt(40, 52);
     this.grid = new Uint8Array(this.cols * this.rows);
     this.explored = new Uint8Array(this.cols * this.rows); // fog-of-war memory
     this.floorTint = new Uint8Array(this.cols * this.rows); // per-tile room colour id
@@ -117,6 +131,7 @@ export class World {
     else if (this.isStreets) { if (floorLevel === 1) this._sewers(); else this._streets(); }
     else if (this.isCity) this._city();
     else if (this.isForest) this._forest();
+    else if (this.isAirport) this._airport();
     else this._generate();
     this._decorate();
   }
@@ -133,12 +148,17 @@ export class World {
     else if (this.isHouse) { this.ambient = 0.30; grime = area * 0.035; debris = area * 0.02; trash = area * 0.014; garbage = area * 0.003; }
     else if (this.isCity) { this.ambient = 0.14; grime = area * 0.03; debris = area * 0.028; trash = area * 0.024; garbage = area * 0.007; } // downtown: littered, dusk-lit
     else if (this.isForest) { this.ambient = 0.34; grime = area * 0.02; debris = area * 0.03; trash = area * 0.004; garbage = area * 0.001; } // woods: shady canopy, leaf litter
+    else if (this.isAirport) { this.ambient = 0.12; grime = area * 0.02; debris = area * 0.022; trash = area * 0.012; garbage = area * 0.003; } // airfield: dusk, wind-blown litter
     else { this.ambient = 0.06; grime = area * 0.02; debris = area * 0.02; trash = area * 0.016; garbage = area * 0.004; } // streets: near-daylight
     const push = (kind, extra) => { const p = cellFloor(); if (p) this.decor.push({ x: p.x + R(-12, 12), y: p.y + R(-12, 12), kind, seed: (Math.random() * 1e9) | 0, rot: R(-Math.PI, Math.PI), ...extra }); };
     for (let i = 0; i < grime; i++) push("grime", { r: R(6, 16), tone: pick(["#171a12", "#1c160f", "#141414", "#181c1e"]) });
     for (let i = 0; i < debris; i++) push("debris");
     for (let i = 0; i < trash; i++) push("trash");
     for (let i = 0; i < garbage; i++) push("garbage");
+    // Tufts of grass, ferns and fallen leaves carpet the woods (and a lighter
+    // scatter of weeds greens up the airfield infield).
+    if (this.isForest) for (let i = 0; i < area * 0.09; i++) push("grass", { tone: pick(["#2e4a24", "#35521f", "#3c5a2a", "#436327"]) });
+    else if (this.isAirport) for (let i = 0; i < area * 0.03; i++) push("grass", { tone: pick(["#3a4a28", "#42502c", "#48582f"]) });
 
     // Light sources. Interiors get flickery ceiling lamps; sewers a few grimy
     // bulbs; streets stay lit by daylight (no lamps, tiny ambient).
@@ -151,9 +171,9 @@ export class World {
 
   // Floor checker-pair for a tile, tinted by terrain (house rooms / streets / sewers).
   floorPair(cx, cy) {
-    if (!this.isHouse && !this.isStreets && !this.isCity && !this.isForest) return null;
+    if (!this.isHouse && !this.isStreets && !this.isCity && !this.isForest && !this.isAirport) return null;
     const id = this.floorTint[this.idx(cx, cy)];
-    const pal = this.isSewers ? SEWER_TERRAIN : this.isHouse ? ROOM_FLOOR : this.isCity ? CITY_TERRAIN : this.isForest ? FOREST_TERRAIN : STREET_TERRAIN;
+    const pal = this.isSewers ? SEWER_TERRAIN : this.isHouse ? ROOM_FLOOR : this.isCity ? CITY_TERRAIN : this.isForest ? FOREST_TERRAIN : this.isAirport ? AIRPORT_TERRAIN : STREET_TERRAIN;
     return pal[id] || pal[0];
   }
 
@@ -208,7 +228,7 @@ export class World {
   }
 
   // Low furniture you can shoot over (still blocks movement).
-  _isLowFurniture(type) { return type === "table" || type === "chair" || type === "couch" || type === "bench" || type === "bed" || type === "rock" || type === "log"; }
+  _isLowFurniture(type) { return type === "table" || type === "chair" || type === "couch" || type === "bench" || type === "bed" || type === "rock" || type === "log" || type === "bush" || type === "shrub"; }
 
   idx(cx, cy) { return cy * this.cols + cx; }
   inBounds(cx, cy) { return cx >= 0 && cy >= 0 && cx < this.cols && cy < this.rows; }
@@ -724,11 +744,14 @@ export class World {
     const exCx = clamp(riverX[rows - 2] + 5, 6, cols - 6);
     this._forestTrail(spawnCx, spawnCy, exCx, rows - 2, reserve);
 
-    // Scatter dense pine woods on the open floor (clearings/trails/water/sites stay clear).
+    // Scatter open pine woods on the floor — spaced out so it never walls you
+    // in, with the odd tight cluster and plenty of room to move between trunks.
     for (let y = 2; y < rows - 2; y++) for (let x = 2; x < cols - 2; x++) {
       if (this.tileAt(x, y) !== T.FLOOR || reserved(x, y)) continue;
       if (this.floorTint[this.idx(x, y)] !== 1) continue;
-      if (chance(0.34)) this._set(x, y, T.PROP); // a pine
+      // Keep a one-tile gap from the last pine so trunks don't fuse into a maze.
+      const crowded = this.tileAt(x - 1, y) === T.PROP || this.tileAt(x, y - 1) === T.PROP;
+      if (chance(crowded ? 0.05 : 0.17)) this._set(x, y, T.PROP); // a pine
     }
 
     // Two log cabins tucked in glades, and a rocky cave in a far corner.
@@ -736,11 +759,25 @@ export class World {
     this._forestCabin(glades[1][0] - 2, glades[1][1] - 1);
     this._forestCave(cols - 8, rows - 8);
 
+    // Leafy undergrowth: bushes and shrubs (low cover you can shoot over) dotted
+    // through the open forest floor.
+    let bushes = 0;
+    for (let i = 0; i < 160 && bushes < 46; i++) {
+      const x = randInt(2, cols - 3), y = randInt(2, rows - 3);
+      if (this.tileAt(x, y) !== T.FLOOR) continue;
+      const tint = this.floorTint[this.idx(x, y)];
+      if (tint === 3 || tint === 4) continue; // not in water or the cave
+      if (this.furnitureAt((x + 0.5) * TILE, (y + 0.5) * TILE)) continue;
+      this._furn((x + 0.5) * TILE, (y + 0.5) * TILE, chance(0.4) ? "shrub" : "bush", rand(7, 10), rand(6, 8), 24);
+      bushes++;
+    }
+
     // Boulders & rocks strewn about.
     let placed = 0;
-    for (let i = 0; i < 80 && placed < 26; i++) {
+    for (let i = 0; i < 80 && placed < 30; i++) {
       const x = randInt(2, cols - 3), y = randInt(2, rows - 3);
       if (this.tileAt(x, y) !== T.FLOOR || this.floorTint[this.idx(x, y)] === 3) continue;
+      if (this.furnitureAt((x + 0.5) * TILE, (y + 0.5) * TILE)) continue;
       const big = chance(0.5);
       this._furn((x + 0.5) * TILE, (y + 0.5) * TILE, big ? "boulder" : "rock", big ? rand(9, 13) : rand(5, 7), big ? rand(8, 11) : rand(4, 6), big ? 500 : 120);
       placed++;
@@ -809,6 +846,92 @@ export class World {
     this._furn((cx - rr - 0.5) * TILE, (cy - 2.5) * TILE, "boulder", 11, 10, 500);
     this._furn((cx - rr - 0.5) * TILE, (cy + 2.5) * TILE, "boulder", 11, 10, 500);
     this.rooms.push({ name: "cave", cx, cy });
+  }
+
+  // Ashford Airport: a wide open airfield — a big marked runway with grass
+  // infield, a taxiway to a concrete apron lined with parked airliners, ground
+  // vehicles, open hangars and a long glass-fronted terminal.
+  _airport() {
+    const cols = this.cols, rows = this.rows;
+    this.grid.fill(T.FLOOR);
+    this.floorTint.fill(1); // airfield grass
+    this.furniture = [];
+    this.rooms = [];
+    // Chain-link perimeter fence.
+    for (let x = 0; x < cols; x++) { this._set(x, 0, T.WALL); this._set(x, rows - 1, T.WALL); }
+    for (let y = 0; y < rows; y++) { this._set(0, y, T.WALL); this._set(cols - 1, y, T.WALL); }
+    const midR = Math.floor(rows / 2);
+
+    // The big runway down the right-centre of the field.
+    const rwX0 = 30, rwX1 = 41, rwM1 = 35, rwM2 = 36;
+    for (let y = 1; y < rows - 1; y++) for (let x = rwX0; x <= rwX1; x++) {
+      let tint = 2;
+      if (x === rwX0 || x === rwX1) tint = 7;            // edge stripes
+      else if (x === rwM1 || x === rwM2) tint = 4;       // dashed centreline
+      this._tint(x, y, tint);
+    }
+    // Threshold "piano keys" at each end.
+    for (const ty of [2, 3, rows - 4, rows - 3]) for (let x = rwX0 + 1; x <= rwX1 - 1; x += 2) this._tint(x, ty, 7);
+
+    // Concrete apron on the left; a taxiway links it to the runway.
+    for (let y = 5; y < rows - 5; y++) for (let x = 6; x <= 27; x++) this._tint(x, y, 3);
+    for (let y = midR - 1; y <= midR + 1; y++) for (let x = 27; x <= rwX0; x++) this._tint(x, y, 2);
+    // A yellow taxi-lead line down the middle of the taxiway.
+    for (let x = 27; x <= rwX0; x++) this._tint(x, midR, 6);
+
+    // The terminal along the far left, gates facing the apron.
+    this._airportTerminal(2, 9, 8, rows - 10);
+    // Two open hangars on the apron, a jet inside each.
+    this._airportHangar(11, 6);
+    this._airportHangar(11, rows - 13);
+    // Parked airliners out on the open apron, nosed toward the terminal.
+    this._furn(22 * TILE, (midR - 6) * TILE, "plane", 34, 11, 900, Math.PI);
+    this._furn(24 * TILE, (midR + 7) * TILE, "plane", 34, 11, 900, Math.PI);
+    // Ground vehicles: a fuel bowser and a couple of luggage tugs.
+    this._furn(16 * TILE, 20 * TILE, "truck", 11, 20, 220);
+    this._furn(19 * TILE, (rows - 15) * TILE, "car", 11, 13, 160);
+    this._furn(26 * TILE, midR * TILE, "car", 13, 11, 160);
+    // A windsock mast and an antenna out on the grass infield.
+    this._set(rwX1 + 7, 6, T.PROP);
+    this._set(rwX1 + 16, rows - 8, T.PROP);
+
+    // Spawn on the open apron; the runway is the way out (off the bottom).
+    this.spawnPoint = { x: 21 * TILE + 16, y: midR * TILE + 16 };
+    const exCx = rwM1;
+    this._set(exCx, rows - 1, T.EXIT); this._tint(exCx, rows - 1, 2);
+    this._set(exCx - 1, rows - 1, T.FLOOR); this._tint(exCx - 1, rows - 1, 2);
+    this._set(exCx + 1, rows - 1, T.FLOOR); this._tint(exCx + 1, rows - 1, 2);
+    this.exit = { x: (exCx + 0.5) * TILE, y: (rows - 1 + 0.5) * TILE };
+    this.exitFacing = "down";
+    this.rooms.push({ name: "apron", cx: 20, cy: midR });
+  }
+
+  // The terminal: a long hall with a glass gate frontage and doors onto the
+  // apron, rows of seating and loot inside.
+  _airportTerminal(x0, y0, x1, y1) {
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const edge = x === x0 || x === x1 || y === y0 || y === y1;
+      if (edge) this._set(x, y, T.WALL);
+      else { this._set(x, y, T.FLOOR); this._tint(x, y, 5); }
+    }
+    for (let y = y0 + 2; y <= y1 - 2; y += 2) this._set(x1, y, T.WINDOW);          // glass gate frontage
+    for (const dy of [Math.floor((y0 + y1) / 2), y0 + 4, y1 - 4]) this._doorway(x1, dy); // doors onto the apron
+    for (let y = y0 + 3; y <= y1 - 3; y += 5) { this._furn((x0 + 2.5) * TILE, (y + 0.5) * TILE, "bench", 12, 5, 40); this._furn((x0 + 4.5) * TILE, (y + 0.5) * TILE, "bench", 12, 5, 40); }
+    this.rooms.push({ name: "terminal", cx: Math.floor((x0 + x1) / 2), cy: Math.floor((y0 + y1) / 2) });
+  }
+
+  // A hangar: three steel walls with an open front toward the runway, a parked
+  // jet inside.
+  _airportHangar(x0, y0) {
+    const w = 8, h = 7, x1 = x0 + w - 1, y1 = y0 + h - 1;
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const wallCell = x === x0 || y === y0 || y === y1; // back + sides; front (x1) open
+      if (wallCell) { this._set(x, y, T.WALL); this._tint(x, y, 12); }
+      else { this._set(x, y, T.FLOOR); this._tint(x, y, 3); }
+    }
+    for (let y = y0 + 1; y <= y1 - 1; y++) { this._set(x1, y, T.FLOOR); this._tint(x1, y, 3); } // open front
+    this._furn((x0 + 4) * TILE, ((y0 + y1) / 2 + 0.5) * TILE, "plane", 26, 9, 700, 0);
+    this.rooms.push({ name: "hangar", cx: x0 + 3, cy: Math.floor((y0 + y1) / 2) });
   }
 
   // The sewers: a maze of 2-wide tunnels carved through concrete, with ladders

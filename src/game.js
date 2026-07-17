@@ -183,7 +183,7 @@ export class Game {
     }
     // Throwables: grenades everywhere, flares mostly outside.
     if (chance(0.8)) { const p = this.world.randomFloor(); this.pickups.push(new Pickup(p.x, p.y, "grenade", { amount: randInt(1, 3) })); }
-    if ((this.world.isStreets || this.world.isCity) && chance(0.8)) { const p = this.world.randomFloor(); this.pickups.push(new Pickup(p.x, p.y, "flare", { amount: randInt(1, 2) })); }
+    if ((this.world.isStreets || this.world.isCity || this.world.isAirport) && chance(0.8)) { const p = this.world.randomFloor(); this.pickups.push(new Pickup(p.x, p.y, "flare", { amount: randInt(1, 2) })); }
   }
 
   // House floors carry a curated loot list (key/axe/room rewards).
@@ -316,14 +316,33 @@ export class Game {
       if (w >= 4) table.push(["spitter", 2]);
       if (w >= 5) table.push(["brute", 1 + Math.floor(w / 5)]);
       if (this.world.isSewers) table.push(["rat", 7 + w]);                              // swarms underground
-      else if ((this.world.isStreets || this.world.isCity) && w >= 2) table.push(["dog", 2 + Math.floor(w / 4)]); // stray packs outside
+      else if ((this.world.isStreets || this.world.isCity || this.world.isAirport) && w >= 2) table.push(["dog", 2 + Math.floor(w / 4)]); // stray packs outside
     }
     const total = table.reduce((s, t) => s + t[1], 0);
     let r = rand(0, total), type = "walker";
     for (const [k, wgt] of table) { if ((r -= wgt) <= 0) { type = k; break; } }
     const hpScale = 1 + (w - 1) * 0.16; // tougher each wave
-    this.zombies.push(new Zombie(p.x, p.y, type, hpScale));
+    const z = new Zombie(p.x, p.y, type, hpScale);
+    // In the woods much of the horde claws its way up out of the earth rather
+    // than shambling in from the treeline.
+    if (this.world.isForest && type !== "bigbird" && chance(0.6)) {
+      z.startEmerge(rand(0.7, 1.1));
+      this._dirtBurst(p.x, p.y + z.r * 0.4, z.r);
+    }
+    this.zombies.push(z);
     if (chance(0.4)) sfx.play("groan");
+  }
+
+  // A spray of upturned earth clods thrown out as something claws up from below.
+  _dirtBurst(x, y, r) {
+    for (let i = 0; i < 10; i++) {
+      const a = rand(0, TAU), s = rand(30, 110);
+      this.particles.push(new Particle(x, y, {
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s - rand(20, 70), life: rand(0.4, 0.9),
+        color: pick(["#3a2a18", "#4a3620", "#2e2214", "#523f26"]), size: randInt(2, 4), drag: 0.86, gravity: 240,
+      }));
+    }
+    this.stains.push({ x, y, r: r + rand(2, 5), life: rand(10, 20), color: "#2a1e12" }); // scar of turned soil
   }
 
   // ------------------------------------------------------- Loop
@@ -1417,6 +1436,15 @@ export class Game {
         ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(-1, -0.4, 2, 0.8);
         if (h % 3 === 0) { ctx.fillStyle = "#7a2a24"; ctx.fillRect(2, 0, 3, 1.2); } // a can/bottle
         ctx.restore();
+      } else if (d.kind === "grass") {
+        // A little tuft of grass blades / fern fronds fanning up from the floor.
+        ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.rot * 0.15);
+        ctx.strokeStyle = d.tone; ctx.lineWidth = 1;
+        for (let i = -2; i <= 2; i++) {
+          const bx = i * 1.5, lean = i * 0.9 + (h % 3 - 1);
+          ctx.beginPath(); ctx.moveTo(bx, 1.5); ctx.quadraticCurveTo(bx + lean * 0.5, -2, bx + lean, -4.5 - (i & 1)); ctx.stroke();
+        }
+        ctx.lineWidth = 1; ctx.restore();
       } else if (d.kind === "garbage") {
         ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.rot);
         ctx.fillStyle = "rgba(0,0,0,0.28)"; ctx.beginPath(); ctx.ellipse(0, 2, 9, 4, 0, 0, TAU); ctx.fill(); // shadow
@@ -1467,7 +1495,7 @@ export class Game {
   // outdoors, scatter into the air when you come near, and can be shot down.
   // They never attack the player.
   _updateBirds(dt) {
-    const outdoors = (this.world.isStreets || this.world.isCity || this.world.isForest) && !this.world.isSewers;
+    const outdoors = (this.world.isStreets || this.world.isCity || this.world.isForest || this.world.isAirport) && !this.world.isSewers;
     // Fresh carcasses to feed on (settled bodies, not still-collapsing corpses).
     const carrion = this.bodies;
     // Occasionally spawn a bird gliding toward a carcass, up to a small flock.
@@ -2308,6 +2336,31 @@ export class Game {
               ctx.fillStyle = "#274020"; for (const [ox, oy, rr] of [[8, 9, 6], [22, 8, 6], [15, 20, 7]]) { ctx.beginPath(); ctx.arc(x + ox, y + oy, rr, 0, TAU); ctx.fill(); }
               ctx.fillStyle = "rgba(0,0,0,0.32)"; ctx.fillRect(x, y + TILE - 3, TILE, 3);
             }
+          } else if (w.isAirport) {
+            const border = cx === 0 || cy === 0 || cx === w.cols - 1 || cy === w.rows - 1;
+            const rid = w.floorTint[w.idx(cx, cy)];
+            if (border) {
+              // Chain-link perimeter fence: posts with a wire-mesh diamond weave.
+              const rp = w.floorPair(cx, cy) || [set.floor, set.floor2];
+              ctx.fillStyle = ((cx + cy) & 1) ? rp[0] : rp[1]; ctx.fillRect(x, y, TILE, TILE);
+              ctx.strokeStyle = "rgba(150,158,168,0.5)"; ctx.lineWidth = 1;
+              ctx.beginPath();
+              for (let o = -TILE; o < TILE; o += 6) { ctx.moveTo(x + o, y); ctx.lineTo(x + o + TILE, y + TILE); ctx.moveTo(x + o + TILE, y); ctx.lineTo(x + o, y + TILE); }
+              ctx.stroke();
+              ctx.fillStyle = "#6a7078"; ctx.fillRect(x + TILE / 2 - 1, y, 2, TILE); // post
+              ctx.lineWidth = 1;
+            } else if (rid === 12) {
+              // Corrugated-steel hangar wall.
+              ctx.fillStyle = "#5a5f66"; ctx.fillRect(x, y, TILE, TILE);
+              ctx.fillStyle = "rgba(0,0,0,0.16)"; for (let sx = 2; sx < TILE; sx += 4) ctx.fillRect(x + sx, y, 1.5, TILE); // ribs
+              if (w.tileAt(cx, cy - 1) !== T.WALL) { ctx.fillStyle = "#767c84"; ctx.fillRect(x, y, TILE, 4); }
+              if (w.tileAt(cx, cy + 1) !== T.WALL) { ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fillRect(x, y + TILE - 4, TILE, 4); }
+            } else {
+              // Terminal concrete wall.
+              const exposed = w.tileAt(cx, cy - 1) !== T.WALL;
+              ctx.fillStyle = exposed ? set.wall : set.accent; ctx.fillRect(x, y, TILE, TILE);
+              if (exposed) { ctx.fillStyle = set.wallTop; ctx.fillRect(x, y, TILE, 7); ctx.fillStyle = "rgba(0,0,0,0.28)"; ctx.fillRect(x, y + TILE - 4, TILE, 4); }
+            }
           } else {
             // Solid, darker body for deep wall; lit cap only where a wall face is exposed to floor above.
             const exposed = w.tileAt(cx, cy - 1) !== T.WALL;
@@ -2395,6 +2448,13 @@ export class Game {
             else if (rid === 9) { ctx.fillStyle = "rgba(230,232,235,0.5)"; for (let sx = 3; sx < TILE - 3; sx += 7) ctx.fillRect(x + sx, y + 3, 3.5, TILE - 6); } // zebra crosswalk / lobby tile
             else if (rid === 4 && !((cx + cy) & 1)) { ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fillRect(x, y + TILE - 1, TILE, 1); ctx.fillRect(x + TILE - 1, y, 1, TILE); } // paver joints
           }
+          if (w.isAirport && t === T.FLOOR) {
+            const rid = w.floorTint[w.idx(cx, cy)];
+            if (rid === 4) { if (cy & 1) { ctx.fillStyle = "rgba(236,238,240,0.85)"; ctx.fillRect(x + TILE / 2 - 2, y, 4, TILE); } } // dashed runway centreline
+            else if (rid === 7) { ctx.fillStyle = "rgba(236,238,240,0.82)"; ctx.fillRect(x + TILE / 2 - 2, y, 4, TILE); }             // solid white stripe (edges / threshold)
+            else if (rid === 6) { ctx.fillStyle = "rgba(224,200,60,0.85)"; ctx.fillRect(x + TILE / 2 - 1.5, y, 3, TILE); }             // yellow taxi lead-line
+            else if (rid === 3 && !((cx + cy) & 1)) { ctx.fillStyle = "rgba(0,0,0,0.1)"; ctx.fillRect(x, y + TILE - 1, TILE, 1); }     // apron slab joints
+          }
           if (w.isForest && t === T.FLOOR) {
             const rid = w.floorTint[w.idx(cx, cy)];
             if (rid === 3) {
@@ -2441,7 +2501,14 @@ export class Game {
             ctx.lineWidth = 1;
           }
           if (t === T.PROP) {
-            if (w.isForest) {
+            if (w.isAirport) {
+              // A windsock on a mast: a striped cone streaming off a pole.
+              const cxp = x + TILE / 2, cyp = y + TILE / 2, sway = Math.sin((this._waterT || 0) * 2 + cx) * 3;
+              ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(cxp, cyp + 10, 5, 2.4, 0, 0, TAU); ctx.fill();
+              ctx.fillStyle = "#8a8f96"; ctx.fillRect(cxp - 1, cyp - 8, 2, 18); // mast
+              const segs = ["#d24a2a", "#e8e2d0", "#d24a2a", "#e8e2d0"];
+              for (let i = 0; i < 4; i++) { ctx.fillStyle = segs[i]; ctx.beginPath(); ctx.moveTo(cxp + 1 + i * 4, cyp - 8); ctx.lineTo(cxp + 1 + i * 4 + 4, cyp - 8 + sway * (i + 1) * 0.2); ctx.lineTo(cxp + 1 + i * 4 + 4, cyp - 3 + sway * (i + 1) * 0.2); ctx.lineTo(cxp + 1 + i * 4, cyp - 3); ctx.closePath(); ctx.fill(); }
+            } else if (w.isForest) {
               // A conifer: ground shadow, a dark trunk and stacked pine tiers.
               const cxp = x + TILE / 2, cyp = y + TILE / 2, hh = ((cx * 92821) ^ (cy * 68917)) >>> 0;
               ctx.fillStyle = "rgba(0,0,0,0.28)"; ctx.beginPath(); ctx.ellipse(cxp, cyp + 10, 8, 3.5, 0, 0, TAU); ctx.fill();
@@ -2765,6 +2832,20 @@ export class Game {
           alpha = clamp(1 - (dist(z.x, z.y, p.x, p.y) - 40) / 120, 0.25, 1);
         }
       }
+      // Clawing up out of the ground: draw only the surfaced portion (the rest
+      // hidden below the soil line) rising up, ringed by a mound of turned earth.
+      if (z.emergeT > 0) {
+        const prog = clamp(1 - z.emergeT / (z.emergeDur || 0.9), 0, 1);
+        const sink = (1 - prog) * (z.r * 2.4 + 12);
+        const groundY = z.y + z.r * 0.5;
+        const halfW = z.r * 3 + 24;
+        ctx.save();
+        ctx.beginPath(); ctx.rect(z.x - halfW, groundY - 240, halfW * 2, 240); ctx.clip();
+        drawZombie(ctx, z.x, z.y + sink, z.angle, z.frame, z.type, z.r, z.hurtFlash > 0, z.parts, z.prone, z.strideAmp, 0, z.vx, z.vy, z.look);
+        ctx.restore();
+        this._drawEmergeMound(ctx, z.x, groundY, prog, z.r);
+        continue;
+      }
       if (alpha < 1) ctx.globalAlpha = alpha;
       drawZombie(ctx, z.x, z.y, z.angle, z.frame, z.type, z.r, z.hurtFlash > 0, z.parts, z.prone, z.strideAmp, z.jumpH, z.vx, z.vy, z.look);
       if (alpha < 1) ctx.globalAlpha = 1;
@@ -2779,6 +2860,20 @@ export class Game {
         }
       }
     }
+  }
+
+  // A low mound of upturned earth at the hole a zombie is clawing out of —
+  // clods heaped around a dark broken-soil centre, settling as it fully surfaces.
+  _drawEmergeMound(ctx, x, y, prog, r) {
+    const spread = r * (1.3 + 0.5 * (1 - prog));
+    ctx.fillStyle = "#1c140c"; ctx.beginPath(); ctx.ellipse(x, y, spread, spread * 0.5, 0, 0, TAU); ctx.fill(); // hole
+    ctx.fillStyle = "#3a2a18";
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * TAU, rr = spread * 0.9;
+      ctx.beginPath(); ctx.ellipse(x + Math.cos(a) * rr, y + Math.sin(a) * rr * 0.5, r * 0.4, r * 0.28, a, 0, TAU); ctx.fill(); // heaped clods
+    }
+    ctx.fillStyle = "#4a3826";
+    for (let i = 0; i < 5; i++) { const a = (i / 5) * TAU + 0.6; ctx.fillRect(x + Math.cos(a) * spread * 0.7 - 1, y + Math.sin(a) * spread * 0.35 - 1, 2, 2); }
   }
 
   _drawPlayer(ctx) {

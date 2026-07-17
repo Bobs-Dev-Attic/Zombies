@@ -1,7 +1,18 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.34.0";
+export const VERSION = "0.35.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.35.0",
+    date: "2026-07-17",
+    title: "Open Ground",
+    changes: [
+      "The Woods are roomier — trees are spaced well apart now (no more maze), the map is bigger, and the forest floor is greened up with bushes, shrubs, ferns and tufts of grass.",
+      "In the Woods, much of the horde now claws its way up out of the ground — bursting from the earth in a shower of dirt right where you're standing — instead of only shambling in from the treeline.",
+      "New environment: Ashford Airport — a big open airfield with a marked runway, a concrete apron lined with parked airliners, ground vehicles, open hangars and a long glass-fronted terminal. Choose it on the menu.",
+      "Coming soon: a cruise ship, a hotel, and a prison.",
+    ],
+  },
   {
     version: "0.34.0",
     date: "2026-07-17",
