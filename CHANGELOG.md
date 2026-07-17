@@ -7,6 +7,12 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.29.0] — 2026-07-17
+### Pew Pew
+- **Laser Pistol** — a new energy weapon (`kind: "laserpistol"`, `beam: true`, new `cells` ammo) that fires an **instant hitscan beam** (`_fireBeam`) rather than a projectile. The beam is raycast to the first wall/solid and **pierces every zombie along the line in one shot**, boring a **cauterised, smoking hole** through each (`_laserBurn`: smoke wisps, sparks, a spot of blood, and a charred mark).
+- **Burn to fire** — each beam hit stacks `laserHeat` on a zombie; once it's taken **3 hits** it **catches fire** (`_igniteZombie`) and burns like any other blaze — so sustained fire on a target sets it ablaze.
+- Rendered as a magenta beam with a white-hot core and end-flare (`_drawBeams`, drawn over the fog); a sleek laser-pistol held sprite and a zappy `laser` pew SFX. Seeded in the world loot pool with **energy-cell** ammo pickups, and included in All Weapons.
+
 ## [0.28.3] — 2026-07-17
 ### Rattle the Bones
 - **Bone variety** — bone gibs now spawn in assorted shapes via a `boneKind`: a **long** femur, a **short** bone, a **curved rib**, or a **little** bone (rendered in `drawGroundLimb`), for messier, more varied gore.

@@ -109,6 +109,7 @@ export class SFX {
       case "pop":    this._noise(0.03, 0.6, t, "highpass", 3200, 0.6, null); this._noise(0.12, 0.5, t, "bandpass", 1700, 0.9, 350); this._tone("triangle", 300, 70, 0.08, 0.3, t); this._tone("sine", 130, 46, 0.13, 0.2, t); break; // sharp crack + punchy body + low thump
       case "boom":   this._noise(0.26, 0.6, t, "lowpass", 1300, 1, 130);   this._tone("sine", 120, 40, 0.22, 0.3, t); break;
       case "crack":  this._noise(0.12, 0.5, t, "highpass", 2400, 1, null); this._tone("square", 400, 120, 0.08, 0.16, t); break;
+      case "laser":  this._tone("sawtooth", 1700, 320, 0.12, 0.18, t); this._tone("square", 900, 200, 0.1, 0.09, t); this._noise(0.06, 0.14, t, "highpass", 3200, 1, null); break; // pew: zappy downward chirp
       case "rattle": this._noise(0.05, 0.32, t, "bandpass", 1800, 1.2, 900); break; // per-round
       case "launch": this._noise(0.4, 0.5, t, "lowpass", 900, 1, 200);     this._tone("sawtooth", 180, 60, 0.35, 0.22, t); break;
       // --- melee ---

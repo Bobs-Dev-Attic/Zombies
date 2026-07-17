@@ -1,7 +1,16 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.28.3";
+export const VERSION = "0.29.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.29.0",
+    date: "2026-07-17",
+    title: "Pew Pew",
+    changes: [
+      "New Laser Pistol — fires an instant searing beam that lances clean through every zombie in a line, boring smoking holes right through them.",
+      "Keep the beam on a zombie and the heat builds until it bursts into flames. Runs on energy cells (found in the world, or via All Weapons).",
+    ],
+  },
   {
     version: "0.28.3",
     date: "2026-07-17",
