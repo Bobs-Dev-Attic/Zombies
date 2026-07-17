@@ -1,7 +1,19 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.26.0";
+export const VERSION = "0.27.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.27.0",
+    date: "2026-07-17",
+    title: "Trial by Fire",
+    changes: [
+      "New Flamethrower — belch a cone of fire that sets zombies, furniture and vehicles ablaze, filling the scene with smoke. Find it in the world, or turn it on via All Weapons.",
+      "Fire is alive: it burns over time, spreads from one thing to the next, and dies down into smouldering ash. Zombies on fire keep coming at you but slowly burn up and collapse into a pile of ash.",
+      "Burning vehicles now cook off and explode.",
+      "Exploding Zombies now blow apart — heads, limbs, guts and blood fly out and ricochet off walls, furniture and everything else.",
+      "The axe and katana now lop a limb off with every single hit, quickly crippling and disabling zombies.",
+    ],
+  },
   {
     version: "0.26.0",
     date: "2026-07-17",

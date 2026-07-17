@@ -1,7 +1,7 @@
 // Weapon catalogue. Ammo is shared by type across weapons that use it.
 // spread is in radians, fireRate in shots/sec, range in world px.
 
-export const AMMO_TYPES = ["shells", "rounds", "rockets"]; // knives/bats need no ammo
+export const AMMO_TYPES = ["shells", "rounds", "rockets", "fuel"]; // knives/bats need no ammo
 
 export const WEAPONS = {
   knife: {
@@ -17,12 +17,12 @@ export const WEAPONS = {
   axe: {
     name: "Axe", tag: "AXE", kind: "melee_axe", melee: true, damage: 46,
     fireRate: 1.7, range: 30, arc: 1.15, knockback: 130, ammoType: null,
-    sever: 0.34, hs: 0.16, doorMul: 3.2, sound: "chop",
+    sever: 0.34, hs: 0.16, doorMul: 3.2, sound: "chop", alwaysSever: true,
   },
   sword: {
     name: "Katana", tag: "SWD", kind: "melee_sword", melee: true, damage: 62,
     fireRate: 2.8, range: 34, arc: 1.5, knockback: 70, ammoType: null,
-    sever: 0.6, hs: 0.2, doorMul: 2.0, sound: "chop",
+    sever: 0.6, hs: 0.2, doorMul: 2.0, sound: "chop", alwaysSever: true,
   },
 
   // --- Pistols: rising stopping power, falling speed & magazine, own reloads.
@@ -87,6 +87,11 @@ export const WEAPONS = {
     spread: 0.01, range: 420, speed: 300, clip: 1, ammoType: "rockets",
     reload: 2.6, knockback: 200, explosive: 42, sever: 0.7, hs: 0, sound: "launch",
   },
+  flamethrower: {
+    name: "Flamethrower", tag: "FLM", kind: "flamethrower", damage: 5, fireRate: 20, pellets: 1,
+    spread: 0.32, range: 122, speed: 0, clip: 120, ammoType: "fuel",
+    reload: 2.6, knockback: 0, sever: 0, hs: 0, sound: "flame", flame: true,
+  },
   grenade: {
     name: "Grenade", tag: "GRN", kind: "grenade", throwable: true, damage: 95, fireRate: 1.1,
     ammoType: "grenades", explosive: 44, fuse: 1.3, throwSpeed: 235, knockback: 220,
@@ -104,14 +109,14 @@ export const WEAPON_ORDER = [
   "pistol22", "pistol", "pistol357", "smg",
   "shotgun", "shotgun_semi", "shotgun_sxs",
   "rifle", "rifle_semi", "rifle_auto",
-  "bazooka", "grenade", "flare",
+  "bazooka", "flamethrower", "grenade", "flare",
 ];
 
 export function newLoadout() {
   return {
     owned: { knife: true, pistol: true },
     clip: { pistol: WEAPONS.pistol.clip },
-    ammo: { shells: 0, rounds: 48, rockets: 0, grenades: 0, flares: 0 },
+    ammo: { shells: 0, rounds: 48, rockets: 0, fuel: 0, grenades: 0, flares: 0 },
     keys: 0,
     armor: 0, armorMax: 0,   // body-armour points (absorbs damage, then breaks)
     helmet: 0, helmetMax: 0, // helmet points

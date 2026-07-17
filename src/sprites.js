@@ -234,6 +234,7 @@ function drawWeaponLocal(ctx, kind) {
       R(-3, 0, 4, 3, "#141414"); R(0, 0, 11, 2.4, "#2a2f2a"); R(2, 2.6, 3.6, 4, "#111"); R(1, -1.7, 5, 1.3, "#333"); R(10, 0, 3, 1.6, "#0d0d0d"); break;
     case "smg": R(1, 2, 3, 3, "#1a1a1f"); R(0, 0, 9, 3, "#2a2a2f"); break;
     case "bazooka": R(-3, 0, 3, 3, "#2a331d"); R(-2, 0, 18, 5, "#3d4a2a"); break;
+    case "flamethrower": R(-4, 1, 4, 5, "#7a2a1a"); R(-3.5, 1, 1.5, 5, "#a03a24"); R(-1, 0, 10, 2.4, "#3a3a3e"); R(9, 0, 3, 3.4, "#26262a"); ctx.fillStyle = "#1a1a1e"; ctx.fillRect(11, -1, 2, 2); break; // fuel tank + nozzle
     default: R(0, 0, 6, 3, "#2c2f33");
   }
 }

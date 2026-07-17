@@ -64,6 +64,7 @@ export class SFX {
     const t = this.ctx.currentTime;
     // Throttle ambient/voice sounds so overlapping enemies don't blare.
     if ((name === "groan" || name === "hiss" || name === "caw" || name === "screech") && this._last[name] && t - this._last[name] < 0.2) return;
+    if (name === "flame" && this._last[name] && t - this._last[name] < 0.09) return;
     this._last[name] = t;
     switch (name) {
       // --- gunshots (weapon.sound strings) ---
@@ -80,6 +81,7 @@ export class SFX {
       // --- world / feedback ---
       case "explode": this._noise(0.6, 0.8, t, "lowpass", 1600, 1, 60); this._tone("sine", 90, 30, 0.5, 0.4, t); break;
       case "gib":    this._noise(0.32, 0.7, t, "lowpass", 900, 1, 120); this._tone("sine", 70, 26, 0.4, 0.34, t); this._noise(0.14, 0.4, t + 0.02, "bandpass", 500, 0.7, 180); break; // wet tearing burst
+      case "flame":  this._noise(0.14, 0.22, t, "lowpass", 1400, 0.7, 700); this._noise(0.1, 0.12, t, "highpass", 2600, 0.8, null); break; // roaring jet of fire
       case "hurt":   this._tone("sawtooth", 300, 110, 0.18, 0.28, t); this._noise(0.1, 0.14, t, "lowpass", 800, 1, null); break;
       case "pickup": this._tone("square", 600, 1000, 0.12, 0.22, t); break;
       case "heal":   this._tone("sine", 520, 900, 0.2, 0.22, t); break;
