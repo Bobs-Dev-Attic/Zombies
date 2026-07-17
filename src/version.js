@@ -1,7 +1,16 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.22.1";
+export const VERSION = "0.23.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.23.0",
+    date: "2026-07-17",
+    title: "From the Hip",
+    changes: [
+      "The shotgun is now fired from the hip — the stock is tucked at your waist and the barrel angles across to your aim, so from the top-down view the gun swings out to your left or right as you turn.",
+      "Firing it kicks the gun back, and the pump-action shotgun visibly racks its fore-end after each shot, spitting a spent red shell out the side.",
+    ],
+  },
   {
     version: "0.22.1",
     date: "2026-07-16",

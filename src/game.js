@@ -1238,14 +1238,17 @@ export class Game {
   }
 
   _ejectCasing(p) {
-    // Brass tumbles out of the ejection port (to the player's right), arcs and lands.
-    const a = p.angle + Math.PI / 2 + rand(-0.25, 0.25);
-    const s = rand(80, 130);
-    const bx = p.x + Math.cos(p.angle) * 6, by = p.y + Math.sin(p.angle) * 6;
+    // Spent case flips out of the ejection port (to the player's right), arcs
+    // and lands. Shotguns kick out a fat red hull instead of a brass casing.
+    const k = p.weapon.kind;
+    const shell = k === "shotgun" || k === "shotgun_semi" || k === "shotgun_sxs";
+    const a = p.angle + Math.PI / 2 + rand(-0.3, 0.3);
+    const s = rand(shell ? 60 : 80, shell ? 120 : 130);
+    const bx = p.x + Math.cos(p.angle) * 5 + Math.cos(a) * 3, by = p.y + Math.sin(p.angle) * 5 + Math.sin(a) * 3;
     this.particles.push(new Particle(bx, by, {
-      vx: Math.cos(a) * s, vy: Math.sin(a) * s - 40, life: 0.7,
-      color: "#e0b83a", size: 3, drag: 0.9, gravity: 260, kind: "casing",
-      spin: rand(-24, 24), angle: p.angle,
+      vx: Math.cos(a) * s, vy: Math.sin(a) * s - (shell ? 50 : 40), life: shell ? 0.95 : 0.7,
+      color: shell ? "#b3352b" : "#e0b83a", size: shell ? 4 : 3, drag: 0.9, gravity: 260, kind: "casing",
+      shell, spin: rand(-24, 24), angle: p.angle,
     }));
   }
 
@@ -2055,7 +2058,7 @@ export class Game {
     const action = {
       recoil: p.recoil, swingT: p.swingT, swingDur: p.swingDur, melee: p.weapon.melee,
       variant: p.meleeVariant, moving: p.moving, run: p.running, vx: p.vx, vy: p.vy,
-      stamina: p.stamina / p.maxStamina, idleT: p.idleT,
+      stamina: p.stamina / p.maxStamina, idleT: p.idleT, pump: p.pumpT,
       helmet: (p.loadout.helmet || 0) > 0, armor: (p.loadout.armor || 0) > 0,
     };
     drawPlayer(ctx, p.x, p.y, p.angle, p.walkFrame, p.hurtFlash > 0, p.weapon.kind, PLAYER_PAL, action);
@@ -2103,14 +2106,21 @@ export class Game {
     for (const p of this.particles) {
       ctx.globalAlpha = p.settled ? clamp(p.life / 6, 0, 0.9) : clamp(p.life / p.maxLife, 0, 1);
       if (p.kind === "casing") {
-        // Tumbling brass shell.
+        // Tumbling spent case: a fat red shotgun hull, or a brass pistol/rifle casing.
         ctx.save();
         ctx.translate(p.x, p.y);
         ctx.rotate(p.angle);
-        ctx.fillStyle = "#e0b83a";
-        ctx.fillRect(-2, -1, 4, 2);
-        ctx.fillStyle = "#8a6a1a";
-        ctx.fillRect(-2, -1, 1.2, 2);
+        if (p.shell) {
+          ctx.fillStyle = p.color || "#b3352b";
+          ctx.fillRect(-3, -1.5, 6, 3);
+          ctx.fillStyle = "#c9a24a"; // brass base
+          ctx.fillRect(-3, -1.5, 2.2, 3);
+        } else {
+          ctx.fillStyle = "#e0b83a";
+          ctx.fillRect(-2, -1, 4, 2);
+          ctx.fillStyle = "#8a6a1a";
+          ctx.fillRect(-2, -1, 1.2, 2);
+        }
         ctx.restore();
         continue;
       }

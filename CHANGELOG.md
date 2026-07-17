@@ -7,6 +7,11 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.23.0] — 2026-07-17
+### From the Hip
+- **Hip-fired shotgun** — the shotgun family is now held at the **waist** instead of raised centre-line: the stock is tucked at the player's right hip and the barrel angles across to the aim line, so from the top-down view the gun visibly **swings out to the left or right** as you turn. Rendered by a dedicated `drawShotgunLocal` with per-variant bodies (pump barrel + mag tube, semi-auto, side-by-side twin barrels) and both hands posed on the grip and fore-end.
+- **Recoil + pump + shell eject** — firing drives the whole gun **back on recoil** with a slight muzzle rise; the **pump-action** shotgun's fore-end **racks back and returns** after each shot (new `pumpT` timer on the player), and a **fat red shotgun hull** is flipped out of the ejection port and tumbles to the ground (shotguns now eject a red shell instead of a brass casing).
+
 ## [0.22.1] — 2026-07-16
 ### Sharper Shot
 - **Reworked the pistol shot sound** (the shared `pop` used by the .22 and 9mm) into a punchier, crisper report — an instant high-frequency snap transient over a band-swept body plus a low triangle/sine thump for weight, replacing the old thin bandpass pop. Still short (~44 ms) so rapid fire stays tight.
