@@ -57,7 +57,8 @@ export class Game {
     this.floorCooldown = 0;
     this._onTransit = false;
     this.world = new World(settingIndex, 0);
-    this.player = new Player(this.world.spawnPoint.x, this.world.spawnPoint.y, newLoadout());
+    this.player = new Player(this.world.spawnPoint.x, this.world.spawnPoint.y, this._buildLoadout());
+    this._applyCheats(this.player);
     this.zombies = [];
     this.projectiles = [];
     this.particles = [];
@@ -94,6 +95,28 @@ export class Game {
     requestAnimationFrame(this._loop);
   }
 
+  // ------------------------------------------------------- Cheats / mutators
+  // Build the starting loadout, honouring the "all weapons" / "swords" mutators.
+  _buildLoadout() {
+    const lo = newLoadout();
+    const c = this.cheats || {};
+    if (c.allWeapons) {
+      for (const id of WEAPON_ORDER) { lo.owned[id] = true; if (WEAPONS[id].clip) lo.clip[id] = WEAPONS[id].clip; }
+      lo.ammo = { shells: 999, rounds: 999, rockets: 99, grenades: 20, flares: 20 };
+      lo.current = "rifle_auto";
+    }
+    if (c.swords) lo.owned.sword = true;
+    if (c.unlimitedAmmo) lo.ammo = { shells: 999, rounds: 999, rockets: 99, grenades: 99, flares: 99 };
+    return lo;
+  }
+
+  // Apply the per-player mutators (half damage, unlimited ammo) to a Player.
+  _applyCheats(player) {
+    const c = this.cheats || {};
+    player.damageTakenMul = c.halfDamage ? 0.5 : 1;
+    player.unlimitedAmmo = !!c.unlimitedAmmo;
+  }
+
   advanceSetting() {
     const next = (this.settingIndex + 1) % SETTINGS.length;
     // Carry loadout & score forward into the next setting.
@@ -108,6 +131,7 @@ export class Game {
     this.world = new World(next, 0);
     const hp = this.player.health, sta = this.player.stamina;
     this.player = new Player(this.world.spawnPoint.x, this.world.spawnPoint.y, loadout);
+    this._applyCheats(this.player);
     this.player.health = hp; this.player.stamina = sta;
     this.player.kills = kills;
     this.zombies = []; this.projectiles = []; this.particles = []; this.pickups = []; this.stains = []; this.corpses = [];
@@ -569,15 +593,17 @@ export class Game {
     if (w.melee) { this._meleeSwing(w, variant); return; }
     if (w.throwable) { this._throw(w); return; }
 
-    p.loadout.clip[p.loadout.current]--;
+    if (!p.unlimitedAmmo) p.loadout.clip[p.loadout.current]--;
+    const laser = !!(this.cheats && this.cheats.lasers) && !w.explosive;
     const pellets = w.pellets || 1;
     for (let i = 0; i < pellets; i++) {
       const a = p.angle + rand(-w.spread, w.spread);
       const proj = new Projectile(p.x + Math.cos(p.angle) * 12, p.y + Math.sin(p.angle) * 12, a, {
-        speed: w.speed, damage: w.damage, range: w.range, knockback: w.knockback,
-        pierce: w.pierce || 0, explosive: w.explosive || 0, kind: w.explosive ? "rocket" : "bullet",
+        speed: laser ? Math.max(w.speed, 900) : w.speed, damage: w.damage, range: laser ? Math.max(w.range, 420) : w.range, knockback: w.knockback,
+        pierce: laser ? 99 : (w.pierce || 0), explosive: w.explosive || 0, kind: w.explosive ? "rocket" : "bullet",
         sever: w.sever || 0, hs: w.hs || 0, r: w.explosive ? 3 : 1.6,
       });
+      if (laser) proj.laser = true;
       this.projectiles.push(proj);
     }
     // Feedback: muzzle smoke, casing, shake.
@@ -752,7 +778,7 @@ export class Game {
   // ------------------------------------------------------- Throwables
   _throw(w) {
     const p = this.player;
-    p.loadout.ammo[w.ammoType] = (p.loadout.ammo[w.ammoType] || 0) - 1;
+    if (!p.unlimitedAmmo) p.loadout.ammo[w.ammoType] = (p.loadout.ammo[w.ammoType] || 0) - 1;
     this.thrown.push(new Thrown(p.x + Math.cos(p.angle) * 10, p.y + Math.sin(p.angle) * 10, p.angle, {
       kind: w.kind, speed: w.throwSpeed, fuse: w.fuse || 2.5,
       explosive: w.explosive || 0, damage: w.damage || 0, knockback: w.knockback || 0, sever: w.sever || 0,
@@ -1316,12 +1342,42 @@ export class Game {
     this.shake += 1;
   }
 
+  // Cheat "exploding zombies": a small fireball on death that splashes damage
+  // into the surrounding horde (which can chain-detonate), lightly scorches the
+  // ground, and nudges the player if they're hugging the blast.
+  _zombieBurst(z) {
+    z._burst = true;
+    const R = 58;
+    this.shockwaves.push({ x: z.x, y: z.y, r: 6, max: R + 8, life: 0.35 });
+    for (let i = 0; i < 18; i++) {
+      const a = rand(0, TAU), s = rand(40, 180);
+      this.particles.push(new Particle(z.x, z.y, { vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.2, 0.6), color: pick(["#ffce54", "#ff7043", "#ffffff", "#a01818", "#6a8a2a"]), size: randInt(2, 4), drag: 0.86 }));
+    }
+    this.scorches.push({ x: z.x, y: z.y, r: 15, smolder: rand(2, 4), seed: (Math.random() * 1e9) | 0 });
+    if (this.scorches.length > 40) this.scorches.shift();
+    for (const o of this.zombies) {
+      if (o === z || o.dead) continue;
+      const d = dist(z.x, z.y, o.x, o.y);
+      if (d < R + o.r) {
+        const a = angleTo(z.x, z.y, o.x, o.y), fall = clamp(1 - d / R, 0.25, 1);
+        this._damageZombie(o, 85 * fall, a, 240 * fall, 0.4); // may chain-detonate
+      }
+    }
+    const pd = dist(z.x, z.y, this.player.x, this.player.y);
+    if (pd < R * 0.7) this.player.hurt(10 * clamp(1 - pd / (R * 0.7), 0, 1));
+    this.shake += 4;
+    const now = this._waterT || 0;
+    if (now - (this._lastBurstSfx || -1) > 0.05) { sfx.play("explode"); this._lastBurstSfx = now; }
+  }
+
   _killZombie(z, angle, headshot = false) {
     this.score += z.def.score + (headshot ? 15 : 0);
     this.player.kills++;
     // Gore burst (plus brains + a HEADSHOT banner on a headshot).
     this._gore(z.x, z.y, angle, z.def.gore);
     if (headshot) this._brains(z.x, z.y, angle);
+    // Cheat: the dead detonate, splashing damage into the rest of the horde.
+    if (this.cheats && this.cheats.explodingZombies && !z._burst) this._zombieBurst(z);
     // The body falls down: hand it to the corpse list for a collapse animation.
     this.corpses.push({
       x: z.x, y: z.y, angle: z.angle, type: z.type, r: z.r,
@@ -2305,6 +2361,17 @@ export class Game {
         ctx.fillStyle = "#ffb347"; ctx.fillRect(Math.round(pr.x - 2), Math.round(pr.y - 2), 4, 4);
         ctx.fillStyle = "rgba(255,120,40,0.5)";
         ctx.fillRect(Math.round(pr.px - 1), Math.round(pr.py - 1), 2, 2);
+        continue;
+      }
+      if (pr.laser) {
+        // Neon energy bolt: a long fading beam behind a bright core and a hot tip.
+        const dx = pr.x - pr.px, dy = pr.y - pr.py, m = Math.hypot(dx, dy) || 1;
+        const tx = pr.x - (dx / m) * 16, ty = pr.y - (dy / m) * 16; // extend the trail
+        ctx.strokeStyle = "rgba(90,230,120,0.5)"; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(pr.x, pr.y); ctx.stroke();
+        ctx.strokeStyle = "#eafff0"; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(pr.x, pr.y); ctx.stroke();
+        ctx.fillStyle = "#b6ffcf"; ctx.beginPath(); ctx.arc(pr.x, pr.y, 2.2, 0, TAU); ctx.fill();
         continue;
       }
       // Bullet tracer — a soft glow, a bright core streak, and a hot head dot

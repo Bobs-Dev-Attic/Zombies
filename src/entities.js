@@ -37,6 +37,8 @@ export class Player {
     this.lungeT = 0;             // forward-dash timer for the two-handed lunge
     this.pumpT = 0;              // pump-action rack animation (pump shotgun)
     this.bloodyFeet = 0;         // px-budget of bloody footprints left to track
+    this.damageTakenMul = 1;     // cheat: <1 makes you take less damage
+    this.unlimitedAmmo = false;  // cheat: guns/throwables never run dry
   }
 
   triggerRecoil(w, variant) {
@@ -145,7 +147,7 @@ export class Player {
 
   hurt(amount) {
     if (this.invuln > 0) return;
-    let dmg = amount;
+    let dmg = amount * this.damageTakenMul;
     const l = this.loadout;
     // A helmet soaks a slice of every blow (head protection) until it shatters.
     if (l && l.helmet > 0 && dmg > 0) {
@@ -170,6 +172,7 @@ export class Player {
     if (this.cooldown > 0 || this.reloading > 0) return false;
     const w = this.weapon;
     if (w.melee) return true;
+    if (this.unlimitedAmmo) return true;
     if (w.throwable) return (this.loadout.ammo[w.ammoType] || 0) > 0;
     const clip = this.loadout.clip[this.loadout.current] ?? 0;
     return clip > 0;

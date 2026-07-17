@@ -1,7 +1,21 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.25.1";
+export const VERSION = "0.26.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.26.0",
+    date: "2026-07-17",
+    title: "Fun Options",
+    changes: [
+      "New Fun Options on the start menu — tap the toggles before you hit START to mix in cheats/mutators (your picks are remembered).",
+      "All Weapons — start holding the entire arsenal, loaded.",
+      "Unlimited Ammo — guns and throwables never run dry.",
+      "½ Damage — you only take half the damage you normally would.",
+      "Exploding Zombies — every zombie you kill detonates, splashing damage into the horde and setting off chain reactions.",
+      "Laser Guns — your bullets become bright green energy bolts that punch straight through everything.",
+      "Swords — adds a katana: a fast, long-reaching blade with a wide, brutal swing (also in All Weapons).",
+    ],
+  },
   {
     version: "0.25.1",
     date: "2026-07-17",

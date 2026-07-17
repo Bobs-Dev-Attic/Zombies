@@ -127,6 +127,22 @@ for (const btn of document.querySelectorAll(".close-overlay")) {
   btn.addEventListener("click", () => { sfx.play("ui"); hideOverlays(); if (btn.dataset.target !== undefined) $("menu").classList.remove("hidden"); });
 }
 
+// ---------------- Fun options (cheats / mutators) ----------------
+// Toggle chips on the menu; the chosen set is read by the game on START and
+// remembered between sessions.
+game.cheats = {};
+try { Object.assign(game.cheats, JSON.parse(localStorage.getItem("z_cheats") || "{}")); } catch (_) {}
+for (const btn of document.querySelectorAll(".cheat")) {
+  const key = btn.dataset.cheat;
+  btn.classList.toggle("on", !!game.cheats[key]);
+  btn.addEventListener("click", () => {
+    game.cheats[key] = !game.cheats[key];
+    btn.classList.toggle("on", !!game.cheats[key]);
+    localStorage.setItem("z_cheats", JSON.stringify(game.cheats));
+    sfx.play("ui");
+  });
+}
+
 // ---------------- Changelog rendering ----------------
 function renderChangelog() {
   const body = $("changelog-body");

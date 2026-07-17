@@ -217,6 +217,7 @@ function drawWeaponLocal(ctx, kind) {
     case "melee_knife": R(-1, 0, 2, 2, "#5a4632"); R(1, 0, 6, 2, "#cfd6e0"); break;
     case "melee_bat": R(-3, 0, 3, 2, "#5a4632"); R(0, 0, 11, 3, "#9c6b3a"); break;
     case "melee_axe": R(-2, 0, 3, 2, "#6a4a2c"); R(1, 0, 8, 2, "#7a5636"); ctx.fillStyle = "#c0c8d0"; ctx.beginPath(); ctx.moveTo(8, -1); ctx.lineTo(12, -4); ctx.lineTo(12, 3); ctx.lineTo(8, 1); ctx.closePath(); ctx.fill(); break;
+    case "melee_sword": R(-3, 0, 3, 2, "#2a1c12"); ctx.fillStyle = "#c8a040"; ctx.fillRect(-0.5, -2.5, 2, 5); R(1, 0, 15, 1.8, "#dfe6ee"); ctx.fillStyle = "#aeb6c0"; ctx.fillRect(1, 0.3, 15, 0.9); ctx.fillStyle = "#eef3f8"; ctx.fillRect(14.5, -0.9, 2, 1.8); break; // guard + long steel blade
     case "pistol": R(-1, 1.5, 2, 3, "#20242a"); R(0, 0, 6, 3, "#2c2f33"); break;
     case "pistol22": R(-1, 1.2, 2, 2.4, "#20242a"); R(0, 0, 5, 2, "#3a3f45"); break; // slim & short
     case "pistol357": // revolver: wood grip, frame, cylinder bump, longer barrel
