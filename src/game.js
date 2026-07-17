@@ -484,7 +484,7 @@ export class Game {
     else if (w.throwable) ammoStr = "×" + (l.ammo[w.ammoType] || 0);
     else {
       const clip = l.clip[l.current] ?? 0;
-      ammoStr = `${clip} / ${l.ammo[w.ammoType] ?? 0}`;
+      ammoStr = `${clip} / ${l.ammo[w.ammoType] ?? 0}` + (w.unit ? " " + w.unit : "");
     }
     const armMax = l.armorMax || 0, helmMax = l.helmetMax || 0;
     return {
@@ -1571,16 +1571,17 @@ export class Game {
     p.muzzle = 0; // no bullet muzzle-flash for the torch
     const ox = p.x + Math.cos(p.angle) * 12, oy = p.y + Math.sin(p.angle) * 12;
     sfx.play("flame");
-    // Jet of fire particles fanning out along the aim.
-    for (let i = 0; i < 5; i++) {
-      const a = p.angle + rand(-w.spread, w.spread), reach = rand(0.3, 1) * w.range, s = rand(160, 300);
+    // A long jet of fire fanning out along the aim — high velocity so it
+    // streams well downrange before the drag lets it billow up and die.
+    for (let i = 0; i < 7; i++) {
+      const a = p.angle + rand(-w.spread, w.spread), s = rand(300, 520);
       this.particles.push(new Particle(ox, oy, {
-        vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.25, 0.6),
-        color: pick(["#ffd24a", "#ff9030", "#ff5a2a", "#ffce54", "#c0341a"]), size: randInt(3, 6), drag: 0.9, gravity: -20,
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.35, 0.78),
+        color: pick(["#ffd24a", "#ff9030", "#ff5a2a", "#ffce54", "#c0341a"]), size: randInt(3, 6), drag: 0.945, gravity: -22,
       }));
     }
-    if (chance(0.7)) this.particles.push(new Particle(ox + Math.cos(p.angle) * rand(20, 80), oy + Math.sin(p.angle) * rand(20, 80), {
-      vx: rand(-14, 14), vy: rand(-40, -14), life: rand(0.9, 1.8), color: pick(["rgba(40,40,40,0.5)", "rgba(60,58,56,0.45)"]), size: randInt(4, 8), drag: 0.94, gravity: -8,
+    if (chance(0.8)) this.particles.push(new Particle(ox + Math.cos(p.angle) * rand(40, 130), oy + Math.sin(p.angle) * rand(40, 130), {
+      vx: rand(-16, 16), vy: rand(-44, -16), life: rand(1.0, 2.0), color: pick(["rgba(40,40,40,0.5)", "rgba(60,58,56,0.45)"]), size: randInt(4, 9), drag: 0.94, gravity: -8,
     }));
     // Ignite anything caught in the cone.
     const half = w.spread + 0.15;

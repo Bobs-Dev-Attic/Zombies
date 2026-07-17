@@ -1,7 +1,17 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.27.0";
+export const VERSION = "0.27.1";
 
 export const CHANGELOG = [
+  {
+    version: "0.27.1",
+    date: "2026-07-17",
+    title: "Longer Reach",
+    changes: [
+      "The Flamethrower now streams fire much further downrange.",
+      "Its fuel is now measured in liters (shown as L on the ammo counter).",
+      "Gave it a throatier, jet-engine-style roar.",
+    ],
+  },
   {
     version: "0.27.0",
     date: "2026-07-17",
