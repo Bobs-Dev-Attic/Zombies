@@ -235,6 +235,7 @@ function drawWeaponLocal(ctx, kind) {
     case "smg": R(1, 2, 3, 3, "#1a1a1f"); R(0, 0, 9, 3, "#2a2a2f"); break;
     case "bazooka": R(-3, 0, 3, 3, "#2a331d"); R(-2, 0, 18, 5, "#3d4a2a"); break;
     case "flamethrower": R(-4, 1, 4, 5, "#7a2a1a"); R(-3.5, 1, 1.5, 5, "#a03a24"); R(-1, 0, 10, 2.4, "#3a3a3e"); R(9, 0, 3, 3.4, "#26262a"); ctx.fillStyle = "#1a1a1e"; ctx.fillRect(11, -1, 2, 2); break; // fuel tank + nozzle
+    case "mine": ctx.fillStyle = "#3a3d33"; ctx.beginPath(); ctx.arc(3, 0, 3.2, 0, TAU); ctx.fill(); ctx.fillStyle = "#4c5044"; ctx.beginPath(); ctx.arc(3, 0, 2, 0, TAU); ctx.fill(); ctx.fillStyle = "#ff3020"; ctx.fillRect(2.4, -0.6, 1.2, 1.2); break; // a mine held ready to drop
     default: R(0, 0, 6, 3, "#2c2f33");
   }
 }

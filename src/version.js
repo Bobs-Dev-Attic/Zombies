@@ -1,7 +1,16 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.27.3";
+export const VERSION = "0.28.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.28.0",
+    date: "2026-07-17",
+    title: "Minefield",
+    changes: [
+      "New Fun Option — Super Stamina: sprint forever, you never tire.",
+      "Land mines! A new weapon you drop at your feet. It arms after a moment (red light blinking), then when a zombie steps on it, it blows — hurling everything, kicking up debris and shrapnel, and spraying blood, guts and bones everywhere. Find them in the world, or grab them all via All Weapons.",
+    ],
+  },
   {
     version: "0.27.3",
     date: "2026-07-17",

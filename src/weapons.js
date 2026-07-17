@@ -101,6 +101,10 @@ export const WEAPONS = {
     name: "Flare", tag: "FLR", kind: "flare", throwable: true, damage: 0, fireRate: 1.2,
     ammoType: "flares", fuse: 9, throwSpeed: 210, sound: "hiss",
   },
+  mine: {
+    name: "Land Mine", tag: "MINE", kind: "mine", deploy: true, damage: 85, fireRate: 1.4,
+    ammoType: "mines", explosive: 38, knockback: 240, sever: 0.65, sound: "clink",
+  },
 };
 
 // Order used when swapping weapons.
@@ -109,14 +113,14 @@ export const WEAPON_ORDER = [
   "pistol22", "pistol", "pistol357", "smg",
   "shotgun", "shotgun_semi", "shotgun_sxs",
   "rifle", "rifle_semi", "rifle_auto",
-  "bazooka", "flamethrower", "grenade", "flare",
+  "bazooka", "flamethrower", "grenade", "flare", "mine",
 ];
 
 export function newLoadout() {
   return {
     owned: { knife: true, pistol: true },
     clip: { pistol: WEAPONS.pistol.clip },
-    ammo: { shells: 0, rounds: 48, rockets: 0, fuel: 0, grenades: 0, flares: 0 },
+    ammo: { shells: 0, rounds: 48, rockets: 0, fuel: 0, grenades: 0, flares: 0, mines: 0 },
     keys: 0,
     armor: 0, armorMax: 0,   // body-armour points (absorbs damage, then breaks)
     helmet: 0, helmetMax: 0, // helmet points
