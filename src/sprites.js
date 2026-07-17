@@ -595,6 +595,13 @@ export function drawGroundLimb(ctx, x, y, angle, part, color, zHeight) {
     ctx.fillStyle = color || "#9c3a4a";
     for (const [ox, oy] of [[0, 0], [1.4, 0.4], [-1.2, 0.6], [0.4, -1]]) { ctx.beginPath(); ctx.arc(ox, oy, 1.5, 0, TAU); ctx.fill(); }
     ctx.fillStyle = "#7a2030"; ctx.beginPath(); ctx.arc(0.4, 0.2, 0.9, 0, TAU); ctx.fill();
+  } else if (part === "bone") {
+    // A bloody bone shard: an ivory shaft with knobby ends.
+    ctx.fillStyle = color || "#e8e2d0";
+    ctx.fillRect(-3, -0.9, 6, 1.8);
+    for (const ex of [-3, 3]) { ctx.beginPath(); ctx.arc(ex, -0.7, 1.1, 0, TAU); ctx.arc(ex, 0.7, 1.1, 0, TAU); ctx.fill(); }
+    ctx.fillStyle = "rgba(0,0,0,0.14)"; ctx.fillRect(-3, 0.4, 6, 0.6); // shading groove
+    ctx.fillStyle = "rgba(120,20,20,0.5)"; ctx.beginPath(); ctx.arc(3, 0, 1.1, 0, TAU); ctx.fill(); // bloody snapped end
   } else {
     ctx.fillStyle = color || "#72a83a";
     ctx.fillRect(-len / 2, -1.6, len, 3.2);

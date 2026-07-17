@@ -7,6 +7,10 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.27.2] — 2026-07-17
+### Bare Bones
+- **Bones** are now among the body parts a zombie can shed — a new `bone` gib (ivory shaft with knobby ends, rendered in `drawGroundLimb`). Severing a limb (`_severFX`) has a ~60% chance to also fling a splintered bone, and blowing a zombie apart (`_flingZombieGibs`) scatters 3–5 shattered bones among the guts. Bones ricochet off walls/furniture like the other explosion gibs and settle as ground decals.
+
 ## [0.27.1] — 2026-07-17
 ### Longer Reach
 - **Flamethrower reach** — the fire stream now travels much further downrange (ignition range 122 → 200 px; flame particles fire faster, live longer and carry with less drag for a long jet).
