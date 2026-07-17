@@ -1,7 +1,18 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.31.0";
+export const VERSION = "0.32.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.32.0",
+    date: "2026-07-17",
+    title: "Downtown",
+    changes: [
+      "Choose your start — the menu now has a “Choose your start” picker to begin in The House, The Streets, or the new Downtown. Your pick is remembered.",
+      "Fun Options is now a tidy flyout — tap it to drop a checklist of toggles instead of a row of chips.",
+      "New environment: Downtown — a dense city grid of roads, sidewalks and zebra crosswalks between glass-fronted office towers (duck into their lobbies for cover and loot), open parking garages with concrete pillars and parked cars to fight among, and paved plazas with planters, benches and fountains. Stray dog packs and carrion birds roam the streets.",
+      "More new environments — a forest/woodland with wildlife — are on the way.",
+    ],
+  },
   {
     version: "0.31.0",
     date: "2026-07-17",

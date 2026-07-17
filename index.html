@@ -73,16 +73,27 @@
         <p class="subtitle">Escape the Horde</p>
         <p class="version">v<span id="menu-version">0.0.0</span></p>
         <button id="start-btn" class="menu-btn primary">START</button>
-        <p class="cheats-label">⚡ Fun Options</p>
-        <div id="cheats" class="cheats">
-          <button class="cheat" data-cheat="allWeapons">🔫 All Weapons</button>
-          <button class="cheat" data-cheat="unlimitedAmmo">♾️ Unlimited Ammo</button>
-          <button class="cheat" data-cheat="halfDamage">🛡️ ½ Damage</button>
-          <button class="cheat" data-cheat="explodingZombies">💥 Exploding Zombies</button>
-          <button class="cheat" data-cheat="lasers">🟢 Laser Guns</button>
-          <button class="cheat" data-cheat="swords">⚔️ Swords</button>
-          <button class="cheat" data-cheat="superStamina">🏃 Super Stamina</button>
+
+        <p class="pick-label">Choose your start</p>
+        <div id="env-pick" class="env-pick">
+          <button class="env" data-env="house">🏠 The House</button>
+          <button class="env" data-env="streets">🏙️ The Streets</button>
+          <button class="env" data-env="city">🌆 Downtown</button>
         </div>
+
+        <div class="funopts">
+          <button id="funopts-toggle" class="menu-btn ghost funopts-btn" aria-expanded="false" aria-controls="funopts-panel">⚡ Fun Options <span class="caret">▾</span></button>
+          <div id="funopts-panel" class="funopts-panel hidden" role="menu">
+            <label class="funopt"><input type="checkbox" class="cheat" data-cheat="allWeapons" /><span>🔫 All Weapons</span></label>
+            <label class="funopt"><input type="checkbox" class="cheat" data-cheat="unlimitedAmmo" /><span>♾️ Unlimited Ammo</span></label>
+            <label class="funopt"><input type="checkbox" class="cheat" data-cheat="halfDamage" /><span>🛡️ ½ Damage</span></label>
+            <label class="funopt"><input type="checkbox" class="cheat" data-cheat="explodingZombies" /><span>💥 Exploding Zombies</span></label>
+            <label class="funopt"><input type="checkbox" class="cheat" data-cheat="lasers" /><span>🟢 Laser Guns</span></label>
+            <label class="funopt"><input type="checkbox" class="cheat" data-cheat="swords" /><span>⚔️ Swords</span></label>
+            <label class="funopt"><input type="checkbox" class="cheat" data-cheat="superStamina" /><span>🏃 Super Stamina</span></label>
+          </div>
+        </div>
+
         <div class="menu-links">
           <button id="how-btn" class="menu-btn ghost">How to Play</button>
           <button id="changelog-btn" class="menu-btn ghost">Changelog</button>

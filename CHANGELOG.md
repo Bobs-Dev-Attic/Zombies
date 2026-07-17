@@ -7,6 +7,16 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.32.0] — 2026-07-17
+### Downtown
+- **Start-environment picker** — the menu now has a “Choose your start” row (`#env-pick`) letting the player begin in **The House**, **The Streets** or the new **Downtown**; `beginGame` resolves the chosen `SETTINGS` id to an index and passes it to `game.start()`, and the pick is remembered in `localStorage` (`z_startEnv`).
+- **Fun Options flyout** — the row of cheat chips is now a flyout menu: a toggle button (`#funopts-toggle`) drops an opaque `#funopts-panel` of checkbox rows (`.funopt input.cheat`), which close on an outside tap. Same `game.cheats` + `localStorage` wiring, now via checkbox `change` events.
+- **New environment — Downtown** (`id: "city"`, `isCity`, `_city()` generator): a dense downtown grid of asphalt **roads** with painted centre-lines, concrete **sidewalks** and zebra **crosswalks**, laid out around a block layout of:
+  - **Office towers** (`_cityOffice`) — solid footprints with **glass-facade windows** and a ground-floor **lobby** (carved floor + a `_doorway` off the sidewalk, front desk & a shelf of loot) to duck into.
+  - **Parking garages** (`_cityGarage`) — open concrete decks ringed by a parapet with **drive-in gaps** onto the roads, a grid of concrete **support pillars** (`T.PROP`, rendered as columns) and **parked cars** to fight among.
+  - **Plazas** (`_cityPlaza`) — paved open squares with planters, benches and a central fountain; the player spawns in the central one.
+- New `CITY_TERRAIN` palette + `isCity` handling in `floorPair`, `_decorate` (dusk-lit, littered), the road-line / stall / crosswalk / paver floor rendering, and the concrete-pillar `T.PROP` renderer. Stray **dog** packs, **carrion birds** and **flares** now appear downtown like on the streets.
+
 ## [0.31.0] — 2026-07-17
 ### Bolt & Blaze
 - **Bolt-action rifle handling** — the Hunting Rifle (`kind: "rifle"`) now has a dedicated shouldered pose in `drawPlayer` (`drawHuntingRifleLocal`): the butt is pulled into the shoulder, the scoped barrel runs straight down the sightline, and it rides back on recoil. After each shot a new `boltT` timer (set in `triggerRecoil`, decays deliberately) drives a bolt-cycle animation — the trigger hand comes off the grip to lift, draw the bolt to the rear and shove it home, and the spent case is ejected mid-cycle (`_boltEject` delay) rather than instantly.
