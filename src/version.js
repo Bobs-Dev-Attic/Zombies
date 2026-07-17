@@ -1,7 +1,15 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.22.0";
+export const VERSION = "0.22.1";
 
 export const CHANGELOG = [
+  {
+    version: "0.22.1",
+    date: "2026-07-16",
+    title: "Sharper Shot",
+    changes: [
+      "Reworked the pistol shot sound (the .22 and 9mm) into a punchier, crisper crack — a sharp snap with a low thump behind it, instead of the old thin pop.",
+    ],
+  },
   {
     version: "0.22.0",
     date: "2026-07-16",
