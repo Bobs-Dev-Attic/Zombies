@@ -7,6 +7,16 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.26.0] — 2026-07-17
+### Fun Options
+- **Fun Options menu** — a row of toggle chips on the start screen (`#cheats`, wired in `main.js`, read by the game on START as `game.cheats`) lets you mix in cheats/mutators before a run; the chosen set is remembered in localStorage.
+- **All Weapons** — the starting loadout (`_buildLoadout`) owns the entire arsenal, magazines loaded and ammo stocked, starting on the assault rifle.
+- **Unlimited Ammo** — `player.unlimitedAmmo` skips all clip/ammo decrements and keeps `canFire` true, so guns and throwables never run dry (no reloads needed).
+- **½ Damage** — `player.damageTakenMul = 0.5`, applied in `Player.hurt`, halves all incoming damage.
+- **Exploding Zombies** — every kill triggers `_zombieBurst`: a fireball + shockwave that splashes damage (85 with falloff) into nearby zombies — **chain-detonating** the horde — scorches the ground, and nudges the player if they're too close.
+- **Laser Guns** — gun shots become bright green energy bolts (`proj.laser`): faster, longer-range, and **pierce through everything** (rendered as a neon beam in `_drawProjectiles`).
+- **Swords** — new **Katana** melee weapon (`kind: "melee_sword"`, damage 62, wide 1.5-rad arc, high sever) with its own long-blade sprite; granted by the Swords toggle and included in All Weapons.
+
 ## [0.25.1] — 2026-07-17
 ### Catch Your Breath
 - **Slower, more realistic breathing** — the player's idle chest-heave cadence was roughly halved (breathing `rate` from `3.0 + tired*4.6` to `1.4 + tired*2.4`), so at rest you breathe at a natural ~13 breaths/min and only quicken toward heavy heaving (~36/min) when winded, instead of panting fast all the time. Heave depth is unchanged.

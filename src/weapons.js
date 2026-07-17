@@ -19,6 +19,11 @@ export const WEAPONS = {
     fireRate: 1.7, range: 30, arc: 1.15, knockback: 130, ammoType: null,
     sever: 0.34, hs: 0.16, doorMul: 3.2, sound: "chop",
   },
+  sword: {
+    name: "Katana", tag: "SWD", kind: "melee_sword", melee: true, damage: 62,
+    fireRate: 2.8, range: 34, arc: 1.5, knockback: 70, ammoType: null,
+    sever: 0.6, hs: 0.2, doorMul: 2.0, sound: "chop",
+  },
 
   // --- Pistols: rising stopping power, falling speed & magazine, own reloads.
   pistol22: {
@@ -95,7 +100,7 @@ export const WEAPONS = {
 
 // Order used when swapping weapons.
 export const WEAPON_ORDER = [
-  "knife", "bat", "axe",
+  "knife", "bat", "axe", "sword",
   "pistol22", "pistol", "pistol357", "smg",
   "shotgun", "shotgun_semi", "shotgun_sxs",
   "rifle", "rifle_semi", "rifle_auto",
