@@ -1,6 +1,7 @@
 // Entry point: wires the DOM/UI to the Game instance.
 import { Game } from "./game.js";
 import { WEAPONS } from "./weapons.js";
+import { SETTINGS } from "./world.js";
 import { sfx } from "./audio.js";
 import { VERSION, CHANGELOG } from "./version.js";
 
@@ -98,9 +99,11 @@ function hideGameUI() { $("touch-ui").classList.add("hidden"); }
 
 function beginGame() {
   sfx.resume();
+  closeFunOpts();
   hideOverlays();
   showGameUI();
-  game.start(0);
+  const idx = Math.max(0, SETTINGS.findIndex((s) => s.id === startEnv));
+  game.start(idx);
 }
 
 // ---------------- Sound ----------------
@@ -127,21 +130,53 @@ for (const btn of document.querySelectorAll(".close-overlay")) {
   btn.addEventListener("click", () => { sfx.play("ui"); hideOverlays(); if (btn.dataset.target !== undefined) $("menu").classList.remove("hidden"); });
 }
 
+// ---------------- Start-environment picker ----------------
+// The player chooses which setting to begin in; the pick is remembered.
+const ENV_IDS = new Set(SETTINGS.map((s) => s.id));
+let startEnv = localStorage.getItem("z_startEnv") || "house";
+if (!ENV_IDS.has(startEnv)) startEnv = "house";
+function refreshEnvPick() {
+  for (const btn of document.querySelectorAll(".env")) btn.classList.toggle("on", btn.dataset.env === startEnv);
+}
+for (const btn of document.querySelectorAll(".env")) {
+  btn.addEventListener("click", () => {
+    startEnv = btn.dataset.env;
+    localStorage.setItem("z_startEnv", startEnv);
+    refreshEnvPick();
+    sfx.play("ui");
+  });
+}
+refreshEnvPick();
+
 // ---------------- Fun options (cheats / mutators) ----------------
-// Toggle chips on the menu; the chosen set is read by the game on START and
+// A flyout list of checkboxes; the chosen set is read by the game on START and
 // remembered between sessions.
 game.cheats = {};
 try { Object.assign(game.cheats, JSON.parse(localStorage.getItem("z_cheats") || "{}")); } catch (_) {}
-for (const btn of document.querySelectorAll(".cheat")) {
-  const key = btn.dataset.cheat;
-  btn.classList.toggle("on", !!game.cheats[key]);
-  btn.addEventListener("click", () => {
-    game.cheats[key] = !game.cheats[key];
-    btn.classList.toggle("on", !!game.cheats[key]);
+for (const box of document.querySelectorAll(".funopt input.cheat")) {
+  const key = box.dataset.cheat;
+  box.checked = !!game.cheats[key];
+  box.addEventListener("change", () => {
+    game.cheats[key] = box.checked;
     localStorage.setItem("z_cheats", JSON.stringify(game.cheats));
     sfx.play("ui");
   });
 }
+
+// The Fun Options flyout: a toggle button that drops the checkbox panel.
+const funToggle = $("funopts-toggle");
+const funPanel = $("funopts-panel");
+function openFunOpts() { funPanel.classList.remove("hidden"); funToggle.setAttribute("aria-expanded", "true"); }
+function closeFunOpts() { funPanel.classList.add("hidden"); funToggle.setAttribute("aria-expanded", "false"); }
+funToggle.addEventListener("click", (e) => {
+  e.stopPropagation();
+  const open = funToggle.getAttribute("aria-expanded") === "true";
+  if (open) closeFunOpts(); else openFunOpts();
+  sfx.play("ui");
+});
+// Tapping the panel shouldn't close it; tapping anywhere else does.
+funPanel.addEventListener("click", (e) => e.stopPropagation());
+document.addEventListener("click", () => { if (funToggle.getAttribute("aria-expanded") === "true") closeFunOpts(); });
 
 // ---------------- Changelog rendering ----------------
 function renderChangelog() {

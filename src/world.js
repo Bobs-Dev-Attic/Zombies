@@ -10,6 +10,7 @@ export const SETTINGS = [
   { id: "mall", name: "Abandoned Mall", floor: "#3a3540", floor2: "#423c48", wall: "#5a4a60", wallTop: "#6e5a76", accent: "#4a4252" },
   { id: "hospital", name: "St. Mercy Hospital", floor: "#28343a", floor2: "#2e3c43", wall: "#3a5058", wallTop: "#48626c", accent: "#324248" },
   { id: "forest", name: "Blackpine Woods", floor: "#1f2a1c", floor2: "#243021", wall: "#2c3a22", wallTop: "#38492c", accent: "#26331e" },
+  { id: "city", name: "Downtown", floor: "#26282d", floor2: "#2c2f34", wall: "#474b53", wallTop: "#5c616b", accent: "#383c43" },
 ];
 
 // Per-room floor colours (checker pairs), keyed by floorTint value.
@@ -49,6 +50,22 @@ export const STREET_TERRAIN = {
 const MOVABLE = new Set(["table", "chair", "couch", "dresser"]);
 const FURN_MASS = { chair: 0.25, table: 0.35, couch: 0.68, dresser: 0.85 };
 
+// Downtown city terrain colours (checker pairs), keyed by floorTint value.
+// Shares ids 2/3/5/6 with the streets (asphalt, sidewalk, road centre-lines)
+// so the road-line renderer works for both.
+export const CITY_TERRAIN = {
+  0: ["#2a2d24", "#30342a"], // fallback
+  1: ["#2a2d24", "#30342a"], // scrubby lot
+  2: ["#26262b", "#2b2b31"], // road asphalt
+  3: ["#54565a", "#5a5c60"], // sidewalk concrete
+  4: ["#3a3d42", "#40434a"], // plaza pavers
+  5: ["#26262b", "#2b2b31"], // vertical road centre-line
+  6: ["#26262b", "#2b2b31"], // horizontal road centre-line
+  7: ["#3f4247", "#45484e"], // parking-deck concrete
+  8: ["#4a4d52", "#50535a"], // painted parking stall
+  9: ["#5a5c60", "#606268"], // crosswalk / lobby tile
+};
+
 // Sewer tunnel terrain — murky water over concrete.
 export const SEWER_TERRAIN = {
   0: ["#1c2a26", "#213330"], // shallow channel water
@@ -62,10 +79,11 @@ export class World {
     this.settingIndex = settingIndex;
     this.isHouse = this.setting.id === "house";
     this.isStreets = this.setting.id === "streets";
+    this.isCity = this.setting.id === "city";
     this.isSewers = this.isStreets && floorLevel === 1; // sewer maze beneath the streets
     this.floorLevel = floorLevel; // 0 = ground/street, 1 = upstairs/sewers
-    this.cols = this.isHouse ? 40 : this.isStreets ? 48 : randInt(40, 52);
-    this.rows = this.isHouse ? 38 : this.isStreets ? 46 : randInt(40, 52);
+    this.cols = this.isHouse ? 40 : this.isStreets ? 48 : this.isCity ? 54 : randInt(40, 52);
+    this.rows = this.isHouse ? 38 : this.isStreets ? 46 : this.isCity ? 52 : randInt(40, 52);
     this.grid = new Uint8Array(this.cols * this.rows);
     this.explored = new Uint8Array(this.cols * this.rows); // fog-of-war memory
     this.floorTint = new Uint8Array(this.cols * this.rows); // per-tile room colour id
@@ -86,6 +104,7 @@ export class World {
     this.spawnPoint = { x: 0, y: 0 };
     if (this.isHouse) { if (floorLevel === 1) this._houseUpper(); else this._houseGround(); }
     else if (this.isStreets) { if (floorLevel === 1) this._sewers(); else this._streets(); }
+    else if (this.isCity) this._city();
     else this._generate();
     this._decorate();
   }
@@ -100,6 +119,7 @@ export class World {
     let grime, debris, trash, garbage;
     if (this.isSewers) { this.ambient = 0.52; grime = area * 0.05; debris = area * 0.03; trash = area * 0.02; garbage = area * 0.006; }
     else if (this.isHouse) { this.ambient = 0.30; grime = area * 0.035; debris = area * 0.02; trash = area * 0.014; garbage = area * 0.003; }
+    else if (this.isCity) { this.ambient = 0.14; grime = area * 0.03; debris = area * 0.028; trash = area * 0.024; garbage = area * 0.007; } // downtown: littered, dusk-lit
     else { this.ambient = 0.06; grime = area * 0.02; debris = area * 0.02; trash = area * 0.016; garbage = area * 0.004; } // streets: near-daylight
     const push = (kind, extra) => { const p = cellFloor(); if (p) this.decor.push({ x: p.x + R(-12, 12), y: p.y + R(-12, 12), kind, seed: (Math.random() * 1e9) | 0, rot: R(-Math.PI, Math.PI), ...extra }); };
     for (let i = 0; i < grime; i++) push("grime", { r: R(6, 16), tone: pick(["#171a12", "#1c160f", "#141414", "#181c1e"]) });
@@ -118,9 +138,9 @@ export class World {
 
   // Floor checker-pair for a tile, tinted by terrain (house rooms / streets / sewers).
   floorPair(cx, cy) {
-    if (!this.isHouse && !this.isStreets) return null;
+    if (!this.isHouse && !this.isStreets && !this.isCity) return null;
     const id = this.floorTint[this.idx(cx, cy)];
-    const pal = this.isSewers ? SEWER_TERRAIN : this.isHouse ? ROOM_FLOOR : STREET_TERRAIN;
+    const pal = this.isSewers ? SEWER_TERRAIN : this.isHouse ? ROOM_FLOOR : this.isCity ? CITY_TERRAIN : STREET_TERRAIN;
     return pal[id] || pal[0];
   }
 
@@ -491,6 +511,154 @@ export class World {
     putF(x1 - 1, cym, "bench", 12, 5, 40);
     for (const [tx, ty] of [[x0 + 1, y0 + 1], [x1 - 1, y0 + 1], [x0 + 1, y1 - 1], [x1 - 1, y1 - 1]]) if (this.tileAt(tx, ty) === T.FLOOR) this._set(tx, ty, T.PROP);
     this.rooms.push({ name: "park", cx: cxm, cy: cym });
+  }
+
+  // Downtown: a dense city grid of roads & sidewalks between office towers,
+  // open parking garages and paved plazas. You fight in the streets, ducking
+  // into lobbies and garages for cover.
+  _city() {
+    const cols = this.cols, rows = this.rows;
+    this.grid.fill(T.FLOOR);
+    this.floorTint.fill(1); // scrubby lot by default
+    this.furniture = [];
+    this.rooms = [];
+    // Concrete border wall around downtown.
+    for (let x = 0; x < cols; x++) { this._set(x, 0, T.WALL); this._set(x, rows - 1, T.WALL); }
+    for (let y = 0; y < rows; y++) { this._set(0, y, T.WALL); this._set(cols - 1, y, T.WALL); }
+
+    const vC = [13, 27, 41];  // vertical-road centre columns
+    const hC = [13, 26, 39];  // horizontal-road centre rows
+    const nearV = (x) => vC.some((c) => Math.abs(x - c) <= 1);
+    const nearH = (y) => hC.some((c) => Math.abs(y - c) <= 1);
+
+    // Roads (asphalt + centre lines) flanked by concrete sidewalks.
+    for (let y = 1; y < rows - 1; y++) {
+      for (let x = 1; x < cols - 1; x++) {
+        const rv = nearV(x), rh = nearH(y);
+        if (rv || rh) {
+          let tint = 2;
+          if (rv && vC.includes(x) && !rh) tint = 5;      // vertical centre-line
+          else if (rh && hC.includes(y) && !rv) tint = 6; // horizontal centre-line
+          this._tint(x, y, tint);
+        } else if (nearV(x - 1) || nearV(x + 1) || nearH(y - 1) || nearH(y + 1)) {
+          this._tint(x, y, 3); // sidewalk hugging the kerb
+        }
+      }
+    }
+    // Zebra-striped crosswalks flanking each intersection.
+    for (const cx of vC) for (const cy of hC) {
+      for (let d = -1; d <= 1; d++) { this._tint(cx + d, cy - 2, 9); this._tint(cx + d, cy + 2, 9); this._tint(cx - 2, cy + d, 9); this._tint(cx + 2, cy + d, 9); }
+    }
+
+    // The blocks between the road bands; a layout of building types with a
+    // central plaza to start in.
+    const xB = [[1, 10], [16, 24], [30, 38], [44, cols - 2]];
+    const yB = [[1, 10], [16, 23], [29, 36], [42, rows - 2]];
+    const layout = [
+      ["office", "garage", "office", "plaza"],
+      ["plaza",  "office", "garage", "office"],
+      ["garage", "office", "office", "garage"],
+      ["office", "plaza",  "office", "office"],
+    ];
+    this._citySpawn = null;
+    for (let bi = 0; bi < xB.length; bi++) {
+      for (let bj = 0; bj < yB.length; bj++) {
+        const [x0, x1] = xB[bi], [y0, y1] = yB[bj];
+        const kind = layout[bj][bi];
+        if (kind === "garage") this._cityGarage(x0, y0, x1, y1);
+        else if (kind === "plaza") this._cityPlaza(x0, y0, x1, y1, bi === 1 && bj === 1);
+        else this._cityOffice(x0, y0, x1, y1, bj < 2 ? "down" : "up");
+      }
+    }
+
+    // Parked cars & trucks along the kerbs.
+    const spots = [];
+    for (const c of vC) for (let y = 4; y < rows - 4; y += 6) spots.push({ x: c + 2, y, vert: true });
+    for (const c of hC) for (let x = 5; x < cols - 5; x += 7) spots.push({ x, y: c + 2, vert: false });
+    for (const s of spots) {
+      if (!chance(0.35) || this.tileAt(s.x, s.y) !== T.FLOOR) continue;
+      const truck = chance(0.3);
+      const wx = (s.x + 0.5) * TILE, wy = (s.y + 0.5) * TILE;
+      const L = truck ? 30 : 22, W = truck ? 13 : 11;
+      this._furn(wx, wy, truck ? "truck" : "car", s.vert ? W : L, s.vert ? L : W, truck ? 220 : 160);
+      if (chance(0.16)) this.furniture[this.furniture.length - 1].burning = true; // a few are ablaze
+    }
+
+    // Start in the central plaza; the exit road runs off the bottom of the map.
+    this.spawnPoint = this._citySpawn || { x: (vC[0] + 0.5) * TILE, y: (hC[0] + 0.5) * TILE };
+    const exCx = vC[1];
+    this._set(exCx, rows - 1, T.EXIT); this._tint(exCx, rows - 1, 2);
+    this._set(exCx - 1, rows - 1, T.FLOOR); this._tint(exCx - 1, rows - 1, 2);
+    this._set(exCx + 1, rows - 1, T.FLOOR); this._tint(exCx + 1, rows - 1, 2);
+    this.exit = { x: (exCx + 0.5) * TILE, y: (rows - 1 + 0.5) * TILE };
+    this.exitFacing = "down";
+  }
+
+  // A solid office tower: glass-fronted facade with a ground-floor lobby you can
+  // duck into for cover and loot.
+  _cityOffice(x0, y0, x1, y1, facing) {
+    const w = x1 - x0 + 1, h = y1 - y0 + 1;
+    if (w < 3 || h < 3) { // too small: a scrubby lot with a planter or two
+      for (let i = 0; i < randInt(1, 3); i++) { const px = randInt(x0, x1), py = randInt(y0, y1); if (this.tileAt(px, py) === T.FLOOR) this._set(px, py, T.PROP); }
+      return;
+    }
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) this._set(x, y, T.WALL);
+    // Glass facade: windows every other tile around the perimeter.
+    const winEdge = (x, y) => { if (this.tileAt(x, y) === T.WALL) this._set(x, y, T.WINDOW); };
+    for (let x = x0 + 1; x <= x1 - 1; x += 2) { winEdge(x, y0); winEdge(x, y1); }
+    for (let y = y0 + 1; y <= y1 - 1; y += 2) { winEdge(x0, y); winEdge(x1, y); }
+    // Carve a lobby into the road-facing side, with a glass door.
+    const lobW = Math.min(w - 2, 4), lobH = Math.min(h - 2, 2);
+    if (lobW >= 2 && lobH >= 1) {
+      const lx0 = x0 + Math.floor((w - lobW) / 2), lx1 = lx0 + lobW - 1;
+      const down = facing !== "up";
+      const ly0 = down ? y1 - lobH : y0 + 1, ly1 = down ? y1 - 1 : y0 + lobH;
+      for (let y = ly0; y <= ly1; y++) for (let x = lx0; x <= lx1; x++) { this._set(x, y, T.FLOOR); this._tint(x, y, 9); }
+      const dxg = Math.floor((lx0 + lx1) / 2);
+      this._doorway(dxg, down ? y1 : y0); // lobby entrance from the sidewalk
+      // Front desk and a shelf of loot inside.
+      const dy = down ? ly0 : ly1;
+      this._furn((lx0 + 0.5) * TILE, (dy + 0.5) * TILE, "table", 12, 6, 55);
+      if (lobW >= 3 && chance(0.6)) this._furn((lx1 + 0.5) * TILE, (dy + 0.5) * TILE, "shelf", 12, 6, 60);
+    }
+    this.rooms.push({ name: "office", cx: Math.floor((x0 + x1) / 2), cy: Math.floor((y0 + y1) / 2) });
+  }
+
+  // An open parking garage: a concrete deck ringed by a low parapet with drive-in
+  // gaps on the road sides, regular support pillars and parked cars to fight among.
+  _cityGarage(x0, y0, x1, y1) {
+    const w = x1 - x0 + 1, h = y1 - y0 + 1;
+    if (w < 4 || h < 4) return this._cityPlaza(x0, y0, x1, y1, false);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { this._set(x, y, T.FLOOR); this._tint(x, y, 7); }
+    // Parapet wall around the deck.
+    for (let x = x0; x <= x1; x++) { this._set(x, y0, T.WALL); this._set(x, y1, T.WALL); }
+    for (let y = y0; y <= y1; y++) { this._set(x0, y, T.WALL); this._set(x1, y, T.WALL); }
+    // Drive-in gaps wherever the parapet backs onto a road.
+    const mx = Math.floor((x0 + x1) / 2), my = Math.floor((y0 + y1) / 2);
+    const opener = (gx, gy, ox, oy) => { if (this.tileAt(gx + ox, gy + oy) === T.FLOOR) { this._set(gx, gy, T.FLOOR); this._tint(gx, gy, 7); } };
+    opener(mx, y1, 0, 1); opener(mx + 1, y1, 0, 1); opener(mx, y0, 0, -1); opener(mx + 1, y0, 0, -1);
+    opener(x0, my, -1, 0); opener(x0, my + 1, -1, 0); opener(x1, my, 1, 0); opener(x1, my + 1, 1, 0);
+    // Support pillars on a regular grid; painted stalls & parked cars between them.
+    for (let y = y0 + 2; y <= y1 - 2; y += 3) for (let x = x0 + 2; x <= x1 - 2; x += 3) this._set(x, y, T.PROP);
+    for (let y = y0 + 2; y <= y1 - 2; y += 3) for (let x = x0 + 1; x <= x1 - 1; x += 4) {
+      if (this.tileAt(x, y) === T.FLOOR) { this._tint(x, y, 8); if (chance(0.45)) this._furn((x + 0.5) * TILE, (y + 0.5) * TILE, "car", 11, 13, 160); }
+    }
+    this.rooms.push({ name: "garage", cx: mx, cy: my });
+  }
+
+  // A paved plaza: open pavers with planters, benches and a central fountain —
+  // and the block the player starts in.
+  _cityPlaza(x0, y0, x1, y1, isSpawn) {
+    const cxm = Math.floor((x0 + x1) / 2), cym = Math.floor((y0 + y1) / 2);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (this.tileAt(x, y) === T.FLOOR) this._tint(x, y, 4);
+    const putF = (cx, cy, type, hw, hh, hp) => { if (this.tileAt(cx, cy) === T.FLOOR) this._furn((cx + 0.5) * TILE, (cy + 0.5) * TILE, type, hw, hh, hp); };
+    for (const [tx, ty] of [[x0 + 1, y0 + 1], [x1 - 1, y0 + 1], [x0 + 1, y1 - 1], [x1 - 1, y1 - 1]]) putF(tx, ty, "bush", 9, 8, 26); // planters
+    putF(x0 + 1, cym, "bench", 12, 5, 40);
+    putF(x1 - 1, cym, "bench", 12, 5, 40);
+    // A central fountain (skipped on the plaza you spawn in, so you don't stand in it).
+    if (!isSpawn && x1 - x0 >= 5 && y1 - y0 >= 5) { this._set(cxm, cym, T.PROP); putF(cxm - 1, cym, "barrel", 8, 8, 48); putF(cxm + 1, cym, "barrel", 8, 8, 48); }
+    this.rooms.push({ name: "plaza", cx: cxm, cy: cym });
+    if (isSpawn) this._citySpawn = { x: (cxm + 0.5) * TILE, y: (cym + 0.5) * TILE };
   }
 
   // The sewers: a maze of 2-wide tunnels carved through concrete, with ladders

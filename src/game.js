@@ -183,7 +183,7 @@ export class Game {
     }
     // Throwables: grenades everywhere, flares mostly outside.
     if (chance(0.8)) { const p = this.world.randomFloor(); this.pickups.push(new Pickup(p.x, p.y, "grenade", { amount: randInt(1, 3) })); }
-    if (this.world.isStreets && chance(0.8)) { const p = this.world.randomFloor(); this.pickups.push(new Pickup(p.x, p.y, "flare", { amount: randInt(1, 2) })); }
+    if ((this.world.isStreets || this.world.isCity) && chance(0.8)) { const p = this.world.randomFloor(); this.pickups.push(new Pickup(p.x, p.y, "flare", { amount: randInt(1, 2) })); }
   }
 
   // House floors carry a curated loot list (key/axe/room rewards).
@@ -306,7 +306,7 @@ export class Game {
     if (w >= 4) table.push(["spitter", 2]);
     if (w >= 5) table.push(["brute", 1 + Math.floor(w / 5)]);
     if (this.world.isSewers) table.push(["rat", 7 + w]);                              // swarms underground
-    else if (this.world.isStreets && w >= 2) table.push(["dog", 2 + Math.floor(w / 4)]); // packs outside
+    else if ((this.world.isStreets || this.world.isCity) && w >= 2) table.push(["dog", 2 + Math.floor(w / 4)]); // stray packs outside
     const total = table.reduce((s, t) => s + t[1], 0);
     let r = rand(0, total), type = "walker";
     for (const [k, wgt] of table) { if ((r -= wgt) <= 0) { type = k; break; } }
@@ -1430,7 +1430,7 @@ export class Game {
   // outdoors, scatter into the air when you come near, and can be shot down.
   // They never attack the player.
   _updateBirds(dt) {
-    const outdoors = this.world.isStreets && !this.world.isSewers;
+    const outdoors = (this.world.isStreets || this.world.isCity) && !this.world.isSewers;
     // Fresh carcasses to feed on (settled bodies, not still-collapsing corpses).
     const carrion = this.bodies;
     // Occasionally spawn a bird gliding toward a carcass, up to a small flock.
@@ -2325,10 +2325,16 @@ export class Game {
           if (w.isHouse && (t === T.FLOOR || t === T.DOOR)) {
             this._drawFloorMat(ctx, x, y, cx, cy, FLOOR_MAT[w.floorTint[w.idx(cx, cy)]]);
           }
-          if (w.isStreets && !w.isSewers) {
+          if ((w.isStreets || w.isCity) && !w.isSewers) {
             const rid = w.floorTint[w.idx(cx, cy)];
             if (rid === 5 && (cy & 1)) { ctx.fillStyle = "rgba(210,190,80,0.7)"; ctx.fillRect(x + TILE / 2 - 1, y + 4, 2, TILE - 8); }
             else if (rid === 6 && (cx & 1)) { ctx.fillStyle = "rgba(210,190,80,0.7)"; ctx.fillRect(x + 4, y + TILE / 2 - 1, TILE - 8, 2); }
+          }
+          if (w.isCity) {
+            const rid = w.floorTint[w.idx(cx, cy)];
+            if (rid === 8) { ctx.fillStyle = "rgba(220,220,150,0.35)"; ctx.fillRect(x + 3, y + 2, 1.5, TILE - 4); ctx.fillRect(x + TILE - 4, y + 2, 1.5, TILE - 4); } // painted stall lines
+            else if (rid === 9) { ctx.fillStyle = "rgba(230,232,235,0.5)"; for (let sx = 3; sx < TILE - 3; sx += 7) ctx.fillRect(x + sx, y + 3, 3.5, TILE - 6); } // zebra crosswalk / lobby tile
+            else if (rid === 4 && !((cx + cy) & 1)) { ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fillRect(x, y + TILE - 1, TILE, 1); ctx.fillRect(x + TILE - 1, y, 1, TILE); } // paver joints
           }
           if (w.isSewers && t === T.FLOOR) {
             // Flowing water: scrolling ripple lines; deep channels are darker.
@@ -2370,6 +2376,13 @@ export class Game {
               ctx.fillStyle = "#26401e"; ctx.beginPath(); ctx.arc(cxp, cyp - 3, 10, 0, TAU); ctx.fill();
               ctx.fillStyle = "#31502a"; for (const [ox, oy, rr] of [[-4, -4, 5], [4, -3, 5], [0, -7, 5], [2, 1, 5]]) { ctx.beginPath(); ctx.arc(cxp + ox, cyp + oy, rr, 0, TAU); ctx.fill(); }
               ctx.fillStyle = "#3e6234"; for (const [ox, oy, rr] of [[-3, -6, 3], [2, -5, 3]]) { ctx.beginPath(); ctx.arc(cxp + ox, cyp + oy, rr, 0, TAU); ctx.fill(); }
+            } else if (w.isCity) {
+              // A square concrete support pillar with a lit cap and cast shadow.
+              const cxp = x + TILE / 2, cyp = y + TILE / 2;
+              ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fillRect(x + 6, cyp + 3, TILE - 12, 6);   // shadow
+              ctx.fillStyle = "#6a6e76"; ctx.fillRect(x + 6, y + 5, TILE - 12, TILE - 12);       // column body
+              ctx.fillStyle = "#7e838c"; ctx.fillRect(x + 6, y + 5, TILE - 12, 3);               // lit top edge
+              ctx.fillStyle = "rgba(0,0,0,0.22)"; ctx.fillRect(x + TILE - 9, y + 5, 3, TILE - 12); // side shade
             } else {
               ctx.fillStyle = set.accent;
               ctx.fillRect(x + 5, y + 5, TILE - 10, TILE - 10);

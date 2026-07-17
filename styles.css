@@ -279,17 +279,39 @@ html, body {
 .menu-links { display: flex; gap: 10px; justify-content: center; }
 .hint { font-size: 11px; color: var(--muted); margin-top: 16px; }
 
-/* Fun-options (cheat/mutator) toggle chips on the menu. */
-.cheats-label { font-size: 12px; letter-spacing: 1px; color: var(--muted); margin: 4px 0 8px; text-transform: uppercase; }
-.cheats { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; margin-bottom: 14px; }
-.cheat {
+/* Start-environment picker on the menu. */
+.pick-label { font-size: 12px; letter-spacing: 1px; color: var(--muted); margin: 2px 0 8px; text-transform: uppercase; }
+.env-pick { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; margin-bottom: 14px; }
+.env {
   font-family: inherit; font-size: 12px; font-weight: bold;
   border: 1.5px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.04);
-  color: var(--muted); padding: 6px 11px; border-radius: 999px; cursor: pointer;
+  color: var(--muted); padding: 7px 12px; border-radius: 6px; cursor: pointer;
   letter-spacing: 0.3px; transition: transform 0.05s;
 }
-.cheat:active { transform: scale(0.95); }
-.cheat.on { border-color: var(--accent); background: rgba(120,200,80,0.18); color: var(--text); box-shadow: 0 0 8px rgba(120,200,80,0.35); }
+.env:active { transform: scale(0.95); }
+.env.on { border-color: var(--accent); background: rgba(120,200,80,0.18); color: var(--text); box-shadow: 0 0 8px rgba(120,200,80,0.35); }
+
+/* Fun-options flyout: a toggle button that drops a list of checkboxes. */
+.funopts { position: relative; margin-bottom: 14px; }
+.funopts-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.funopts-btn .caret { transition: transform 0.15s; font-size: 11px; }
+.funopts-btn[aria-expanded="true"] .caret { transform: rotate(180deg); }
+.funopts-panel {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 40;
+  background: #12160e; border: 1px solid rgba(114,168,58,0.45); border-radius: 8px;
+  padding: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.65);
+  max-height: 46vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.funopt {
+  display: flex; align-items: center; gap: 10px; text-align: left;
+  padding: 9px 11px; border-radius: 6px; cursor: pointer; color: var(--muted);
+  font-size: 13px; font-weight: bold; letter-spacing: 0.3px;
+}
+.funopt:active { background: rgba(255,255,255,0.05); }
+.funopt input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; flex: none; }
+.funopt:has(input:checked) { color: var(--text); }
+.funopt span { flex: 1; }
 
 .how-list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin: 12px 0 20px; }
 .how-list li { font-size: 14px; line-height: 1.4; color: var(--text); }
