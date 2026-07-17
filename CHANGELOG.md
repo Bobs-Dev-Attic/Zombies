@@ -7,6 +7,12 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.28.2] — 2026-07-17
+### Fire in the Hole
+- **Shoulder-mounted RPG** — the bazooka is no longer held like a rifle out front; it's drawn as a **shoulder-mounted launch tube** (`drawBazookaLocal`, a dedicated pose in `drawPlayer`) braced on the player's shoulder, running fore-and-aft along the aim with the exhaust vent poking out behind, kicking back on recoil.
+- **Backblast** — firing the RPG (`_backblast`) now jets a burst of **fire and smoke out the rear** of the launcher, behind the shooter's shoulder.
+- **Missile exhaust** — the rocket is redrawn as a **finned missile with a hot exhaust flame** out its tail, and it lays a continuous **exhaust trail of flame and smoke** as it flies (`_updateProjectiles`).
+
 ## [0.28.1] — 2026-07-17
 ### Quiet Placement
 - **No muzzle flash on mines** — deploying a land mine (`_deployMine`) now clears `player.muzzle`, so laying one down no longer draws a gun muzzle-flash. (`_tryFire` arms the flash for every weapon; deploy weapons now suppress it, like the flamethrower does.)

@@ -622,10 +622,27 @@ export class Game {
     }
     // Feedback: muzzle smoke, casing, shake.
     this.shake += w.explosive ? 8 : w.pellets > 1 ? 4 : 2;
-    this._ejectCasing(p);
+    if (w.kind === "bazooka") this._backblast(p); // rear exhaust jet out the launcher tube
+    else this._ejectCasing(p);
     this._muzzleSmoke(p);
     sfx.play(w.sound || "pop");
     if (w.explosive || w.pellets > 1) this.hooks.vibrate?.(30);
+  }
+
+  // The RPG's backblast: a jet of fire and smoke bursting out of the rear vent
+  // behind the shooter's shoulder as the rocket leaves the tube.
+  _backblast(p) {
+    const back = p.angle + Math.PI, perp = p.angle + Math.PI / 2;
+    const bx = p.x + Math.cos(back) * 9 + Math.cos(perp) * 3;
+    const by = p.y + Math.sin(back) * 9 + Math.sin(perp) * 3;
+    for (let i = 0; i < 14; i++) {
+      const a = back + rand(-0.45, 0.45), s = rand(120, 320);
+      this.particles.push(new Particle(bx, by, { vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.2, 0.6), color: pick(["#ffd24a", "#ff9030", "#ff5a2a", "#ffffff", "#c0341a"]), size: randInt(2, 4), drag: 0.86, gravity: -10 }));
+    }
+    for (let i = 0; i < 9; i++) {
+      const a = back + rand(-0.6, 0.6), s = rand(40, 150);
+      this.particles.push(new Particle(bx, by, { vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.5, 1.3), color: pick(["rgba(80,80,80,0.5)", "rgba(120,120,120,0.4)", "rgba(50,50,50,0.5)"]), size: randInt(3, 6), drag: 0.9, gravity: -6 }));
+    }
   }
 
   _meleeSwing(w, variant) {
@@ -672,6 +689,15 @@ export class Game {
   _updateProjectiles(dt) {
     for (const proj of this.projectiles) {
       proj.update(dt, this.world);
+      // The rocket rides a jet of exhaust — hot flame and smoke out its tail.
+      if (proj.kind === "rocket" && !proj.dead) {
+        const back = proj.angle + Math.PI, rx = proj.x + Math.cos(back) * 3, ry = proj.y + Math.sin(back) * 3;
+        for (let i = 0; i < 2; i++) {
+          const a = back + rand(-0.35, 0.35), s = rand(50, 120);
+          this.particles.push(new Particle(rx, ry, { vx: Math.cos(a) * s + proj.vx * 0.1, vy: Math.sin(a) * s + proj.vy * 0.1, life: rand(0.14, 0.38), color: pick(["#ffd24a", "#ff9030", "#ff5a2a", "#ffffff"]), size: randInt(2, 3), drag: 0.85 }));
+        }
+        if (chance(0.7)) this.particles.push(new Particle(rx, ry, { vx: Math.cos(back) * rand(10, 40), vy: Math.sin(back) * rand(10, 40), life: rand(0.4, 0.95), color: pick(["rgba(90,90,90,0.5)", "rgba(60,60,60,0.45)", "rgba(120,120,120,0.4)"]), size: randInt(2, 4), drag: 0.9 }));
+      }
       if (proj.hostile) {
         // Enemy spit: only hits player.
         if (dist(proj.x, proj.y, this.player.x, this.player.y) < this.player.r + proj.r + 1) {
@@ -2621,9 +2647,18 @@ export class Game {
     for (const pr of this.projectiles) {
       if (pr.kind === "spit") { ctx.fillStyle = "#8fbf3a"; ctx.beginPath(); ctx.arc(pr.x, pr.y, 2.4, 0, TAU); ctx.fill(); continue; }
       if (pr.kind === "rocket") {
-        ctx.fillStyle = "#ffb347"; ctx.fillRect(Math.round(pr.x - 2), Math.round(pr.y - 2), 4, 4);
-        ctx.fillStyle = "rgba(255,120,40,0.5)";
-        ctx.fillRect(Math.round(pr.px - 1), Math.round(pr.py - 1), 2, 2);
+        // A finned missile with a hot exhaust flame flaring out the back.
+        ctx.save();
+        ctx.translate(pr.x, pr.y);
+        ctx.rotate(pr.angle);
+        ctx.fillStyle = "rgba(255,150,40,0.6)"; // outer flame
+        ctx.beginPath(); ctx.moveTo(-3, 0); ctx.lineTo(-10, -2.2); ctx.lineTo(-10, 2.2); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = "#ffe08a"; // hot inner flame
+        ctx.beginPath(); ctx.moveTo(-3, 0); ctx.lineTo(-7, -1.3); ctx.lineTo(-7, 1.3); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = "#8a8f95"; ctx.fillRect(-3, -2.4, 2, 1); ctx.fillRect(-3, 1.4, 2, 1); // tail fins
+        ctx.fillStyle = "#454b40"; ctx.fillRect(-3, -1.6, 6, 3.2); // body
+        ctx.fillStyle = "#7a2a1a"; ctx.beginPath(); ctx.moveTo(3, -1.6); ctx.lineTo(6, 0); ctx.lineTo(3, 1.6); ctx.closePath(); ctx.fill(); // warhead nose
+        ctx.restore();
         continue;
       }
       if (pr.laser) {
