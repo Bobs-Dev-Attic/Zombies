@@ -1,7 +1,18 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.30.0";
+export const VERSION = "0.31.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.31.0",
+    date: "2026-07-17",
+    title: "Bolt & Blaze",
+    changes: [
+      "The Hunting Rifle is now held and fired like the bolt-action it is — shouldered and aimed down the barrel, and after every shot the player works the bolt (lift, draw back, shove home) as a spent case flips clear.",
+      "The Flamethrower is now hip-fired like the shotguns — the fuel tank rides at the hip and the nozzle wand angles across to your aim.",
+      "Flames are physical now: the fire stream splashes and bounces off walls and furniture, pooling against cover instead of passing through it.",
+      "The fire also washes over low crawling zombies it used to sail right over, setting them alight.",
+    ],
+  },
   {
     version: "0.30.0",
     date: "2026-07-17",

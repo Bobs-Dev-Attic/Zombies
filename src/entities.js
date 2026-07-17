@@ -36,6 +36,7 @@ export class Player {
     this.meleeVariant = "swing"; // swing | stab | lunge (knife)
     this.lungeT = 0;             // forward-dash timer for the two-handed lunge
     this.pumpT = 0;              // pump-action rack animation (pump shotgun)
+    this.boltT = 0;              // bolt-cycle animation (bolt-action hunting rifle)
     this.bloodyFeet = 0;         // px-budget of bloody footprints left to track
     this.damageTakenMul = 1;     // cheat: <1 makes you take less damage
     this.unlimitedAmmo = false;  // cheat: guns/throwables never run dry
@@ -52,6 +53,7 @@ export class Player {
     } else {
       this.recoil = 1;
       if (w.kind === "shotgun") this.pumpT = 1; // rack the pump after the shot
+      if (w.kind === "rifle") this.boltT = 1;   // work the bolt after the shot
     }
   }
 
@@ -77,6 +79,7 @@ export class Player {
     if (this.armorFlash > 0) this.armorFlash -= dt;
     if (this.recoil > 0) this.recoil = Math.max(0, this.recoil - dt * 7);
     if (this.pumpT > 0) this.pumpT = Math.max(0, this.pumpT - dt * 2.6);
+    if (this.boltT > 0) this.boltT = Math.max(0, this.boltT - dt * 2.3); // deliberate bolt cycle
     if (this.swingT > 0) this.swingT = Math.max(0, this.swingT - dt);
     if (this.lungeT > 0) {
       this.lungeT = Math.max(0, this.lungeT - dt);
