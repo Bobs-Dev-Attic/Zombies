@@ -1,7 +1,7 @@
 // Weapon catalogue. Ammo is shared by type across weapons that use it.
 // spread is in radians, fireRate in shots/sec, range in world px.
 
-export const AMMO_TYPES = ["shells", "rounds", "rockets", "fuel"]; // knives/bats need no ammo
+export const AMMO_TYPES = ["shells", "rounds", "rockets", "fuel", "cells"]; // knives/bats need no ammo
 
 export const WEAPONS = {
   knife: {
@@ -40,6 +40,11 @@ export const WEAPONS = {
     name: ".357 Magnum", tag: "357", kind: "pistol357", damage: 54, fireRate: 2.2, pellets: 1,
     spread: 0.02, range: 300, speed: 620, clip: 6, ammoType: "rounds",
     reload: 1.6, knockback: 140, sever: 0.22, hs: 0.2, sound: "boom",
+  },
+  laserpistol: {
+    name: "Laser Pistol", tag: "LAS", kind: "laserpistol", beam: true, damage: 15, fireRate: 5,
+    spread: 0.004, range: 340, clip: 30, ammoType: "cells",
+    reload: 1.2, knockback: 0, sever: 0, hs: 0, sound: "laser",
   },
 
   smg: {
@@ -110,7 +115,7 @@ export const WEAPONS = {
 // Order used when swapping weapons.
 export const WEAPON_ORDER = [
   "knife", "bat", "axe", "sword",
-  "pistol22", "pistol", "pistol357", "smg",
+  "pistol22", "pistol", "pistol357", "laserpistol", "smg",
   "shotgun", "shotgun_semi", "shotgun_sxs",
   "rifle", "rifle_semi", "rifle_auto",
   "bazooka", "flamethrower", "grenade", "flare", "mine",
@@ -120,7 +125,7 @@ export function newLoadout() {
   return {
     owned: { knife: true, pistol: true },
     clip: { pistol: WEAPONS.pistol.clip },
-    ammo: { shells: 0, rounds: 48, rockets: 0, fuel: 0, grenades: 0, flares: 0, mines: 0 },
+    ammo: { shells: 0, rounds: 48, rockets: 0, fuel: 0, cells: 0, grenades: 0, flares: 0, mines: 0 },
     keys: 0,
     armor: 0, armorMax: 0,   // body-armour points (absorbs damage, then breaks)
     helmet: 0, helmetMax: 0, // helmet points

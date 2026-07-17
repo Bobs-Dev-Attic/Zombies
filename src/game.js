@@ -75,6 +75,7 @@ export class Game {
     this.prints = [];  // bloody footprints / drag smears left on the floor
     this.scorches = []; // smouldering scorch marks left by explosions
     this.mines = [];   // deployed land mines waiting for something to step on them
+    this.beams = [];   // transient laser beams (drawn for a couple of frames)
     this.score = 0;
     this.wave = 0;
     this.waveActive = false;
@@ -103,11 +104,11 @@ export class Game {
     const c = this.cheats || {};
     if (c.allWeapons) {
       for (const id of WEAPON_ORDER) { lo.owned[id] = true; if (WEAPONS[id].clip) lo.clip[id] = WEAPONS[id].clip; }
-      lo.ammo = { shells: 999, rounds: 999, rockets: 99, fuel: 600, grenades: 20, flares: 20, mines: 20 };
+      lo.ammo = { shells: 999, rounds: 999, rockets: 99, fuel: 600, cells: 999, grenades: 20, flares: 20, mines: 20 };
       lo.current = "rifle_auto";
     }
     if (c.swords) lo.owned.sword = true;
-    if (c.unlimitedAmmo) lo.ammo = { shells: 999, rounds: 999, rockets: 99, fuel: 600, grenades: 99, flares: 99, mines: 99 };
+    if (c.unlimitedAmmo) lo.ammo = { shells: 999, rounds: 999, rockets: 99, fuel: 600, cells: 999, grenades: 99, flares: 99, mines: 99 };
     return lo;
   }
 
@@ -137,7 +138,7 @@ export class Game {
     this.player.health = hp; this.player.stamina = sta;
     this.player.kills = kills;
     this.zombies = []; this.projectiles = []; this.particles = []; this.pickups = []; this.stains = []; this.corpses = [];
-    this.bodies = []; this.limbs = []; this.gibs = []; this.thrown = []; this.shockwaves = []; this.flies = []; this.birds = []; this.prints = []; this.scorches = []; this.mines = [];
+    this.bodies = []; this.limbs = []; this.gibs = []; this.thrown = []; this.shockwaves = []; this.flies = []; this.birds = []; this.prints = []; this.scorches = []; this.mines = []; this.beams = [];
     this.score = score; this.wave = wave;
     this.waveActive = false; this.spawnQueue = 0; this.waveOrigins = []; this.betweenWaves = 2; this.exitReady = false;
     this.cam.x = this.player.x; this.cam.y = this.player.y;
@@ -150,7 +151,7 @@ export class Game {
     // The house hand-places its loot (key, axe, room rewards) via world.loot.
     if (this.world.loot) { this._seedHouseLoot(); return; }
     // Scatter weapon crates, ammo, and medkits across the map.
-    const weaponPool = ["bat", "axe", "sword", "pistol22", "pistol357", "smg",
+    const weaponPool = ["bat", "axe", "sword", "pistol22", "pistol357", "laserpistol", "smg",
       "shotgun", "shotgun_semi", "shotgun_sxs",
       "rifle", "rifle_semi", "rifle_auto", "bazooka", "flamethrower", "mine"];
     const crates = randInt(3, 5);
@@ -158,11 +159,11 @@ export class Game {
       const p = this.world.randomFloorFar(this.player.x, this.player.y, 120);
       if (p) this.pickups.push(new Pickup(p.x, p.y, "weapon", pick(weaponPool)));
     }
-    const ammoTypes = ["rounds", "shells", "rockets", "fuel", "mines"];
+    const ammoTypes = ["rounds", "shells", "rockets", "fuel", "cells", "mines"];
     for (let i = 0; i < randInt(4, 7); i++) {
       const p = this.world.randomFloor();
       const type = pick(ammoTypes);
-      const amount = type === "rockets" ? randInt(1, 2) : type === "mines" ? randInt(2, 4) : type === "fuel" ? randInt(40, 90) : type === "shells" ? randInt(6, 14) : randInt(20, 40);
+      const amount = type === "rockets" ? randInt(1, 2) : type === "mines" ? randInt(2, 4) : type === "fuel" ? randInt(40, 90) : type === "cells" ? randInt(15, 35) : type === "shells" ? randInt(6, 14) : randInt(20, 40);
       this.pickups.push(new Pickup(p.x, p.y, "ammo", { type, amount }));
     }
     for (let i = 0; i < randInt(2, 3); i++) {
@@ -222,7 +223,7 @@ export class Game {
     }
     if (arrive) { this.player.x = (arrive.cx + 0.5) * TILE; this.player.y = (arrive.cy + 0.5) * TILE; }
     else { this.player.x = this.world.landing.x; this.player.y = this.world.landing.y; }
-    this.zombies = []; this.projectiles = []; this.particles = []; this.thrown = []; this.shockwaves = []; this.flies = []; this.birds = [];
+    this.zombies = []; this.projectiles = []; this.particles = []; this.thrown = []; this.shockwaves = []; this.flies = []; this.birds = []; this.beams = [];
     this.cam.x = this.player.x; this.cam.y = this.player.y;
     this.flow = null; this.flowTimer = 0; // rebuild the flow field for the new grid
     this.floorCooldown = 1.2;
@@ -382,6 +383,8 @@ export class Game {
     this._updateFlies(dt);
     this._updateBirds(dt);
     this._updateScorches(dt);
+    for (const bm of this.beams) bm.life -= dt;
+    this.beams = this.beams.filter((bm) => bm.life > 0);
     for (const p of this.particles) p.update(dt);
     for (const s of this.stains) s.life -= dt * 0.15;
     for (const fp of this.prints) fp.life -= dt * 0.14;
@@ -608,6 +611,7 @@ export class Game {
 
     if (!p.unlimitedAmmo) p.loadout.clip[p.loadout.current]--;
     if (w.flame) { this._flame(w); return; }
+    if (w.beam) { this._fireBeam(w); return; }
     const laser = !!(this.cheats && this.cheats.lasers) && !w.explosive;
     const pellets = w.pellets || 1;
     for (let i = 0; i < pellets; i++) {
@@ -643,6 +647,46 @@ export class Game {
       const a = back + rand(-0.6, 0.6), s = rand(40, 150);
       this.particles.push(new Particle(bx, by, { vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.5, 1.3), color: pick(["rgba(80,80,80,0.5)", "rgba(120,120,120,0.4)", "rgba(50,50,50,0.5)"]), size: randInt(3, 6), drag: 0.9, gravity: -6 }));
     }
+  }
+
+  // Laser pistol: a single instant beam that lances through EVERY zombie in its
+  // path (stopping at the first wall), boring smoking holes clean through them
+  // and — as they soak up more shots — setting them alight.
+  _fireBeam(w) {
+    const p = this.player;
+    p.muzzle = 0; // the beam is its own flash
+    const a = p.angle + rand(-w.spread, w.spread), c = Math.cos(a), s = Math.sin(a);
+    const ox = p.x + c * 10, oy = p.y + s * 10;
+    // Raycast the beam to the first solid tile/furniture, else its max range.
+    let ex = ox + c * w.range, ey = oy + s * w.range;
+    const steps = Math.ceil(w.range / 6);
+    for (let i = 1; i <= steps; i++) {
+      const sx = ox + c * w.range * (i / steps), sy = oy + s * w.range * (i / steps);
+      if (this.world.blocksShot(sx, sy)) { ex = sx; ey = sy; break; }
+    }
+    // Every zombie the beam crosses is hit — it pierces the whole line.
+    const hits = [];
+    for (const z of this.zombies) { if (z.dead) continue; if (this._segHitsCircle(ox, oy, ex, ey, z.x, z.y, z.r + 5)) hits.push(z); }
+    hits.sort((za, zb) => dist2(ox, oy, za.x, za.y) - dist2(ox, oy, zb.x, zb.y));
+    for (const z of hits) {
+      this._laserBurn(z.x, z.y, a); // a smoking, cauterised hole punched through
+      z.laserHeat = (z.laserHeat || 0) + 1;
+      if (z.laserHeat >= 3 && z.burning <= 0) this._igniteZombie(z, 4); // enough heat sets it ablaze
+      this._damageZombie(z, w.damage, a, 0, w.sever || 0, 0);
+    }
+    // The searing beam itself, drawn for a couple of frames.
+    this.beams.push({ x0: ox, y0: oy, x1: ex, y1: ey, life: 0.1 });
+    if (this.beams.length > 8) this.beams.shift();
+    sfx.play("laser");
+    this.shake += 0.4;
+  }
+
+  // A cauterised laser hole: a wisp of smoke, a few sparks, and a scorched dot.
+  _laserBurn(x, y, angle) {
+    for (let i = 0; i < 3; i++) this.particles.push(new Particle(x + rand(-2, 2), y + rand(-2, 2), { vx: rand(-14, 14), vy: rand(-30, -6), life: rand(0.3, 0.7), color: pick(["rgba(60,60,60,0.5)", "rgba(90,90,90,0.4)", "rgba(40,40,40,0.5)"]), size: randInt(2, 3), drag: 0.9, gravity: -8 }));
+    for (let i = 0; i < 2; i++) this.particles.push(new Particle(x, y, { vx: rand(-30, 30), vy: rand(-30, 30), life: rand(0.12, 0.34), color: pick(["#ff7a2a", "#ffce54", "#ffffff"]), size: 1, drag: 0.85 }));
+    this._blood(x, y, angle, 2);
+    if (chance(0.5)) this.stains.push({ x: x + rand(-3, 3), y: y + rand(-3, 3), r: rand(1, 2), life: rand(8, 14), color: "#1a1410" }); // charred hole
   }
 
   _meleeSwing(w, variant) {
@@ -1995,6 +2039,7 @@ export class Game {
     this._drawLighting(ctx); // dim veil + flickering lamp pools + player torch
     this._drawFog(ctx, -ox, -oy);
     this._drawProjectiles(ctx); // over the fog so tracers are always crisp
+    this._drawBeams(ctx);       // laser beams lance over everything
     this._drawBanners(ctx);
     this._drawExitBeacon(ctx);
     ctx.restore();
@@ -2641,6 +2686,24 @@ export class Game {
       ctx.strokeStyle = "#ffd24a";
       ctx.beginPath(); ctx.arc(p.x, p.y, 13, -Math.PI / 2, -Math.PI / 2 + prog * TAU); ctx.stroke();
       ctx.lineWidth = 1;
+    }
+  }
+
+  _drawBeams(ctx) {
+    for (const bm of this.beams) {
+      const a = clamp(bm.life / 0.1, 0, 1);
+      // Outer glow, a magenta body, and a white-hot core.
+      ctx.lineCap = "round";
+      ctx.strokeStyle = `rgba(255,60,120,${(a * 0.28).toFixed(3)})`; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(bm.x0, bm.y0); ctx.lineTo(bm.x1, bm.y1); ctx.stroke();
+      ctx.strokeStyle = `rgba(255,40,90,${a.toFixed(3)})`; ctx.lineWidth = 2.6;
+      ctx.beginPath(); ctx.moveTo(bm.x0, bm.y0); ctx.lineTo(bm.x1, bm.y1); ctx.stroke();
+      ctx.strokeStyle = `rgba(255,235,245,${a.toFixed(3)})`; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(bm.x0, bm.y0); ctx.lineTo(bm.x1, bm.y1); ctx.stroke();
+      // A hot flare at the emitter and where the beam terminates.
+      ctx.fillStyle = `rgba(255,120,170,${(a * 0.8).toFixed(3)})`;
+      ctx.beginPath(); ctx.arc(bm.x1, bm.y1, 2.6 * a + 1, 0, TAU); ctx.fill();
+      ctx.lineCap = "butt"; ctx.lineWidth = 1;
     }
   }
 

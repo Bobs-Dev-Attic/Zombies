@@ -234,6 +234,8 @@ function drawWeaponLocal(ctx, kind) {
     case "pistol22": R(-1, 1.2, 2, 2.4, "#20242a"); R(0, 0, 5, 2, "#3a3f45"); break; // slim & short
     case "pistol357": // revolver: wood grip, frame, cylinder bump, longer barrel
       R(-1, 1.5, 2, 3, "#3a2a18"); R(0, 0, 5, 3, "#4a4e54"); R(2, 0, 3, 4, "#5a5e64"); R(5, 0, 4, 2, "#33373d"); break;
+    case "laserpistol": // sleek sci-fi frame with a glowing pink emitter
+      R(-1, 1.6, 2, 3, "#2a2f3a"); R(-1, 0, 7, 3, "#3a4250"); R(0, -1.4, 5, 1.2, "#5a6472"); ctx.fillStyle = "#ff3c78"; ctx.fillRect(6, -1, 2, 2); ctx.fillStyle = "#ffd0e2"; ctx.fillRect(6.5, -0.5, 1, 1); break;
     case "shotgun": R(0, 0, 13, 3, "#3a2f28"); R(11, 0, 4, 2, "#20242a"); break;
     case "shotgun_semi": // receiver + barrel with an under mag-tube
       R(-2, 0, 3, 3, "#2a2a2e"); R(0, 0, 12, 3, "#3a2f28"); R(1, 2, 8, 1.6, "#20242a"); R(11, 0, 3, 2, "#20242a"); break;
