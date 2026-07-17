@@ -89,7 +89,7 @@ export const WEAPONS = {
   },
   flamethrower: {
     name: "Flamethrower", tag: "FLM", kind: "flamethrower", damage: 5, fireRate: 20, pellets: 1,
-    spread: 0.32, range: 122, speed: 0, clip: 120, ammoType: "fuel",
+    spread: 0.3, range: 200, speed: 0, clip: 100, ammoType: "fuel", unit: "L",
     reload: 2.6, knockback: 0, sever: 0, hs: 0, sound: "flame", flame: true,
   },
   grenade: {

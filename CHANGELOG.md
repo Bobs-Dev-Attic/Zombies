@@ -7,6 +7,12 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.27.1] — 2026-07-17
+### Longer Reach
+- **Flamethrower reach** — the fire stream now travels much further downrange (ignition range 122 → 200 px; flame particles fire faster, live longer and carry with less drag for a long jet).
+- **Fuel in liters** — the flamethrower's fuel is now measured in liters, shown as an `L` unit on the ammo counter (`weapon.unit`, appended in `_stats`); the tank is 100 L.
+- **Jet-engine roar** — reworked the `flame` SFX into a throatier jet-engine sound: a low lowpass rumble + a bandpass hiss/whine + a low sawtooth rumble tone (louder, throttled).
+
 ## [0.27.0] — 2026-07-17
 ### Trial by Fire
 - **Flamethrower** — a new weapon (`kind: "flamethrower"`, `fuel` ammo) that belches a forward **cone of fire + smoke** (`_flame`), igniting every zombie and flammable piece of furniture it touches. Found in the world loot pool, sold with fuel-can ammo pickups, and included in All Weapons.
