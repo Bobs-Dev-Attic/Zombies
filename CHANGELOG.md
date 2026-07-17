@@ -7,6 +7,10 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.22.1] — 2026-07-16
+### Sharper Shot
+- **Reworked the pistol shot sound** (the shared `pop` used by the .22 and 9mm) into a punchier, crisper report — an instant high-frequency snap transient over a band-swept body plus a low triangle/sine thump for weight, replacing the old thin bandpass pop. Still short (~44 ms) so rapid fire stays tight.
+
 ## [0.22.0] — 2026-07-16
 ### Torn Apart
 - **Corpses match the fallen zombie** — the ground body decal (`drawBodyDecal`) now mirrors the zombie that died: it keeps that individual's **skin tone, clothing colour and hairstyle** (short / long / bald), and lies **torn open with viscera and exposed ribs**. It's **type-aware** — dogs leave a four-legged carcass, rats a tiny one, brutes a bigger body with a wider blood pool, and severed limbs render as **stumps**. The "dead tint" was softened so a corpse stays recognisably the same enemy instead of washing out to grey.
