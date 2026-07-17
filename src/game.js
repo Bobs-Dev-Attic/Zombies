@@ -349,6 +349,14 @@ export class Game {
     if (actions.interact) this._interact();
     if (inp.firing) this._tryFire();
 
+    // Sustained flamethrower roar: spool the engine-thrust loop up while the
+    // trigger's held and there's fuel to burn, and down the moment it stops.
+    const cw = this.player.weapon;
+    const flaming = inp.firing && cw.flame && this.player.reloading <= 0 &&
+      (this.player.unlimitedAmmo || (this.player.loadout.clip[this.player.loadout.current] ?? 0) > 0);
+    if (flaming && !this._flaming) { sfx.startFlame(); this._flaming = true; }
+    else if (!flaming && this._flaming) { sfx.stopFlame(); this._flaming = false; }
+
     // Auto-grab nearby pickups.
     this._autoGrab();
 
@@ -1578,22 +1586,24 @@ export class Game {
   _flame(w) {
     const p = this.player;
     p.muzzle = 0; // no bullet muzzle-flash for the torch
-    const ox = p.x + Math.cos(p.angle) * 12, oy = p.y + Math.sin(p.angle) * 12;
-    sfx.play("flame");
-    // A long jet of fire fanning out along the aim — high velocity so it
-    // streams well downrange before the drag lets it billow up and die.
-    for (let i = 0; i < 7; i++) {
-      const a = p.angle + rand(-w.spread, w.spread), s = rand(300, 520);
-      this.particles.push(new Particle(ox, oy, {
-        vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.35, 0.78),
-        color: pick(["#ffd24a", "#ff9030", "#ff5a2a", "#ffce54", "#c0341a"]), size: randInt(3, 6), drag: 0.945, gravity: -22,
+    const c = Math.cos(p.angle), s = Math.sin(p.angle), perpX = -s, perpY = c;
+    const ox = p.x + c * 12, oy = p.y + s * 12;
+    // A tight, coherent JET of fire: particles launched nearly straight ahead
+    // (only a little jitter) from a narrow nozzle, so it reads as a stream, not
+    // a fanning spray. High speed carries it downrange before drag lets it
+    // billow up and die.
+    for (let i = 0; i < 6; i++) {
+      const jit = rand(-0.07, 0.07), off = rand(-2.2, 2.2), a = p.angle + jit, sp = rand(360, 560);
+      this.particles.push(new Particle(ox + perpX * off, oy + perpY * off, {
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.34, 0.8),
+        color: pick(["#ffd24a", "#ff9030", "#ff5a2a", "#ffce54", "#c0341a"]), size: randInt(3, 6), drag: 0.955, gravity: -18,
       }));
     }
-    if (chance(0.8)) this.particles.push(new Particle(ox + Math.cos(p.angle) * rand(40, 130), oy + Math.sin(p.angle) * rand(40, 130), {
+    if (chance(0.8)) this.particles.push(new Particle(ox + c * rand(60, 150), oy + s * rand(60, 150), {
       vx: rand(-16, 16), vy: rand(-44, -16), life: rand(1.0, 2.0), color: pick(["rgba(40,40,40,0.5)", "rgba(60,58,56,0.45)"]), size: randInt(4, 9), drag: 0.94, gravity: -8,
     }));
-    // Ignite anything caught in the cone.
-    const half = w.spread + 0.15;
+    // Ignite anything caught in the narrow stream.
+    const half = w.spread + 0.13;
     for (const z of this.zombies) {
       if (z.dead) continue;
       const d = dist(ox, oy, z.x, z.y);
@@ -1753,6 +1763,7 @@ export class Game {
 
   _gameOver() {
     if (this.death) return;
+    if (this._flaming) { sfx.stopFlame(); this._flaming = false; } // cut the torch roar
     // Don't cut to the game-over screen — bleed out. The world keeps running
     // while a sheet of blood floods the screen over the next minute; the YOU
     // DIED card fades in a beat later so the blood drips over it.
@@ -2605,6 +2616,6 @@ export class Game {
     ctx.restore();
   }
 
-  pause(v) { this.paused = v; this.lastT = performance.now(); }
+  pause(v) { this.paused = v; this.lastT = performance.now(); if (v && this._flaming) { sfx.stopFlame(); this._flaming = false; } }
   stop() { this.running = false; }
 }
