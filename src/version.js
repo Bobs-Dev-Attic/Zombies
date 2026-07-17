@@ -1,7 +1,15 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.25.0";
+export const VERSION = "0.25.1";
 
 export const CHANGELOG = [
+  {
+    version: "0.25.1",
+    date: "2026-07-17",
+    title: "Catch Your Breath",
+    changes: [
+      "Slowed the player's idle breathing to a more realistic cadence — a natural rest rhythm that only quickens into heavy heaving when you're winded, instead of panting too fast all the time.",
+    ],
+  },
   {
     version: "0.25.0",
     date: "2026-07-17",

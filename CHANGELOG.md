@@ -7,6 +7,10 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.25.1] — 2026-07-17
+### Catch Your Breath
+- **Slower, more realistic breathing** — the player's idle chest-heave cadence was roughly halved (breathing `rate` from `3.0 + tired*4.6` to `1.4 + tired*2.4`), so at rest you breathe at a natural ~13 breaths/min and only quicken toward heavy heaving (~36/min) when winded, instead of panting fast all the time. Heave depth is unchanged.
+
 ## [0.25.0] — 2026-07-17
 ### Scorched Earth
 - **The horde tracks blood** — most zombies (`z.bloody`, ~80%) now leave a trail of **bloody footprints** as they move (alternating left/right, fading over time), and **crawlers drag a bloody smear**. Prints land on floors, tile and rugs and are capped/culled so the floor stays readable.
