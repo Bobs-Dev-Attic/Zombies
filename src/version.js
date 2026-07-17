@@ -1,7 +1,15 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.27.1";
+export const VERSION = "0.27.2";
 
 export const CHANGELOG = [
+  {
+    version: "0.27.2",
+    date: "2026-07-17",
+    title: "Bare Bones",
+    changes: [
+      "Bones! Snapping a limb off now often flings a splintered bone, and blowing a zombie apart scatters shattered bones among the guts — they clatter off the walls and litter the ground.",
+    ],
+  },
   {
     version: "0.27.1",
     date: "2026-07-17",

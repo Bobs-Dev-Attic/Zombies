@@ -882,6 +882,11 @@ export class Game {
       z: 5, vz: rand(40, 90), angle: rand(0, TAU), spin: rand(-14, 14),
       part, color: part.endsWith("leg") ? "#6a7a34" : "#7a8f3a", limbColor: ZOMBIE_LIMB[z.type] || "#72a83a",
     });
+    // Snapping a limb off often exposes/flings a splinter of bone.
+    if (chance(0.6)) {
+      const ba = angle + rand(-0.9, 0.9), bs = rand(80, 170);
+      this.gibs.push({ x: z.x, y: z.y - 5, vx: Math.cos(ba) * bs, vy: Math.sin(ba) * bs - 40, z: 5, vz: rand(50, 100), angle: rand(0, TAU), spin: rand(-18, 18), part: "bone", limbColor: pick(["#e8e2d0", "#ded6c0"]) });
+    }
     for (let i = 0; i < 3; i++) {
       const ba = angle + rand(-1, 1), bs = rand(40, 120);
       this.particles.push(new Particle(z.x, z.y, {
@@ -937,6 +942,10 @@ export class Game {
     for (let i = 0; i < 5; i++) { // guts
       const a = rand(0, TAU), s = rand(80, 220);
       this.gibs.push({ x: z.x, y: z.y - 3, vx: Math.cos(a) * s, vy: Math.sin(a) * s, z: rand(2, 6), vz: rand(50, 120), angle: rand(0, TAU), spin: rand(-12, 12), part: "gut", limbColor: pick(["#9c3a4a", "#7a2030", "#8a2a3a"]), bounce: true });
+    }
+    for (let i = 0; i < randInt(3, 5); i++) { // shattered bones
+      const a = rand(0, TAU), s = rand(120, 300);
+      this.gibs.push({ x: z.x, y: z.y - 4, vx: Math.cos(a) * s, vy: Math.sin(a) * s, z: rand(3, 7), vz: rand(70, 150), angle: rand(0, TAU), spin: rand(-20, 20), part: "bone", limbColor: pick(["#e8e2d0", "#ded6c0", "#efe9d8"]), bounce: true });
     }
     for (let i = 0; i < 16; i++) { // blood droplets that also bounce
       const a = rand(0, TAU), s = rand(120, 340);
