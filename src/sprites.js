@@ -603,17 +603,21 @@ export function drawBodyDecal(ctx, x, y, angle, type, r, parts, look) {
 }
 
 // A severed limb lying on the ground (or, when zHeight>0, tumbling in the air).
-export function drawGroundLimb(ctx, x, y, angle, part, color, zHeight) {
+// Bones take an optional scale (relative to the body they came from) and a kind
+// (long / short / rib / little).
+export function drawGroundLimb(ctx, x, y, angle, part, color, zHeight, boneScale, boneKind) {
   const big = part === "head" || part === "torso" || part === "gut";
+  const bsc = boneScale || 1;
   const len = part && part.endsWith("leg") ? 8 : 6;
+  const shW = part === "bone" ? 3.5 * bsc : (big ? 4.5 : len * 0.5);
   if (zHeight > 0) {
     ctx.fillStyle = "rgba(0,0,0,0.25)";
-    ctx.beginPath(); ctx.ellipse(x, y, (big ? 4.5 : len * 0.5), 2, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, y, shW, 2 * (part === "bone" ? bsc : 1), 0, 0, TAU); ctx.fill();
   }
   ctx.save();
   ctx.translate(x, y - (zHeight || 0));
   ctx.rotate(angle);
-  if (!zHeight) { ctx.fillStyle = "rgba(60,10,10,0.4)"; ctx.beginPath(); ctx.ellipse(0, 0, (big ? 5 : len * 0.7), 3, 0, 0, TAU); ctx.fill(); }
+  if (!zHeight) { ctx.fillStyle = "rgba(60,10,10,0.4)"; ctx.beginPath(); ctx.ellipse(0, 0, (part === "bone" ? 4 * bsc : big ? 5 : len * 0.7), 3 * (part === "bone" ? bsc : 1), 0, 0, TAU); ctx.fill(); }
   if (part === "head") {
     ctx.fillStyle = color || "#d9a066"; ctx.beginPath(); ctx.arc(0, 0, 3.4, 0, TAU); ctx.fill();
     ctx.fillStyle = "#3a2a1a"; ctx.beginPath(); ctx.arc(-1.5, 0, 2.3, 0, TAU); ctx.fill();          // hair on the back
@@ -629,12 +633,25 @@ export function drawGroundLimb(ctx, x, y, angle, part, color, zHeight) {
     for (const [ox, oy] of [[0, 0], [1.4, 0.4], [-1.2, 0.6], [0.4, -1]]) { ctx.beginPath(); ctx.arc(ox, oy, 1.5, 0, TAU); ctx.fill(); }
     ctx.fillStyle = "#7a2030"; ctx.beginPath(); ctx.arc(0.4, 0.2, 0.9, 0, TAU); ctx.fill();
   } else if (part === "bone") {
-    // A bloody bone shard: an ivory shaft with knobby ends.
-    ctx.fillStyle = color || "#e8e2d0";
-    ctx.fillRect(-3, -0.9, 6, 1.8);
-    for (const ex of [-3, 3]) { ctx.beginPath(); ctx.arc(ex, -0.7, 1.1, 0, TAU); ctx.arc(ex, 0.7, 1.1, 0, TAU); ctx.fill(); }
-    ctx.fillStyle = "rgba(0,0,0,0.14)"; ctx.fillRect(-3, 0.4, 6, 0.6); // shading groove
-    ctx.fillStyle = "rgba(120,20,20,0.5)"; ctx.beginPath(); ctx.arc(3, 0, 1.1, 0, TAU); ctx.fill(); // bloody snapped end
+    // Bloody bone shards in a few shapes, scaled to the body they came from:
+    // a long femur, a shorter bone, a curved rib, or a tiny little bone.
+    ctx.scale(bsc, bsc);
+    const ivory = color || "#e8e2d0";
+    if (boneKind === "rib") {
+      ctx.strokeStyle = ivory; ctx.lineWidth = 1.3; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.arc(0, 2.6, 3.3, -Math.PI * 0.86, -Math.PI * 0.14); ctx.stroke();
+      ctx.fillStyle = "rgba(120,20,20,0.5)"; ctx.beginPath(); ctx.arc(-2.9, 1.4, 0.8, 0, TAU); ctx.fill();
+      ctx.lineWidth = 1; ctx.lineCap = "butt";
+    } else if (boneKind === "little") {
+      ctx.fillStyle = ivory; ctx.fillRect(-1.4, -0.6, 2.8, 1.2);
+      for (const ex of [-1.4, 1.4]) { ctx.beginPath(); ctx.arc(ex, -0.5, 0.8, 0, TAU); ctx.arc(ex, 0.5, 0.8, 0, TAU); ctx.fill(); }
+    } else {
+      const L = boneKind === "short" ? 4 : 6; // femur-ish long bone vs a shorter one
+      ctx.fillStyle = ivory; ctx.fillRect(-L / 2, -0.9, L, 1.8);
+      for (const ex of [-L / 2, L / 2]) { ctx.beginPath(); ctx.arc(ex, -0.7, 1.1, 0, TAU); ctx.arc(ex, 0.7, 1.1, 0, TAU); ctx.fill(); }
+      ctx.fillStyle = "rgba(0,0,0,0.14)"; ctx.fillRect(-L / 2, 0.4, L, 0.6); // shading groove
+      ctx.fillStyle = "rgba(120,20,20,0.5)"; ctx.beginPath(); ctx.arc(L / 2, 0, 1.1, 0, TAU); ctx.fill(); // bloody snapped end
+    }
   } else {
     ctx.fillStyle = color || "#72a83a";
     ctx.fillRect(-len / 2, -1.6, len, 3.2);

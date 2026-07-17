@@ -7,6 +7,11 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.28.3] — 2026-07-17
+### Rattle the Bones
+- **Bone variety** — bone gibs now spawn in assorted shapes via a `boneKind`: a **long** femur, a **short** bone, a **curved rib**, or a **little** bone (rendered in `drawGroundLimb`), for messier, more varied gore.
+- **Size-relative bones** — bones are scaled to the body they came from (`boneScale ≈ clamp(z.r/7, …)`), so a **rat** leaves tiny little bones (~0.55×) while a **brute** scatters big ones (~1.6×). Scale + kind are carried through the flying gibs and their settled ground decals, and the bone's shadow scales too.
+
 ## [0.28.2] — 2026-07-17
 ### Fire in the Hole
 - **Shoulder-mounted RPG** — the bazooka is no longer held like a rifle out front; it's drawn as a **shoulder-mounted launch tube** (`drawBazookaLocal`, a dedicated pose in `drawPlayer`) braced on the player's shoulder, running fore-and-aft along the aim with the exhaust vent poking out behind, kicking back on recoil.
