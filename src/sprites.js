@@ -152,7 +152,23 @@ export function drawPlayer(ctx, cx, cy, angle, frame, hurtFlash, weaponKind, pal
   const isShotgun = !melee && (weaponKind === "shotgun" || weaponKind === "shotgun_semi" || weaponKind === "shotgun_sxs");
   const isFlamer = !melee && weaponKind === "flamethrower";
   const isRifle = !melee && weaponKind === "rifle"; // bolt-action hunting rifle
-  if (isFlamer) {
+  const isSmg = !melee && weaponKind === "smg";     // waist-fired machine gun
+  if (isSmg) {
+    // Waist-fired machine gun: gripped at the hip with the compact body angling
+    // across to the aim line, rattling back as it chatters.
+    const recoil = action.recoil || 0;
+    const hipX = 2.0 - recoil * 2.4, hipY = 3.2;
+    const barAng = -0.22 - recoil * 0.05;          // muzzle climbs a touch on recoil
+    const cA = Math.cos(barAng), sA = Math.sin(barAng);
+    const foreHX = hipX + cA * 7, foreHY = hipY + sA * 7 + 0.2;
+    limb2(ctx, 1, 3.0, hipX, hipY, 3, skin);       // trigger hand at the hip
+    limb2(ctx, 1, -1.2, foreHX, foreHY, 3, skin);  // support hand forward on the grip
+    ctx.save();
+    ctx.translate(hipX, hipY);
+    ctx.rotate(barAng);
+    drawSmgLocal(ctx, recoil);
+    ctx.restore();
+  } else if (isFlamer) {
     // Hip-fired flamethrower: the fuel tank rides low at the hip and the nozzle
     // wand angles across to the aim line, gripped in both hands — like the
     // shotgun, but belching fire instead of shot.
@@ -326,6 +342,25 @@ function drawShotgunLocal(ctx, kind, slide, recoil) {
     R(2, -2.4, 2.4, 1.6, "#b3352b");
     R(2, -2.4, 0.9, 1.6, "#c9a24a");
   }
+}
+
+// Waist-fired machine gun, drawn from the hip grip (0,0) with the compact body
+// running forward (+x). `recoil` (0..1) flicks a spent case out the ejection port.
+function drawSmgLocal(ctx, recoil) {
+  const R = (ox, oy, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(ox, oy - h / 2, w, h); };
+  // Folding wire stock tucked back at the hip.
+  R(-6, 0.4, 5, 2.4, "#2a2a2e");
+  R(-6, 0.4, 1.4, 2.4, "#1a1a1e");
+  // Receiver + short barrel + muzzle.
+  R(-1.5, 0, 5, 3.2, "#26262b");
+  R(1, -1.8, 5, 1, "#33373d");     // top rail / sight
+  R(3, 0, 8, 2, "#20242a");        // barrel
+  R(10.5, 0, 2, 2.4, "#15181c");   // muzzle
+  // Stubby box magazine hanging down under the receiver.
+  R(0.5, 2.2, 3.2, 4, "#141418");
+  R(0.5, 2.2, 3.2, 1, "#2c2c32");
+  // Spent brass flicking out the top as it rattles.
+  if (recoil > 0.4) { R(1.4, -2.4, 1.6, 1, "#e0b83a"); R(1.4, -2.4, 0.6, 1, "#8a6a1a"); }
 }
 
 // Hip-fired flamethrower, drawn from the wand grip (0,0) with the fuel tank

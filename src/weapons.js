@@ -29,17 +29,17 @@ export const WEAPONS = {
   pistol22: {
     name: ".22 Pistol", tag: ".22", kind: "pistol22", damage: 15, fireRate: 6.5, pellets: 1,
     spread: 0.04, range: 240, speed: 500, clip: 14, ammoType: "rounds",
-    reload: 0.85, knockback: 26, sever: 0.03, hs: 0.06, sound: "pop",
+    reload: 0.85, knockback: 26, sever: 0.03, hs: 0.06, sound: "pop", ricochet: 2,
   },
   pistol: {
     name: "9mm Pistol", tag: "9mm", kind: "pistol", damage: 26, fireRate: 4.5, pellets: 1,
     spread: 0.03, range: 260, speed: 520, clip: 12, ammoType: "rounds",
-    reload: 1.1, knockback: 60, sever: 0.06, hs: 0.09, sound: "pop",
+    reload: 1.1, knockback: 60, sever: 0.06, hs: 0.09, sound: "pop", ricochet: 2,
   },
   pistol357: {
     name: ".357 Magnum", tag: "357", kind: "pistol357", damage: 54, fireRate: 2.2, pellets: 1,
     spread: 0.02, range: 300, speed: 620, clip: 6, ammoType: "rounds",
-    reload: 1.6, knockback: 140, sever: 0.22, hs: 0.2, sound: "boom",
+    reload: 1.6, knockback: 140, sever: 0.22, hs: 0.2, sound: "boom", wallPen: 0.5,
   },
   laserpistol: {
     name: "Laser Pistol", tag: "LAS", kind: "laserpistol", beam: true, damage: 15, fireRate: 5,
@@ -74,17 +74,17 @@ export const WEAPONS = {
   rifle: {
     name: "Hunting Rifle", tag: "BLT", kind: "rifle", damage: 62, fireRate: 1.7, pellets: 1,
     spread: 0.006, range: 480, speed: 860, clip: 5, ammoType: "rounds",
-    reload: 2.0, knockback: 150, pierce: 2, sever: 0.42, hs: 0.24, sound: "crack",
+    reload: 2.0, knockback: 150, pierce: 2, sever: 0.42, hs: 0.24, sound: "crack", wallPen: 0.6,
   },
   rifle_semi: {
     name: "Battle Rifle", tag: "BR", kind: "rifle_semi", damage: 40, fireRate: 5, pellets: 1,
     spread: 0.02, range: 420, speed: 780, clip: 20, ammoType: "rounds",
-    reload: 1.8, knockback: 110, pierce: 1, sever: 0.28, hs: 0.16, sound: "crack",
+    reload: 1.8, knockback: 110, pierce: 1, sever: 0.28, hs: 0.16, sound: "crack", wallPen: 0.35,
   },
   rifle_auto: {
     name: "Assault Rifle", tag: "AR", kind: "rifle_auto", damage: 24, fireRate: 10, pellets: 1,
     spread: 0.06, range: 360, speed: 720, clip: 30, ammoType: "rounds",
-    reload: 2.0, knockback: 55, auto: true, sever: 0.12, hs: 0.1, sound: "rattle",
+    reload: 2.0, knockback: 55, auto: true, sever: 0.12, hs: 0.1, sound: "rattle", wallPen: 0.12,
   },
 
   bazooka: {

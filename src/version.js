@@ -1,7 +1,17 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.33.0";
+export const VERSION = "0.34.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.34.0",
+    date: "2026-07-17",
+    title: "Off the Wall",
+    changes: [
+      "Powerful guns now punch bullets through walls — but only some rounds make it: the Hunting Rifle most often, the .357 Magnum and Battle Rifle sometimes, the Assault Rifle rarely.",
+      "The 9mm and .22 pistols now ricochet — their light rounds bounce off walls with a metallic zing (and lose a little punch each bounce).",
+      "The Machine Gun is now fired from the waist, held at the hip and swinging to your aim like the shotguns.",
+    ],
+  },
   {
     version: "0.33.0",
     date: "2026-07-17",

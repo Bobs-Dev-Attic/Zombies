@@ -130,6 +130,7 @@ export class SFX {
       case "caw":    this._tone("sawtooth", 720, 380, 0.12, 0.13, t); this._tone("square", 900, 500, 0.1, 0.07, t + 0.11); this._noise(0.09, 0.08, t, "bandpass", 1600, 2, 900); break; // crow
       case "screech":this._tone("sawtooth", 520, 240, 0.3, 0.12, t); this._noise(0.3, 0.09, t, "highpass", 1200, 1.5, 700); break; // vulture
       case "splinter": this._noise(0.12, 0.24, t, "bandpass", 700, 0.7, 250); break;
+      case "ricochet": this._tone("square", 2500, 850, 0.09, 0.1, t); this._tone("triangle", 3400, 1500, 0.06, 0.07, t + 0.008); this._noise(0.04, 0.09, t, "highpass", 4200, 1, null); break; // metallic zing off a wall
       case "ui":     this._tone("square", 440, 660, 0.08, 0.2, t); break;
       // --- zombie voices ---
       case "groan":  this._tone("sawtooth", 105 + Math.random() * 40, 70, 0.5, 0.16, t); this._noise(0.4, 0.07, t, "lowpass", 500, 1, null); break;
