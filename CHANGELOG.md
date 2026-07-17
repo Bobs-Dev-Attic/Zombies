@@ -7,6 +7,14 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.27.0] — 2026-07-17
+### Trial by Fire
+- **Flamethrower** — a new weapon (`kind: "flamethrower"`, `fuel` ammo) that belches a forward **cone of fire + smoke** (`_flame`), igniting every zombie and flammable piece of furniture it touches. Found in the world loot pool, sold with fuel-can ammo pickups, and included in All Weapons.
+- **Living fire** — ignited zombies (`z.burning`) take **damage over time**, throw off flames and smoke, and **spread fire** to adjacent zombies and furniture (`_updateZombieFire`); they keep attacking while they burn, then **die into a smouldering pile of ash** instead of a corpse (`_burnToAsh`, a grey ash scorch). Furniture fires now **consume** the piece over time (`_updateBurning` burn timer) and spread — and **burning vehicles cook off and explode**.
+- **Exploding zombies blow apart** — the Exploding Zombies mutator now flings **heads, limbs, guts and a spray of blood** as gibs that **ricochet off walls, furniture and other solids** (`_flingZombieGibs`, bounce support added to `_updateGibs`).
+- **Bladed dismemberment** — the **axe** and **katana** (`alwaysSever`) now **lop a limb off on every hit** (legs first, to disable), reliably crippling zombies into prone crawlers even as the blow kills them.
+- New synthesized **`flame`** roar (throttled) and a flamethrower sprite.
+
 ## [0.26.0] — 2026-07-17
 ### Fun Options
 - **Fun Options menu** — a row of toggle chips on the start screen (`#cheats`, wired in `main.js`, read by the game on START as `game.cheats`) lets you mix in cheats/mutators before a run; the chosen set is remembered in localStorage.

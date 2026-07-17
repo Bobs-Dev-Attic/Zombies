@@ -102,11 +102,11 @@ export class Game {
     const c = this.cheats || {};
     if (c.allWeapons) {
       for (const id of WEAPON_ORDER) { lo.owned[id] = true; if (WEAPONS[id].clip) lo.clip[id] = WEAPONS[id].clip; }
-      lo.ammo = { shells: 999, rounds: 999, rockets: 99, grenades: 20, flares: 20 };
+      lo.ammo = { shells: 999, rounds: 999, rockets: 99, fuel: 600, grenades: 20, flares: 20 };
       lo.current = "rifle_auto";
     }
     if (c.swords) lo.owned.sword = true;
-    if (c.unlimitedAmmo) lo.ammo = { shells: 999, rounds: 999, rockets: 99, grenades: 99, flares: 99 };
+    if (c.unlimitedAmmo) lo.ammo = { shells: 999, rounds: 999, rockets: 99, fuel: 600, grenades: 99, flares: 99 };
     return lo;
   }
 
@@ -148,19 +148,19 @@ export class Game {
     // The house hand-places its loot (key, axe, room rewards) via world.loot.
     if (this.world.loot) { this._seedHouseLoot(); return; }
     // Scatter weapon crates, ammo, and medkits across the map.
-    const weaponPool = ["bat", "axe", "pistol22", "pistol357", "smg",
+    const weaponPool = ["bat", "axe", "sword", "pistol22", "pistol357", "smg",
       "shotgun", "shotgun_semi", "shotgun_sxs",
-      "rifle", "rifle_semi", "rifle_auto", "bazooka"];
+      "rifle", "rifle_semi", "rifle_auto", "bazooka", "flamethrower"];
     const crates = randInt(3, 5);
     for (let i = 0; i < crates; i++) {
       const p = this.world.randomFloorFar(this.player.x, this.player.y, 120);
       if (p) this.pickups.push(new Pickup(p.x, p.y, "weapon", pick(weaponPool)));
     }
-    const ammoTypes = ["rounds", "shells", "rockets"];
+    const ammoTypes = ["rounds", "shells", "rockets", "fuel"];
     for (let i = 0; i < randInt(4, 7); i++) {
       const p = this.world.randomFloor();
       const type = pick(ammoTypes);
-      const amount = type === "rockets" ? randInt(1, 2) : type === "shells" ? randInt(6, 14) : randInt(20, 40);
+      const amount = type === "rockets" ? randInt(1, 2) : type === "fuel" ? randInt(40, 90) : type === "shells" ? randInt(6, 14) : randInt(20, 40);
       this.pickups.push(new Pickup(p.x, p.y, "ammo", { type, amount }));
     }
     for (let i = 0; i < randInt(2, 3); i++) {
@@ -367,6 +367,7 @@ export class Game {
     this._updateProjectiles(dt);
     this._updateThrown(dt);
     this._updateBurning(dt);
+    this._updateZombieFire(dt);
     this._updateFlies(dt);
     this._updateBirds(dt);
     this._updateScorches(dt);
@@ -594,6 +595,7 @@ export class Game {
     if (w.throwable) { this._throw(w); return; }
 
     if (!p.unlimitedAmmo) p.loadout.clip[p.loadout.current]--;
+    if (w.flame) { this._flame(w); return; }
     const laser = !!(this.cheats && this.cheats.lasers) && !w.explosive;
     const pellets = w.pellets || 1;
     for (let i = 0; i < pellets; i++) {
@@ -637,7 +639,7 @@ export class Game {
       const contact = d <= p.r + z.r + 9;
       if (contact || da <= arc / 2) {
         const dmg = w.damage * (variant === "lunge" ? 1.3 : 1);
-        this._damageZombie(z, dmg, p.angle, w.knockback, w.sever || 0, w.hs || 0);
+        this._damageZombie(z, dmg, p.angle, w.knockback, w.sever || 0, w.hs || 0, !!w.alwaysSever);
         this._hitGore(z.x, z.y, p.angle, z);
         hit = true;
       }
@@ -855,7 +857,10 @@ export class Game {
     const pr = w.collide(p.x, p.y, p.r, false, true); p.x = pr.x; p.y = pr.y;
   }
 
-  _damageZombie(z, dmg, angle, force, sever = 0, hs = 0) {
+  _damageZombie(z, dmg, angle, force, sever = 0, hs = 0, forceSever = false) {
+    // Blades (axe/sword) lop a limb off with every blow — legs first, to disable
+    // the zombie — even if the same swing goes on to kill it.
+    if (forceSever && !z.dead) { const part = z._severRandom(true); if (part) this._severFX(z, part, angle); }
     // Chance for an instant headshot kill (not from explosions).
     if (!z.dead && hs > 0 && Math.random() < hs) {
       z.hp = 0; z.dead = true;
@@ -890,21 +895,54 @@ export class Game {
   }
 
   // Flying limbs fall under gravity, tumble, and settle into ground decals.
+  // Fast, bouncy gibs (from an exploding zombie) ricochet off walls & furniture.
   _updateGibs(dt) {
+    const w = this.world;
     for (const g of this.gibs) {
-      g.x += g.vx * dt; g.y += g.vy * dt;
-      g.vx *= Math.pow(0.1, dt); g.vy *= Math.pow(0.1, dt);
+      const nx = g.x + g.vx * dt, ny = g.y + g.vy * dt;
+      if (g.bounce) {
+        // Reflect off any solid it would enter, per axis, shedding some energy.
+        let hit = false;
+        if (w.solidAt(nx, g.y)) { g.vx = -g.vx * 0.5; hit = true; } else g.x = nx;
+        if (w.solidAt(g.x, ny)) { g.vy = -g.vy * 0.5; hit = true; } else g.y = ny;
+        if (hit) { g.spin = -g.spin * 0.6; if (g.part === "blood" && chance(0.6)) { this.stains.push({ x: g.x, y: g.y, r: rand(1.5, 3), life: rand(6, 12), color: "#5a0f0f" }); g.dead = true; continue; } }
+      } else { g.x = nx; g.y = ny; }
+      g.vx *= Math.pow(g.bounce ? 0.25 : 0.1, dt); g.vy *= Math.pow(g.bounce ? 0.25 : 0.1, dt);
       g.z += g.vz * dt; g.vz -= 260 * dt; // height above ground
       g.angle += g.spin * dt;
       if (g.z <= 0) {
         g.z = 0;
+        if (g.part === "blood") { this.stains.push({ x: g.x, y: g.y, r: rand(1.5, 3.5), life: rand(6, 12), color: "#5a0f0f" }); g.dead = true; continue; }
         this.limbs.push({ x: g.x, y: g.y, angle: g.angle, part: g.part, color: g.limbColor });
-        if (this.limbs.length > 80) this.limbs.shift();
+        if (this.limbs.length > 90) this.limbs.shift();
         this.stains.push({ x: g.x, y: g.y, r: rand(3, 5), life: rand(8, 14), color: "#4a0c0c" });
         g.dead = true;
       }
     }
     this.gibs = this.gibs.filter((g) => !g.dead);
+  }
+
+  // Blow a zombie apart: fling its head, attached limbs, torso, guts and a
+  // spray of blood as bouncing gibs that ricochet off walls and furniture.
+  _flingZombieGibs(z) {
+    const skin = z.look ? z.look.skin : "#72a83a";
+    const cloth = z.look ? z.look.cloth : "#5a5347";
+    const limbCol = ZOMBIE_LIMB[z.type] || "#72a83a";
+    const chunks = [["head", skin], ["torso", cloth]];
+    for (const k of ["larm", "rarm", "lleg", "rleg"]) if (z.parts && z.parts[k]) chunks.push([k, k.endsWith("leg") ? cloth : limbCol]);
+    for (const [part, color] of chunks) {
+      const a = rand(0, TAU), s = rand(120, 300);
+      this.gibs.push({ x: z.x, y: z.y - 4, vx: Math.cos(a) * s, vy: Math.sin(a) * s, z: rand(3, 7), vz: rand(60, 150), angle: rand(0, TAU), spin: rand(-18, 18), part, limbColor: color, bounce: true });
+    }
+    for (let i = 0; i < 5; i++) { // guts
+      const a = rand(0, TAU), s = rand(80, 220);
+      this.gibs.push({ x: z.x, y: z.y - 3, vx: Math.cos(a) * s, vy: Math.sin(a) * s, z: rand(2, 6), vz: rand(50, 120), angle: rand(0, TAU), spin: rand(-12, 12), part: "gut", limbColor: pick(["#9c3a4a", "#7a2030", "#8a2a3a"]), bounce: true });
+    }
+    for (let i = 0; i < 16; i++) { // blood droplets that also bounce
+      const a = rand(0, TAU), s = rand(120, 340);
+      this.gibs.push({ x: z.x, y: z.y - 3, vx: Math.cos(a) * s, vy: Math.sin(a) * s, z: rand(1, 5), vz: rand(40, 120), angle: 0, spin: 0, part: "blood", limbColor: "#7a1010", bounce: true });
+    }
+    if (this.gibs.length > 220) this.gibs.splice(0, this.gibs.length - 220);
   }
 
   _damageFurniture(f, dmg, angle, force) {
@@ -955,9 +993,25 @@ export class Game {
   }
 
   // Wrecked vehicles smoulder: licking flames and a rising column of smoke.
+  // Fire consumes the furniture over time — vehicles blow up, other pieces
+  // collapse to smouldering ash — and spreads to zombies and nearby furniture.
   _updateBurning(dt) {
     for (const f of this.world.furniture) {
       if (!f.burning || f.broken) continue;
+      const vehicle = f.type === "car" || f.type === "truck";
+      if (f.burnT === undefined) f.burnT = vehicle ? rand(12, 26) : rand(6, 12);
+      f.burnT -= dt;
+      // Fire is contagious — it catches the horde and neighbouring furniture alight.
+      if (chance(dt * 2.5)) {
+        for (const z of this.zombies) if (!z.dead && z.burning <= 0 && dist(f.x, f.y, z.x, z.y) < Math.max(f.hw, f.hh) + z.r + 8) this._igniteZombie(z, 4);
+        for (const o of this.world.furniture) if (o !== f && !o.broken && !o.burning && dist(f.x, f.y, o.x, o.y) < Math.max(f.hw, f.hh) + Math.max(o.hw, o.hh) + 10) { this._igniteFurniture(o); break; }
+      }
+      if (f.burnT <= 0) {
+        if (vehicle) this._explode(f.x, f.y, { explosive: 40, damage: 90, sever: 0.6 }); // vehicles blow up
+        else { this.scorches.push({ x: f.x, y: f.y, r: Math.max(f.hw, f.hh), smolder: rand(3, 6), seed: (Math.random() * 1e9) | 0, kind: "ash" }); if (this.scorches.length > 50) this.scorches.shift(); }
+        f.broken = true; f.overturned = true; f.burning = false;
+        continue;
+      }
       f._emberT = (f._emberT || 0) - dt;
       if (f._emberT > 0) continue;
       f._emberT = rand(0.04, 0.1);
@@ -1103,19 +1157,20 @@ export class Game {
 
   _drawScorch(ctx) {
     for (const sc of this.scorches) {
-      // Charred blast burn: a dark radial sear with a sooty ragged rim.
+      // Charred blast burn: a dark radial sear with a sooty ragged rim. Ash
+      // piles (burned-up zombies/furniture) are greyer and mounded.
+      const ash = sc.kind === "ash";
       const g = ctx.createRadialGradient(sc.x, sc.y, 1, sc.x, sc.y, sc.r);
-      g.addColorStop(0, "rgba(8,7,6,0.82)");
-      g.addColorStop(0.55, "rgba(20,16,12,0.6)");
-      g.addColorStop(1, "rgba(24,20,16,0)");
+      if (ash) { g.addColorStop(0, "rgba(46,44,42,0.85)"); g.addColorStop(0.5, "rgba(30,28,26,0.7)"); g.addColorStop(1, "rgba(24,22,20,0)"); }
+      else { g.addColorStop(0, "rgba(8,7,6,0.82)"); g.addColorStop(0.55, "rgba(20,16,12,0.6)"); g.addColorStop(1, "rgba(24,20,16,0)"); }
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(sc.x, sc.y, sc.r, 0, TAU); ctx.fill();
-      // Soot flecks flung out around the crater (deterministic per scorch).
+      // Flecks: pale ash crumbs, or dark soot around a crater (deterministic).
       let h = sc.seed >>> 0;
-      ctx.fillStyle = "rgba(10,9,8,0.6)";
+      ctx.fillStyle = ash ? "rgba(120,116,110,0.55)" : "rgba(10,9,8,0.6)";
       for (let i = 0; i < 10; i++) {
         h = (h * 1103515245 + 12345) >>> 0;
-        const a = (h % 628) / 100, rr = sc.r * (0.6 + (h >> 9) % 45 / 100);
+        const a = (h % 628) / 100, rr = sc.r * ((ash ? 0.2 : 0.6) + (h >> 9) % 45 / 100);
         ctx.fillRect(sc.x + Math.cos(a) * rr, sc.y + Math.sin(a) * rr, 1.6, 1.6);
       }
       // A faint ember glow while it's still smouldering.
@@ -1348,6 +1403,7 @@ export class Game {
   _zombieBurst(z) {
     z._burst = true;
     const R = 58;
+    this._flingZombieGibs(z); // head, limbs, guts and blood ricochet off the walls
     this.shockwaves.push({ x: z.x, y: z.y, r: 6, max: R + 8, life: 0.35 });
     for (let i = 0; i < 18; i++) {
       const a = rand(0, TAU), s = rand(40, 180);
@@ -1505,6 +1561,94 @@ export class Game {
         color: pick(["rgba(180,180,180,0.5)", "rgba(140,140,140,0.4)"]), size: randInt(2, 3), drag: 0.82,
       }));
     }
+  }
+
+  // ------------------------------------------------------- Fire
+  // Flamethrower: belch a forward cone of flame + smoke that torches everything
+  // it touches — zombies, furniture and vehicles catch fire.
+  _flame(w) {
+    const p = this.player;
+    p.muzzle = 0; // no bullet muzzle-flash for the torch
+    const ox = p.x + Math.cos(p.angle) * 12, oy = p.y + Math.sin(p.angle) * 12;
+    sfx.play("flame");
+    // Jet of fire particles fanning out along the aim.
+    for (let i = 0; i < 5; i++) {
+      const a = p.angle + rand(-w.spread, w.spread), reach = rand(0.3, 1) * w.range, s = rand(160, 300);
+      this.particles.push(new Particle(ox, oy, {
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.25, 0.6),
+        color: pick(["#ffd24a", "#ff9030", "#ff5a2a", "#ffce54", "#c0341a"]), size: randInt(3, 6), drag: 0.9, gravity: -20,
+      }));
+    }
+    if (chance(0.7)) this.particles.push(new Particle(ox + Math.cos(p.angle) * rand(20, 80), oy + Math.sin(p.angle) * rand(20, 80), {
+      vx: rand(-14, 14), vy: rand(-40, -14), life: rand(0.9, 1.8), color: pick(["rgba(40,40,40,0.5)", "rgba(60,58,56,0.45)"]), size: randInt(4, 8), drag: 0.94, gravity: -8,
+    }));
+    // Ignite anything caught in the cone.
+    const half = w.spread + 0.15;
+    for (const z of this.zombies) {
+      if (z.dead) continue;
+      const d = dist(ox, oy, z.x, z.y);
+      if (d > w.range + z.r) continue;
+      const da = Math.abs(((angleTo(ox, oy, z.x, z.y) - p.angle + Math.PI * 3) % TAU) - Math.PI);
+      if (da <= half) { this._igniteZombie(z, 4.5); z.hp -= w.damage; if (z.hp <= 0 && !z.dead) this._burnToAsh(z); }
+    }
+    for (const f of this.world.furniture) {
+      if (f.broken || f.burning) continue;
+      const d = dist(ox, oy, f.x, f.y);
+      if (d > w.range + Math.max(f.hw, f.hh)) continue;
+      const da = Math.abs(((angleTo(ox, oy, f.x, f.y) - p.angle + Math.PI * 3) % TAU) - Math.PI);
+      if (da <= half) this._igniteFurniture(f);
+    }
+    this.shake += 0.3;
+  }
+
+  _igniteZombie(z, secs) {
+    if (z.type === "rat") { z.hp = 0; if (!z.dead) this._burnToAsh(z); return; } // too small to burn — just cremated
+    z.burning = Math.max(z.burning, secs);
+  }
+
+  _igniteFurniture(f) {
+    if (f.broken || f.burning) return;
+    f.burning = true;
+    const vehicle = f.type === "car" || f.type === "truck";
+    f.burnT = vehicle ? rand(5, 10) : rand(4, 8); // then it's consumed / explodes
+  }
+
+  // Per-frame fire on the horde: burn damage over time, flames & smoke, spread
+  // to neighbours, and — when it finally dies — collapse into smouldering ash.
+  _updateZombieFire(dt) {
+    for (const z of this.zombies) {
+      if (z.dead || z.burning <= 0) continue;
+      z.burning -= dt;
+      z.hp -= 11 * dt; // fire damage over time (they can still attack meanwhile)
+      // Flames licking up the body + a thread of smoke.
+      if (chance(dt * 34)) this.particles.push(new Particle(z.x + rand(-z.r, z.r), z.y - rand(0, z.r), {
+        vx: rand(-8, 8), vy: rand(-46, -18), life: rand(0.25, 0.55), color: pick(["#ffd24a", "#ff9030", "#ff5a2a", "#ffce54"]), size: randInt(2, 4), drag: 0.88, gravity: -22,
+      }));
+      if (chance(dt * 10)) this.particles.push(new Particle(z.x, z.y - z.r, {
+        vx: rand(-8, 8), vy: rand(-30, -12), life: rand(0.8, 1.6), color: pick(["rgba(40,40,40,0.45)", "rgba(60,58,56,0.4)"]), size: randInt(3, 6), drag: 0.94, gravity: -8,
+      }));
+      // Fire is contagious: touch another zombie or a flammable piece and it spreads.
+      if (chance(dt * 3)) {
+        for (const o of this.zombies) { if (o !== z && !o.dead && o.burning <= 0 && dist(z.x, z.y, o.x, o.y) < z.r + o.r + 6) { this._igniteZombie(o, 4); break; } }
+        for (const f of this.world.furniture) { if (!f.broken && !f.burning && dist(z.x, z.y, f.x, f.y) < Math.max(f.hw, f.hh) + z.r + 4) { this._igniteFurniture(f); break; } }
+      }
+      if (z.hp <= 0 && !z.dead) this._burnToAsh(z);
+    }
+  }
+
+  // A zombie burned to death: no ordinary corpse — it slumps into a smouldering
+  // pile of ash with a last gout of embers and smoke.
+  _burnToAsh(z) {
+    z.dead = true;
+    this.score += z.def.score;
+    this.player.kills++;
+    for (let i = 0; i < 14; i++) {
+      const a = rand(0, TAU), s = rand(20, 110);
+      this.particles.push(new Particle(z.x, z.y, { vx: Math.cos(a) * s, vy: Math.sin(a) * s - 20, life: rand(0.4, 1.1), color: pick(["#ff7a2a", "#ffab40", "#3a3a3a", "#1c1c1c", "#c0341a"]), size: randInt(2, 4), drag: 0.9, gravity: -6 }));
+    }
+    this.scorches.push({ x: z.x, y: z.y, r: z.r * 1.5, smolder: rand(4, 7), seed: (Math.random() * 1e9) | 0, kind: "ash" });
+    if (this.scorches.length > 50) this.scorches.shift();
+    if (this.cheats && this.cheats.explodingZombies && !z._burst) this._zombieBurst(z);
   }
 
   // ------------------------------------------------------- Pickups & doors
@@ -2195,7 +2339,14 @@ export class Game {
   }
 
   _drawGibs(ctx) {
-    for (const g of this.gibs) drawGroundLimb(ctx, g.x, g.y, g.angle, g.part, g.limbColor, g.z);
+    for (const g of this.gibs) {
+      if (g.part === "blood") { // a flying droplet with a faint ground shadow
+        if (g.z > 0) { ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fillRect(Math.round(g.x), Math.round(g.y), 2, 1); }
+        ctx.fillStyle = "#8a1414"; ctx.fillRect(Math.round(g.x), Math.round(g.y - g.z), 2, 2);
+        continue;
+      }
+      drawGroundLimb(ctx, g.x, g.y, g.angle, g.part, g.limbColor, g.z);
+    }
   }
 
   _drawThrown(ctx) {
@@ -2300,6 +2451,16 @@ export class Game {
       if (alpha < 1) ctx.globalAlpha = alpha;
       drawZombie(ctx, z.x, z.y, z.angle, z.frame, z.type, z.r, z.hurtFlash > 0, z.parts, z.prone, z.strideAmp, z.jumpH, z.vx, z.vy, z.look);
       if (alpha < 1) ctx.globalAlpha = 1;
+      // Sheath a burning zombie in a flickering flame aura.
+      if (z.burning > 0) {
+        const t = (this._waterT || 0);
+        for (let i = 0; i < 4; i++) {
+          const a = t * 9 + i * 1.7 + z.frame, fx = z.x + Math.cos(a) * z.r * 0.7, fy = z.y - z.r * 0.5 + Math.sin(a * 1.3) * z.r * 0.5;
+          ctx.fillStyle = i & 1 ? "rgba(255,150,40,0.75)" : "rgba(255,206,84,0.7)";
+          const s = z.r * (0.5 + 0.25 * Math.sin(t * 14 + i));
+          ctx.beginPath(); ctx.moveTo(fx, fy - s); ctx.lineTo(fx - s * 0.5, fy + s * 0.4); ctx.lineTo(fx + s * 0.5, fy + s * 0.4); ctx.closePath(); ctx.fill();
+        }
+      }
     }
   }
 
