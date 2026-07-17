@@ -148,8 +148,20 @@ export function drawPlayer(ctx, cx, cy, angle, frame, hurtFlash, weaponKind, pal
   }
   const gx = Math.cos(sweep) * handFwd, gy = Math.sin(sweep) * handFwd;
 
+  const isBazooka = !melee && weaponKind === "bazooka";
   const isShotgun = !melee && (weaponKind === "shotgun" || weaponKind === "shotgun_semi" || weaponKind === "shotgun_sxs");
-  if (isShotgun) {
+  if (isBazooka) {
+    // Shoulder-mounted RPG: the launch tube rests on the right shoulder and runs
+    // fore-and-aft along the aim, its rear vent sticking out behind the shoulder.
+    const recoil = action.recoil || 0;
+    const shX = 2.5 - recoil * 3.2, shY = 3.0; // rides the shoulder; kicks back on recoil
+    limb2(ctx, 1, 3.0, shX, shY, 3, skin);              // trigger hand at the shoulder grip
+    limb2(ctx, 1, -1.2, shX + 9, shY - 0.6, 3, skin);   // support hand forward on the tube
+    ctx.save();
+    ctx.translate(shX, shY);
+    drawBazookaLocal(ctx);
+    ctx.restore();
+  } else if (isShotgun) {
     // Hip-fired shotgun: the butt is tucked at the right hip and the barrel
     // angles across to the aim line, so from above the gun sits off to one side.
     // It kicks back on recoil and, for the pump gun, the fore-end racks a shell.
@@ -267,6 +279,26 @@ function drawShotgunLocal(ctx, kind, slide, recoil) {
     R(2, -2.4, 2.4, 1.6, "#b3352b");
     R(2, -2.4, 0.9, 1.6, "#c9a24a");
   }
+}
+
+// Shoulder-mounted RPG launcher, drawn from the shoulder origin (0,0) with the
+// tube running forward (+x) and its exhaust vent poking out behind (-x).
+function drawBazookaLocal(ctx) {
+  const R = (ox, oy, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(ox, oy - h / 2, w, h); };
+  // Rear section behind the shoulder, with a flared exhaust vent (the mouth).
+  R(-10, 0, 5, 5.6, "#2a331d");
+  ctx.fillStyle = "#12160d"; ctx.beginPath(); ctx.ellipse(-10, 0, 1.8, 3.2, 0, 0, TAU); ctx.fill(); // vent opening
+  // Main launch tube.
+  R(-5, 0, 21, 5, "#3d4a2a");
+  R(-5, -2.4, 21, 1.1, "#4c5c34");   // top highlight
+  R(-5, 2.1, 21, 0.9, "#2c3620");    // underside shadow
+  // Pistol grip + trigger below.
+  R(-1, 2.4, 3, 3, "#242019");
+  // Front sight ring and post.
+  R(14, 0, 2, 6.4, "#2a331d");
+  R(9, -3.6, 1.6, 2.2, "#20281a");
+  // Muzzle mouth.
+  ctx.fillStyle = "#12160d"; ctx.beginPath(); ctx.ellipse(16, 0, 1.5, 2.6, 0, 0, TAU); ctx.fill();
 }
 
 // Animated muzzle flash at the barrel tip. intensity 0..1 fades it out.

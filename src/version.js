@@ -1,7 +1,16 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.28.1";
+export const VERSION = "0.28.2";
 
 export const CHANGELOG = [
+  {
+    version: "0.28.2",
+    date: "2026-07-17",
+    title: "Fire in the Hole",
+    changes: [
+      "The RPG is now properly shoulder-mounted — a long launch tube braced on your shoulder with the vent out the back.",
+      "Firing it now blasts a jet of fire and smoke out the rear of the launcher, and the rocket streaks off as a finned missile trailing its own exhaust flame and smoke.",
+    ],
+  },
   {
     version: "0.28.1",
     date: "2026-07-17",
