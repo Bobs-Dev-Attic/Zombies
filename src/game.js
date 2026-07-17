@@ -993,10 +993,10 @@ export class Game {
       z: 5, vz: rand(40, 90), angle: rand(0, TAU), spin: rand(-14, 14),
       part, color: part.endsWith("leg") ? "#6a7a34" : "#7a8f3a", limbColor: ZOMBIE_LIMB[z.type] || "#72a83a",
     });
-    // Snapping a limb off often exposes/flings a splinter of bone.
+    // Snapping a limb off often exposes/flings a splinter of bone (sized to the body).
     if (chance(0.6)) {
-      const ba = angle + rand(-0.9, 0.9), bs = rand(80, 170);
-      this.gibs.push({ x: z.x, y: z.y - 5, vx: Math.cos(ba) * bs, vy: Math.sin(ba) * bs - 40, z: 5, vz: rand(50, 100), angle: rand(0, TAU), spin: rand(-18, 18), part: "bone", limbColor: pick(["#e8e2d0", "#ded6c0"]) });
+      const ba = angle + rand(-0.9, 0.9), bs = rand(80, 170), bsz = clamp(z.r / 7, 0.42, 1.8);
+      this.gibs.push({ x: z.x, y: z.y - 5, vx: Math.cos(ba) * bs, vy: Math.sin(ba) * bs - 40, z: 5, vz: rand(50, 100), angle: rand(0, TAU), spin: rand(-18, 18), part: "bone", limbColor: pick(["#e8e2d0", "#ded6c0"]), boneScale: bsz * rand(0.8, 1.2), boneKind: pick(["long", "short", "rib", "little"]) });
     }
     for (let i = 0; i < 3; i++) {
       const ba = angle + rand(-1, 1), bs = rand(40, 120);
@@ -1029,7 +1029,7 @@ export class Game {
       if (g.z <= 0) {
         g.z = 0;
         if (g.part === "blood") { this.stains.push({ x: g.x, y: g.y, r: rand(1.5, 3.5), life: rand(6, 12), color: "#5a0f0f" }); g.dead = true; continue; }
-        this.limbs.push({ x: g.x, y: g.y, angle: g.angle, part: g.part, color: g.limbColor });
+        this.limbs.push({ x: g.x, y: g.y, angle: g.angle, part: g.part, color: g.limbColor, boneScale: g.boneScale, boneKind: g.boneKind });
         if (this.limbs.length > 90) this.limbs.shift();
         this.stains.push({ x: g.x, y: g.y, r: rand(3, 5), life: rand(8, 14), color: "#4a0c0c" });
         g.dead = true;
@@ -1054,9 +1054,10 @@ export class Game {
       const a = rand(0, TAU), s = rand(80, 220);
       this.gibs.push({ x: z.x, y: z.y - 3, vx: Math.cos(a) * s, vy: Math.sin(a) * s, z: rand(2, 6), vz: rand(50, 120), angle: rand(0, TAU), spin: rand(-12, 12), part: "gut", limbColor: pick(["#9c3a4a", "#7a2030", "#8a2a3a"]), bounce: true });
     }
-    for (let i = 0; i < randInt(3, 5); i++) { // shattered bones
+    const bsz = clamp(z.r / 7, 0.42, 1.8); // bones scale to the body they came from
+    for (let i = 0; i < randInt(3, 6); i++) { // shattered bones of assorted shapes
       const a = rand(0, TAU), s = rand(120, 300);
-      this.gibs.push({ x: z.x, y: z.y - 4, vx: Math.cos(a) * s, vy: Math.sin(a) * s, z: rand(3, 7), vz: rand(70, 150), angle: rand(0, TAU), spin: rand(-20, 20), part: "bone", limbColor: pick(["#e8e2d0", "#ded6c0", "#efe9d8"]), bounce: true });
+      this.gibs.push({ x: z.x, y: z.y - 4, vx: Math.cos(a) * s, vy: Math.sin(a) * s, z: rand(3, 7), vz: rand(70, 150), angle: rand(0, TAU), spin: rand(-20, 20), part: "bone", limbColor: pick(["#e8e2d0", "#ded6c0", "#efe9d8"]), bounce: true, boneScale: bsz * rand(0.75, 1.25), boneKind: pick(["long", "long", "short", "rib", "little"]) });
     }
     for (let i = 0; i < 16; i++) { // blood droplets that also bounce
       const a = rand(0, TAU), s = rand(120, 340);
@@ -2463,7 +2464,7 @@ export class Game {
   }
 
   _drawLimbs(ctx) {
-    for (const l of this.limbs) drawGroundLimb(ctx, l.x, l.y, l.angle, l.part, l.color, 0);
+    for (const l of this.limbs) drawGroundLimb(ctx, l.x, l.y, l.angle, l.part, l.color, 0, l.boneScale, l.boneKind);
   }
 
   _drawGibs(ctx) {
@@ -2473,7 +2474,7 @@ export class Game {
         ctx.fillStyle = "#8a1414"; ctx.fillRect(Math.round(g.x), Math.round(g.y - g.z), 2, 2);
         continue;
       }
-      drawGroundLimb(ctx, g.x, g.y, g.angle, g.part, g.limbColor, g.z);
+      drawGroundLimb(ctx, g.x, g.y, g.angle, g.part, g.limbColor, g.z, g.boneScale, g.boneKind);
     }
   }
 

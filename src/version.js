@@ -1,7 +1,16 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.28.2";
+export const VERSION = "0.28.3";
 
 export const CHANGELOG = [
+  {
+    version: "0.28.3",
+    date: "2026-07-17",
+    title: "Rattle the Bones",
+    changes: [
+      "Bones now come in assorted shapes — long bones, shorter bones, curved rib bones and tiny little bones — for messier, more varied gore.",
+      "Bones are also sized to the body they came from, so a rat leaves tiny little bones while a brute scatters big ones.",
+    ],
+  },
   {
     version: "0.28.2",
     date: "2026-07-17",
