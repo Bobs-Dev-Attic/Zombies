@@ -526,6 +526,8 @@ export class Projectile {
     this.hitSet = new Set();
     this.kind = opts.kind || "bullet";
     this.r = opts.r || 1.6;
+    this.ricochet = opts.ricochet || 0; // wall bounces left (light pistol rounds)
+    this.wallPen = opts.wallPen || 0;    // wall punch-throughs left (powerful rounds)
   }
 
   update(dt, world) {

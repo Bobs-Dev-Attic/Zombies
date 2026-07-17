@@ -635,6 +635,8 @@ export class Game {
         speed: laser ? Math.max(w.speed, 900) : w.speed, damage: w.damage, range: laser ? Math.max(w.range, 420) : w.range, knockback: w.knockback,
         pierce: laser ? 99 : (w.pierce || 0), explosive: w.explosive || 0, kind: w.explosive ? "rocket" : "bullet",
         sever: w.sever || 0, hs: w.hs || 0, r: w.explosive ? 3 : 1.6,
+        ricochet: w.ricochet || 0,                              // light rounds bounce off walls
+        wallPen: (w.wallPen && chance(w.wallPen)) ? 1 : 0,      // only some powerful rounds punch through
       });
       if (laser) proj.laser = true;
       this.projectiles.push(proj);
@@ -757,6 +759,30 @@ export class Game {
           this.particles.push(new Particle(rx, ry, { vx: Math.cos(a) * s + proj.vx * 0.1, vy: Math.sin(a) * s + proj.vy * 0.1, life: rand(0.14, 0.38), color: pick(["#ffd24a", "#ff9030", "#ff5a2a", "#ffffff"]), size: randInt(2, 3), drag: 0.85 }));
         }
         if (chance(0.7)) this.particles.push(new Particle(rx, ry, { vx: Math.cos(back) * rand(10, 40), vy: Math.sin(back) * rand(10, 40), life: rand(0.4, 0.95), color: pick(["rgba(90,90,90,0.5)", "rgba(60,60,60,0.45)", "rgba(120,120,120,0.4)"]), size: randInt(2, 4), drag: 0.9 }));
+      }
+      // Wall interaction for player bullets: a hard wall (not glass/doors) can
+      // ricochet a light pistol round or be punched through by a powerful one.
+      if (proj.dead && !proj.hostile && proj.kind === "bullet" && (proj.ricochet > 0 || proj.wallPen > 0) && this.world.solidAt(proj.x, proj.y)) {
+        const tile = this.world.tileAt(Math.floor(proj.x / TILE), Math.floor(proj.y / TILE));
+        const hard = tile === T.WALL || tile === T.PROP || tile === T.FENCE;
+        if (hard && proj.ricochet > 0) {
+          proj.ricochet--; proj.dead = false;
+          const hitX = this.world.solidAt(proj.x, proj.py), hitY = this.world.solidAt(proj.px, proj.y);
+          proj.x = proj.px; proj.y = proj.py;              // step back out of the wall
+          if (hitX && !hitY) proj.vx = -proj.vx;
+          else if (hitY && !hitX) proj.vy = -proj.vy;
+          else { proj.vx = -proj.vx; proj.vy = -proj.vy; } // corner
+          proj.vx *= 0.82; proj.vy *= 0.82;
+          proj.angle = Math.atan2(proj.vy, proj.vx);
+          proj.damage *= 0.8;                              // a ricochet loses some punch
+          this._spark(proj.x, proj.y); sfx.play("ricochet");
+        } else if (hard && proj.wallPen > 0) {
+          proj.wallPen--;
+          let guard = 0;
+          while (this.world.solidAt(proj.x, proj.y) && guard++ < 14) { proj.x += Math.cos(proj.angle) * 3; proj.y += Math.sin(proj.angle) * 3; }
+          if (this.world.solidAt(proj.x, proj.y)) { proj.dead = true; } // too thick to pass
+          else { proj.dead = false; proj.px = proj.x; proj.py = proj.y; proj.damage *= 0.85; this._spark(proj.x, proj.y); }
+        }
       }
       if (proj.hostile) {
         // Enemy spit (a hurled body part): only hits the player, with a wet splat.

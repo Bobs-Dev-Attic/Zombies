@@ -7,6 +7,12 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.34.0] — 2026-07-17
+### Off the Wall
+- **Wall penetration** — powerful single-slug guns can now punch a bullet clean through a solid wall, but only *some* rounds make it: a per-shot `wallPen` chance (Hunting Rifle 0.6, .357 Magnum 0.5, Battle Rifle 0.35, Assault Rifle 0.12) rolls each shot; when it wins, the bullet shoves out the far side (up to ~one tile — thicker walls still stop it) and carries on with slightly reduced damage. Handled in `_updateProjectiles` against hard tiles only (`WALL`/`PROP`/`FENCE`), so glass and doors still shatter/splinter as before.
+- **Pistol ricochet** — the 9mm and .22 (`ricochet: 2`) now **bounce off hard walls** instead of stopping: the round reflects off the struck face (per-axis), loses ~18% speed and a little damage each bounce, and throws a spark with a new metallic **`ricochet`** zing SFX. Up to two bounces before it dies.
+- **Waist-fired Machine Gun** — the SMG now uses a hip-fired pose (`drawSmgLocal`) like the shotguns/flamethrower: gripped at the waist with the compact body angling across to the aim, rattling back and flicking brass on recoil, instead of the old rifle-out-front hold.
+
 ## [0.33.0] — 2026-07-17
 ### Into the Woods
 - **New environment — Blackpine Woods** (`id: "forest"`, `isForest`, `_forest()` generator), selectable from the start picker: a dense pine forest of shady groves (`T.PROP` conifers scattered at ~34% density) and reserved clearings, split by a **winding river** with muddy banks and a tributary (waded through; drawn as a flowing channel) crossed by **log foot-bridges**, with a **dirt trail** from the spawn glade to the exit, two **log cabins** (door + window + loot) and a **rocky cave** (stone-floored nook ringed by rock walls, framed with boulders). `FOREST_TERRAIN` palette + `isForest` handling across `floorPair`, `_decorate` (shady canopy), and new floor / conifer / treeline-cabin-cave-wall rendering.
