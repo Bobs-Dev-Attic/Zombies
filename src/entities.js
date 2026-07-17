@@ -241,6 +241,7 @@ export class Zombie {
     this.flankSign = chance(0.5) ? 1 : -1;
     this.mass = t.r; // heavier things shove lighter ones in collisions
     this.look = makeZombieLook(type); // per-zombie skin/clothes/hair variety
+    this.bloody = chance(0.8);        // most of the horde tracks bloody prints
     this.quad = !!t.quad;              // four-legged (dog)
     this.accuracy = rand(0.5, 1);      // some aim their spit far better than others
 

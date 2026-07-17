@@ -1,7 +1,16 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.24.0";
+export const VERSION = "0.25.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.25.0",
+    date: "2026-07-17",
+    title: "Scorched Earth",
+    changes: [
+      "Most of the horde now tracks gore as they shamble — bloody footprints trailing behind the walkers and a dragging smear behind the crawlers.",
+      "Grenade blasts now sear a smouldering black scorch mark into the ground where they went off — it glows with embers and coughs smoke for a while before settling into a permanent char. (Grenades already blow up on a fuse with a shockwave that damages and hurls zombies, furniture and even you.)",
+    ],
+  },
   {
     version: "0.24.0",
     date: "2026-07-17",
