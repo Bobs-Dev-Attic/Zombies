@@ -36,6 +36,7 @@ export class Player {
     this.meleeVariant = "swing"; // swing | stab | lunge (knife)
     this.lungeT = 0;             // forward-dash timer for the two-handed lunge
     this.pumpT = 0;              // pump-action rack animation (pump shotgun)
+    this.bloodyFeet = 0;         // px-budget of bloody footprints left to track
   }
 
   triggerRecoil(w, variant) {

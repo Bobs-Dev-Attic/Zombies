@@ -1,7 +1,19 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.23.0";
+export const VERSION = "0.24.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.24.0",
+    date: "2026-07-17",
+    title: "Squalor",
+    changes: [
+      "The whole world is grimier now — floors are littered with random debris, trash, crumpled paper, dark grime stains and heaped bags of garbage, and some furniture is already smashed or tipped over when you arrive.",
+      "Torn curtains hang over the house windows, and some zombies drag a snagged scrap of cloth behind them.",
+      "You now track bloody footprints when you walk through blood, and crawlers leave a dragging smear — trails that fade over time across floors, tile and rugs.",
+      "Dim, moody lighting indoors and in the sewers: a darkness veil lit by warm, flickering lamps and a soft torch around you.",
+      "The fog of war fades in a smoother, more gradual gradient instead of a hard edge.",
+    ],
+  },
   {
     version: "0.23.0",
     date: "2026-07-17",

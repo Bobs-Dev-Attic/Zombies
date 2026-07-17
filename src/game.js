@@ -71,6 +71,7 @@ export class Game {
     this.shockwaves = []; // expanding blast rings
     this.flies = [];   // ambient buzzing fly swarm
     this.birds = [];   // carrion birds that pick at corpses and flee from you
+    this.prints = [];  // bloody footprints / drag smears left on the floor
     this.score = 0;
     this.wave = 0;
     this.waveActive = false;
@@ -109,7 +110,7 @@ export class Game {
     this.player.health = hp; this.player.stamina = sta;
     this.player.kills = kills;
     this.zombies = []; this.projectiles = []; this.particles = []; this.pickups = []; this.stains = []; this.corpses = [];
-    this.bodies = []; this.limbs = []; this.gibs = []; this.thrown = []; this.shockwaves = []; this.flies = []; this.birds = [];
+    this.bodies = []; this.limbs = []; this.gibs = []; this.thrown = []; this.shockwaves = []; this.flies = []; this.birds = []; this.prints = [];
     this.score = score; this.wave = wave;
     this.waveActive = false; this.spawnQueue = 0; this.waveOrigins = []; this.betweenWaves = 2; this.exitReady = false;
     this.cam.x = this.player.x; this.cam.y = this.player.y;
@@ -172,7 +173,7 @@ export class Game {
     // Stash the current floor's persistent state.
     this.floorCache[this.floorLevel] = {
       world: this.world, bodies: this.bodies, limbs: this.limbs, stains: this.stains,
-      pickups: this.pickups, corpses: this.corpses, gibs: this.gibs,
+      pickups: this.pickups, corpses: this.corpses, gibs: this.gibs, prints: this.prints,
     };
     this.floorLevel = target;
     const cached = this.floorCache[target];
@@ -180,9 +181,10 @@ export class Game {
       this.world = cached.world;
       this.bodies = cached.bodies; this.limbs = cached.limbs; this.stains = cached.stains;
       this.pickups = cached.pickups; this.corpses = cached.corpses; this.gibs = cached.gibs;
+      this.prints = cached.prints || [];
     } else {
       this.world = new World(this.settingIndex, target);
-      this.bodies = []; this.limbs = []; this.stains = []; this.pickups = []; this.corpses = []; this.gibs = [];
+      this.bodies = []; this.limbs = []; this.stains = []; this.pickups = []; this.corpses = []; this.gibs = []; this.prints = [];
       this._seedLevelLoot();
     }
     // Arrive at the mapped ladder/manhole, else the floor's default landing.
@@ -313,6 +315,7 @@ export class Game {
     this.player.angle = angleLerp(this.player.angle, desired, clamp(dt * 18, 0, 1));
 
     this.player.update(dt, inp, this.world);
+    this._updateFootprints();
     this.world.update(dt);
     this._waterT = (this._waterT || 0) + dt; // drives the flowing-water ripples
 
@@ -343,6 +346,7 @@ export class Game {
     this._updateBirds(dt);
     for (const p of this.particles) p.update(dt);
     for (const s of this.stains) s.life -= dt * 0.15;
+    for (const fp of this.prints) fp.life -= dt * 0.14;
     for (const pk of this.pickups) pk.update(dt);
     for (const c of this.corpses) { c.t += dt; if (c.bannerT > 0) c.bannerT -= dt; }
     this._updateGibs(dt);
@@ -368,6 +372,7 @@ export class Game {
     this.corpses = this.corpses.filter((c) => c.t < c.dur || c.bannerT > 0);
     if (this.stains.length > 220) this.stains.splice(0, this.stains.length - 220);
     this.stains = this.stains.filter((s) => s.life > 0);
+    this.prints = this.prints.filter((fp) => fp.life > 0);
 
     // Wave director.
     if (!this.waveActive) {
@@ -986,6 +991,126 @@ export class Game {
     }
   }
 
+  // Track bloody footprints: stepping through fresh blood coats your boots, then
+  // you leave a fading trail of prints; crawlers drag a smear behind them.
+  _updateFootprints() {
+    const p = this.player;
+    for (const s of this.stains) {
+      if (s.life > 5 && dist2(s.x, s.y, p.x, p.y) < (s.r + 6) * (s.r + 6)) { p.bloodyFeet = Math.max(p.bloodyFeet, 200); break; }
+    }
+    if (p.bloodyFeet > 0) {
+      if (!this._lastFoot) this._lastFoot = { x: p.x, y: p.y, side: 1 };
+      const d = dist(p.x, p.y, this._lastFoot.x, this._lastFoot.y);
+      if (d >= 11) {
+        p.bloodyFeet = Math.max(0, p.bloodyFeet - d);
+        const fade = clamp(p.bloodyFeet / 200, 0.12, 1);
+        const side = (this._lastFoot.side = -this._lastFoot.side);
+        const perp = p.angle + Math.PI / 2;
+        this.prints.push({ x: p.x + Math.cos(perp) * 3.2 * side, y: p.y + Math.sin(perp) * 3.2 * side, angle: p.angle, kind: "foot", life: rand(16, 26), alpha: 0.5 * fade });
+        this._lastFoot.x = p.x; this._lastFoot.y = p.y;
+      }
+    } else this._lastFoot = null;
+    // Crawlers drag a bloody smear as they haul themselves along.
+    for (const z of this.zombies) {
+      if (z.dead || !z.prone) continue;
+      if (Math.hypot(z.vx || 0, z.vy || 0) < 8) continue;
+      if (chance(0.12)) this.prints.push({ x: z.x + rand(-3, 3), y: z.y + rand(-3, 3), angle: z.angle, kind: "smear", life: rand(14, 22), alpha: 0.3 });
+    }
+    if (this.prints.length > 180) this.prints.splice(0, this.prints.length - 180);
+  }
+
+  _drawPrints(ctx) {
+    for (const fp of this.prints) {
+      const a = clamp(fp.life / 16, 0, 1) * fp.alpha;
+      if (a < 0.02) continue;
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.translate(fp.x, fp.y);
+      ctx.rotate(fp.angle);
+      ctx.fillStyle = "#5a0f10";
+      if (fp.kind === "smear") {
+        ctx.beginPath(); ctx.ellipse(-2, 0, 4.5, 1.8, 0, 0, TAU); ctx.fill();
+      } else {
+        // A boot print: heel + sole.
+        ctx.fillRect(1.4, -1.3, 2.6, 2.6);
+        ctx.fillRect(-2.2, -1.1, 2.4, 2.2);
+      }
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Static ground clutter: floor grime, scattered debris, trash and garbage.
+  _drawDecor(ctx) {
+    const cx0 = this.cam.x - this.bufW / 2 - 24, cx1 = this.cam.x + this.bufW / 2 + 24;
+    const cy0 = this.cam.y - this.bufH / 2 - 24, cy1 = this.cam.y + this.bufH / 2 + 24;
+    for (const d of this.world.decor) {
+      if (d.x < cx0 || d.x > cx1 || d.y < cy0 || d.y > cy1) continue; // cull offscreen
+      const h = d.seed;
+      if (d.kind === "grime") {
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = d.tone;
+        ctx.beginPath(); ctx.ellipse(d.x, d.y, d.r, d.r * 0.7, d.rot, 0, TAU); ctx.fill();
+        ctx.globalAlpha = 1;
+      } else if (d.kind === "debris") {
+        ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.rot);
+        ctx.fillStyle = "#4a4038"; ctx.fillRect(-3, -1, 4, 2); ctx.fillRect(1, 1, 3, 2);
+        ctx.fillStyle = "#2c2620"; ctx.fillRect(-1, -3, 2, 2);
+        ctx.fillStyle = "#5a5248"; ctx.fillRect(2 + (h % 3), -2, 2, 1.6);
+        ctx.restore();
+      } else if (d.kind === "trash") {
+        ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.rot);
+        ctx.fillStyle = (h & 1) ? "#8a8377" : "#6a5f4a"; // crumpled paper / wrapper
+        ctx.beginPath(); ctx.ellipse(0, 0, 2.4, 1.8, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(-1, -0.4, 2, 0.8);
+        if (h % 3 === 0) { ctx.fillStyle = "#7a2a24"; ctx.fillRect(2, 0, 3, 1.2); } // a can/bottle
+        ctx.restore();
+      } else if (d.kind === "garbage") {
+        ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.rot);
+        ctx.fillStyle = "rgba(0,0,0,0.28)"; ctx.beginPath(); ctx.ellipse(0, 2, 9, 4, 0, 0, TAU); ctx.fill(); // shadow
+        ctx.fillStyle = "#26282a"; ctx.beginPath(); ctx.ellipse(-2, 0, 6, 5, 0, 0, TAU); ctx.fill();  // trash bag
+        ctx.fillStyle = "#1c1e20"; ctx.beginPath(); ctx.ellipse(3, 1, 5, 4, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = "#3a3d40"; ctx.beginPath(); ctx.arc(-3, -2, 2, 0, TAU); ctx.fill();          // sheen
+        ctx.fillStyle = (h & 1) ? "#7a6a3a" : "#5a4a3a"; ctx.fillRect(4, -3, 3, 2);                   // spilled junk
+        ctx.fillStyle = "#8a8377"; ctx.fillRect(-6, 2, 3, 1.4);
+        ctx.restore();
+      }
+    }
+  }
+
+  // Dim-lighting pass: a darkness veil over the floor with warm, flickering
+  // pools of light around lamps and a soft torch around the player.
+  _drawLighting(ctx) {
+    const w = this.world;
+    if (!w.ambient) return;
+    const t = (this._lampClock = (this._lampClock || 0) + 0.016);
+    const x0 = this.cam.x - this.bufW / 2, y0 = this.cam.y - this.bufH / 2;
+    ctx.save();
+    // Veil.
+    ctx.fillStyle = `rgba(6,7,14,${w.ambient.toFixed(3)})`;
+    ctx.fillRect(x0 - 4, y0 - 4, this.bufW + 8, this.bufH + 8);
+    // Warm pools punched in with additive light.
+    ctx.globalCompositeOperation = "lighter";
+    for (const L of w.lamps) {
+      if (L.x < x0 - L.r || L.x > x0 + this.bufW + L.r || L.y < y0 - L.r || L.y > y0 + this.bufH + L.r) continue;
+      // Flicker: mostly steady with occasional dips (a bad bulb/candle).
+      const f = 0.7 + 0.3 * Math.sin(t * 7 + L.phase) + (Math.sin(t * 23 + L.phase * 2) > 0.86 ? -0.35 : 0);
+      const inten = clamp(L.flick * f, 0.12, 1) * w.ambient;
+      const g = ctx.createRadialGradient(L.x, L.y, 2, L.x, L.y, L.r);
+      g.addColorStop(0, `rgba(255,214,150,${(0.55 * inten).toFixed(3)})`);
+      g.addColorStop(0.5, `rgba(255,190,120,${(0.24 * inten).toFixed(3)})`);
+      g.addColorStop(1, "rgba(255,180,110,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(L.x, L.y, L.r, 0, TAU); ctx.fill();
+    }
+    // Player torch so you're never in pure dark.
+    const p = this.player, pr = 120;
+    const pg = ctx.createRadialGradient(p.x, p.y, 4, p.x, p.y, pr);
+    pg.addColorStop(0, `rgba(230,220,190,${(0.5 * w.ambient + 0.12).toFixed(3)})`);
+    pg.addColorStop(1, "rgba(210,200,170,0)");
+    ctx.fillStyle = pg; ctx.beginPath(); ctx.arc(p.x, p.y, pr, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+
   // Carrion birds: crows, blackbirds and vultures glide in to peck at the dead
   // outdoors, scatter into the air when you come near, and can be shot down.
   // They never attack the player.
@@ -1458,6 +1583,8 @@ export class Game {
 
     ctx.translate(ox, oy);
     this._drawWorld(ctx, -ox, -oy);
+    this._drawDecor(ctx);
+    this._drawPrints(ctx);
     this._drawStains(ctx);
     this._drawBodies(ctx);
     this._drawLimbs(ctx);
@@ -1472,6 +1599,7 @@ export class Game {
     this._drawFlies(ctx);
     this._drawBirds(ctx);
     this._drawShockwaves(ctx);
+    this._drawLighting(ctx); // dim veil + flickering lamp pools + player torch
     this._drawFog(ctx, -ox, -oy);
     this._drawProjectiles(ctx); // over the fog so tracers are always crisp
     this._drawBanners(ctx);
@@ -1525,10 +1653,11 @@ export class Game {
 
   // Fog of war: dark unexplored, dim remembered, clear within sight (feathered).
   _drawFog(ctx, camX, camY) {
-    const w = this.world, R = 6.4;
+    const w = this.world, R = 6.8, feather = 3.0;
     const pcx = this.player.x / TILE, pcy = this.player.y / TILE;
     const startCX = Math.floor(camX / TILE) - 1, startCY = Math.floor(camY / TILE) - 1;
     const endCX = startCX + Math.ceil(this.bufW / TILE) + 2, endCY = startCY + Math.ceil(this.bufH / TILE) + 2;
+    const smooth = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t)); // smoothstep for a gradual edge
     for (let cy = startCY; cy <= endCY; cy++) {
       for (let cx = startCX; cx <= endCX; cx++) {
         let a;
@@ -1538,13 +1667,22 @@ export class Game {
           const d = Math.hypot(cx + 0.5 - pcx, cy + 0.5 - pcy);
           if (d <= R && this._tileVisible(cx, cy)) {
             w.explored[idx] = 1;
-            a = clamp((d - (R - 1.8)) / 1.8, 0, 1) * 0.55; // feathered sight edge
-          } else if (w.explored[idx]) a = 0.68; // remembered
+            a = smooth((d - (R - feather)) / feather) * 0.6; // wide, gradual sight edge
+          } else if (w.explored[idx]) a = 0.66; // remembered
           else a = 0.98;                        // never seen
         }
         if (a > 0.02) { ctx.fillStyle = `rgba(4,5,8,${a.toFixed(3)})`; ctx.fillRect(cx * TILE, cy * TILE, TILE + 1, TILE + 1); }
       }
     }
+    // A soft player-centred radial gradient smooths the blocky per-tile edge
+    // into a gentle falloff around your sight.
+    const px = this.player.x, py = this.player.y, Rpx = R * TILE;
+    const g = ctx.createRadialGradient(px, py, Rpx * 0.45, px, py, Rpx * 1.02);
+    g.addColorStop(0, "rgba(4,5,8,0)");
+    g.addColorStop(0.72, "rgba(4,5,8,0.10)");
+    g.addColorStop(1, "rgba(4,5,8,0.34)");
+    ctx.fillStyle = g;
+    ctx.fillRect(camX, camY, this.bufW, this.bufH);
   }
 
   _drawMinimap() {
@@ -1672,6 +1810,23 @@ export class Game {
           ctx.beginPath(); ctx.moveTo(x + TILE / 2, gy0); ctx.lineTo(x + TILE / 2, gy0 + gh); ctx.stroke();
           ctx.beginPath(); ctx.moveTo(gx0, y + TILE / 2); ctx.lineTo(gx0 + gw, y + TILE / 2); ctx.stroke();
           ctx.lineWidth = 1;
+          // Torn curtains hang over most house windows — a valance plus two
+          // ragged side panels of frayed cloth.
+          if (w.isHouse) {
+            const hh = ((cx * 73856093) ^ (cy * 19349663)) >>> 0;
+            if (hh % 3 !== 0) {
+              const col = (hh & 1) ? "#6a4230" : "#4a4650", dk = (hh & 1) ? "#432a1e" : "#322e39";
+              ctx.fillStyle = col; ctx.fillRect(gx0 - 1, gy0 - 1, gw + 2, 3); // valance
+              const panels = [[gx0 - 1, (hh >> 2) % 5], [gx0 + gw - 4, (hh >> 6) % 5]];
+              for (const [px0, jag] of panels) {
+                const wp = 5, len = gh * (0.5 + jag / 12);
+                ctx.fillStyle = col; ctx.fillRect(px0, gy0, wp, len);
+                ctx.fillStyle = dk; ctx.fillRect(px0 + wp - 1.5, gy0, 1.5, len);            // fold shadow
+                ctx.fillStyle = col; // a frayed, tapering rip at the bottom hem
+                ctx.beginPath(); ctx.moveTo(px0, gy0 + len); ctx.lineTo(px0 + 2, gy0 + len + 4); ctx.lineTo(px0 + wp, gy0 + len); ctx.fill();
+              }
+            }
+          }
         } else {
           // floor with a subtle checker (tinted by room in the house, by
           // terrain — grass / asphalt / sidewalk — in the streets)
