@@ -72,6 +72,7 @@ export class Game {
     this.flies = [];   // ambient buzzing fly swarm
     this.birds = [];   // carrion birds that pick at corpses and flee from you
     this.prints = [];  // bloody footprints / drag smears left on the floor
+    this.scorches = []; // smouldering scorch marks left by explosions
     this.score = 0;
     this.wave = 0;
     this.waveActive = false;
@@ -110,7 +111,7 @@ export class Game {
     this.player.health = hp; this.player.stamina = sta;
     this.player.kills = kills;
     this.zombies = []; this.projectiles = []; this.particles = []; this.pickups = []; this.stains = []; this.corpses = [];
-    this.bodies = []; this.limbs = []; this.gibs = []; this.thrown = []; this.shockwaves = []; this.flies = []; this.birds = []; this.prints = [];
+    this.bodies = []; this.limbs = []; this.gibs = []; this.thrown = []; this.shockwaves = []; this.flies = []; this.birds = []; this.prints = []; this.scorches = [];
     this.score = score; this.wave = wave;
     this.waveActive = false; this.spawnQueue = 0; this.waveOrigins = []; this.betweenWaves = 2; this.exitReady = false;
     this.cam.x = this.player.x; this.cam.y = this.player.y;
@@ -173,7 +174,7 @@ export class Game {
     // Stash the current floor's persistent state.
     this.floorCache[this.floorLevel] = {
       world: this.world, bodies: this.bodies, limbs: this.limbs, stains: this.stains,
-      pickups: this.pickups, corpses: this.corpses, gibs: this.gibs, prints: this.prints,
+      pickups: this.pickups, corpses: this.corpses, gibs: this.gibs, prints: this.prints, scorches: this.scorches,
     };
     this.floorLevel = target;
     const cached = this.floorCache[target];
@@ -181,10 +182,10 @@ export class Game {
       this.world = cached.world;
       this.bodies = cached.bodies; this.limbs = cached.limbs; this.stains = cached.stains;
       this.pickups = cached.pickups; this.corpses = cached.corpses; this.gibs = cached.gibs;
-      this.prints = cached.prints || [];
+      this.prints = cached.prints || []; this.scorches = cached.scorches || [];
     } else {
       this.world = new World(this.settingIndex, target);
-      this.bodies = []; this.limbs = []; this.stains = []; this.pickups = []; this.corpses = []; this.gibs = []; this.prints = [];
+      this.bodies = []; this.limbs = []; this.stains = []; this.pickups = []; this.corpses = []; this.gibs = []; this.prints = []; this.scorches = [];
       this._seedLevelLoot();
     }
     // Arrive at the mapped ladder/manhole, else the floor's default landing.
@@ -344,6 +345,7 @@ export class Game {
     this._updateBurning(dt);
     this._updateFlies(dt);
     this._updateBirds(dt);
+    this._updateScorches(dt);
     for (const p of this.particles) p.update(dt);
     for (const s of this.stains) s.life -= dt * 0.15;
     for (const fp of this.prints) fp.life -= dt * 0.14;
@@ -730,6 +732,9 @@ export class Game {
       if (t === T.WINDOW) { this.world.breakWindow(gx, gy); this._glass((gx + 0.5) * TILE, (gy + 0.5) * TILE); }
       else if (t === T.DOOR) { const dd = this.world.doorAt(gx, gy); if (dd && !dd.broken) this.world.hitDoor(dd, 999); }
     }
+    // A charred, smouldering scorch mark seared into the ground at ground zero.
+    this.scorches.push({ x, y, r: radius * 0.62, smolder: rand(7, 11), seed: (Math.random() * 1e9) | 0 });
+    if (this.scorches.length > 40) this.scorches.shift();
     // Expanding shockwave ring + fireball FX.
     this.shockwaves.push({ x, y, r: 8, max: blast + 12, life: 0.45 });
     for (let i = 0; i < 30; i++) {
@@ -1010,13 +1015,26 @@ export class Game {
         this._lastFoot.x = p.x; this._lastFoot.y = p.y;
       }
     } else this._lastFoot = null;
-    // Crawlers drag a bloody smear as they haul themselves along.
+    // Most of the horde tracks blood as they shamble: crawlers drag a smear,
+    // the rest leave a trail of bloody footprints.
     for (const z of this.zombies) {
-      if (z.dead || !z.prone) continue;
+      if (z.dead || z.type === "rat") continue;
       if (Math.hypot(z.vx || 0, z.vy || 0) < 8) continue;
-      if (chance(0.12)) this.prints.push({ x: z.x + rand(-3, 3), y: z.y + rand(-3, 3), angle: z.angle, kind: "smear", life: rand(14, 22), alpha: 0.3 });
+      if (z.prone) {
+        if (chance(0.12)) this.prints.push({ x: z.x + rand(-3, 3), y: z.y + rand(-3, 3), angle: z.angle, kind: "smear", life: rand(14, 22), alpha: 0.3 });
+      } else if (z.bloody) {
+        if (!z._lp) z._lp = { x: z.x, y: z.y, side: 1 };
+        const d = dist(z.x, z.y, z._lp.x, z._lp.y);
+        if (d >= 15) {
+          const side = (z._lp.side = -z._lp.side);
+          const perp = z.angle + Math.PI / 2;
+          const paw = z.quad ? 2 : 1; // dogs leave smaller, closer paw marks
+          this.prints.push({ x: z.x + Math.cos(perp) * 2.6 * side, y: z.y + Math.sin(perp) * 2.6 * side, angle: z.angle, kind: z.quad ? "smear" : "foot", life: rand(11, 18), alpha: 0.26, scale: 1 / paw });
+          z._lp.x = z.x; z._lp.y = z.y;
+        }
+      }
     }
-    if (this.prints.length > 180) this.prints.splice(0, this.prints.length - 180);
+    if (this.prints.length > 300) this.prints.splice(0, this.prints.length - 300);
   }
 
   _drawPrints(ctx) {
@@ -1027,6 +1045,7 @@ export class Game {
       ctx.globalAlpha = a;
       ctx.translate(fp.x, fp.y);
       ctx.rotate(fp.angle);
+      if (fp.scale && fp.scale !== 1) ctx.scale(fp.scale, fp.scale);
       ctx.fillStyle = "#5a0f10";
       if (fp.kind === "smear") {
         ctx.beginPath(); ctx.ellipse(-2, 0, 4.5, 1.8, 0, 0, TAU); ctx.fill();
@@ -1038,6 +1057,50 @@ export class Game {
       ctx.restore();
     }
     ctx.globalAlpha = 1;
+  }
+
+  // Scorch marks smoulder for a while after an explosion: a wisp of smoke and
+  // the odd ember, then they settle into a permanent charred stain.
+  _updateScorches(dt) {
+    for (const sc of this.scorches) {
+      if (sc.smolder <= 0) continue;
+      sc.smolder -= dt;
+      if (chance(dt * 6)) this.particles.push(new Particle(sc.x + rand(-sc.r * 0.5, sc.r * 0.5), sc.y + rand(-sc.r * 0.4, sc.r * 0.4), {
+        vx: rand(-6, 6), vy: rand(-26, -12), life: rand(0.8, 1.8),
+        color: pick(["rgba(40,40,40,0.5)", "rgba(60,58,56,0.42)", "rgba(28,28,28,0.5)"]), size: randInt(3, 6), drag: 0.94, gravity: -6,
+      }));
+      if (chance(dt * 3)) this.particles.push(new Particle(sc.x + rand(-sc.r * 0.4, sc.r * 0.4), sc.y + rand(-sc.r * 0.4, sc.r * 0.4), {
+        vx: rand(-8, 8), vy: rand(-30, -12), life: rand(0.4, 0.9), color: pick(["#ff7a2a", "#ffab40", "#c0341a"]), size: 1, drag: 0.9, gravity: -10,
+      }));
+    }
+  }
+
+  _drawScorch(ctx) {
+    for (const sc of this.scorches) {
+      // Charred blast burn: a dark radial sear with a sooty ragged rim.
+      const g = ctx.createRadialGradient(sc.x, sc.y, 1, sc.x, sc.y, sc.r);
+      g.addColorStop(0, "rgba(8,7,6,0.82)");
+      g.addColorStop(0.55, "rgba(20,16,12,0.6)");
+      g.addColorStop(1, "rgba(24,20,16,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(sc.x, sc.y, sc.r, 0, TAU); ctx.fill();
+      // Soot flecks flung out around the crater (deterministic per scorch).
+      let h = sc.seed >>> 0;
+      ctx.fillStyle = "rgba(10,9,8,0.6)";
+      for (let i = 0; i < 10; i++) {
+        h = (h * 1103515245 + 12345) >>> 0;
+        const a = (h % 628) / 100, rr = sc.r * (0.6 + (h >> 9) % 45 / 100);
+        ctx.fillRect(sc.x + Math.cos(a) * rr, sc.y + Math.sin(a) * rr, 1.6, 1.6);
+      }
+      // A faint ember glow while it's still smouldering.
+      if (sc.smolder > 0) {
+        ctx.globalAlpha = clamp(sc.smolder / 10, 0, 1) * (0.5 + 0.5 * Math.sin((this._lampClock || 0) * 5 + sc.seed));
+        const eg = ctx.createRadialGradient(sc.x, sc.y, 1, sc.x, sc.y, sc.r * 0.6);
+        eg.addColorStop(0, "rgba(200,70,20,0.5)"); eg.addColorStop(1, "rgba(120,30,10,0)");
+        ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(sc.x, sc.y, sc.r * 0.6, 0, TAU); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
   }
 
   // Static ground clutter: floor grime, scattered debris, trash and garbage.
@@ -1584,6 +1647,7 @@ export class Game {
     ctx.translate(ox, oy);
     this._drawWorld(ctx, -ox, -oy);
     this._drawDecor(ctx);
+    this._drawScorch(ctx);
     this._drawPrints(ctx);
     this._drawStains(ctx);
     this._drawBodies(ctx);

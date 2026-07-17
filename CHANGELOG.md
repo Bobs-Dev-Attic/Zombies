@@ -7,6 +7,12 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.25.0] — 2026-07-17
+### Scorched Earth
+- **The horde tracks blood** — most zombies (`z.bloody`, ~80%) now leave a trail of **bloody footprints** as they move (alternating left/right, fading over time), and **crawlers drag a bloody smear**. Prints land on floors, tile and rugs and are capped/culled so the floor stays readable.
+- **Smouldering scorch marks** — every explosion now sears a **charred black scorch** into the ground at ground zero (`this.scorches` → `_drawScorch`): a dark radial burn with a sooty rim that **glows with embers and coughs smoke** (`_updateScorches`) for several seconds before settling into a permanent char. Marks persist per floor.
+- Grenades were already fully implemented — you toss them, the **fuse counts down**, and detonation sends out a **shockwave that damages and hurls zombies, furniture and the player**, shattering nearby windows and doors. This release adds the lasting burn mark they leave behind.
+
 ## [0.24.0] — 2026-07-17
 ### Squalor
 - **Random floor clutter** — every floor is now strewn with static decor generated at build time (`world.decor`, drawn in `_drawDecor`): dark **grime stains**, scattered **debris/rubble**, **trash** (crumpled paper, wrappers, cans) and heaped **garbage bags**, weighted heaviest in the sewers. Some **furniture spawns already broken** (smashed or tipped over, ~16%).
