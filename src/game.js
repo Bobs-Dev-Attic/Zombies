@@ -74,6 +74,7 @@ export class Game {
     this.birds = [];   // carrion birds that pick at corpses and flee from you
     this.prints = [];  // bloody footprints / drag smears left on the floor
     this.scorches = []; // smouldering scorch marks left by explosions
+    this.mines = [];   // deployed land mines waiting for something to step on them
     this.score = 0;
     this.wave = 0;
     this.waveActive = false;
@@ -102,11 +103,11 @@ export class Game {
     const c = this.cheats || {};
     if (c.allWeapons) {
       for (const id of WEAPON_ORDER) { lo.owned[id] = true; if (WEAPONS[id].clip) lo.clip[id] = WEAPONS[id].clip; }
-      lo.ammo = { shells: 999, rounds: 999, rockets: 99, fuel: 600, grenades: 20, flares: 20 };
+      lo.ammo = { shells: 999, rounds: 999, rockets: 99, fuel: 600, grenades: 20, flares: 20, mines: 20 };
       lo.current = "rifle_auto";
     }
     if (c.swords) lo.owned.sword = true;
-    if (c.unlimitedAmmo) lo.ammo = { shells: 999, rounds: 999, rockets: 99, fuel: 600, grenades: 99, flares: 99 };
+    if (c.unlimitedAmmo) lo.ammo = { shells: 999, rounds: 999, rockets: 99, fuel: 600, grenades: 99, flares: 99, mines: 99 };
     return lo;
   }
 
@@ -115,6 +116,7 @@ export class Game {
     const c = this.cheats || {};
     player.damageTakenMul = c.halfDamage ? 0.5 : 1;
     player.unlimitedAmmo = !!c.unlimitedAmmo;
+    player.superStamina = !!c.superStamina;
   }
 
   advanceSetting() {
@@ -135,7 +137,7 @@ export class Game {
     this.player.health = hp; this.player.stamina = sta;
     this.player.kills = kills;
     this.zombies = []; this.projectiles = []; this.particles = []; this.pickups = []; this.stains = []; this.corpses = [];
-    this.bodies = []; this.limbs = []; this.gibs = []; this.thrown = []; this.shockwaves = []; this.flies = []; this.birds = []; this.prints = []; this.scorches = [];
+    this.bodies = []; this.limbs = []; this.gibs = []; this.thrown = []; this.shockwaves = []; this.flies = []; this.birds = []; this.prints = []; this.scorches = []; this.mines = [];
     this.score = score; this.wave = wave;
     this.waveActive = false; this.spawnQueue = 0; this.waveOrigins = []; this.betweenWaves = 2; this.exitReady = false;
     this.cam.x = this.player.x; this.cam.y = this.player.y;
@@ -150,17 +152,17 @@ export class Game {
     // Scatter weapon crates, ammo, and medkits across the map.
     const weaponPool = ["bat", "axe", "sword", "pistol22", "pistol357", "smg",
       "shotgun", "shotgun_semi", "shotgun_sxs",
-      "rifle", "rifle_semi", "rifle_auto", "bazooka", "flamethrower"];
+      "rifle", "rifle_semi", "rifle_auto", "bazooka", "flamethrower", "mine"];
     const crates = randInt(3, 5);
     for (let i = 0; i < crates; i++) {
       const p = this.world.randomFloorFar(this.player.x, this.player.y, 120);
       if (p) this.pickups.push(new Pickup(p.x, p.y, "weapon", pick(weaponPool)));
     }
-    const ammoTypes = ["rounds", "shells", "rockets", "fuel"];
+    const ammoTypes = ["rounds", "shells", "rockets", "fuel", "mines"];
     for (let i = 0; i < randInt(4, 7); i++) {
       const p = this.world.randomFloor();
       const type = pick(ammoTypes);
-      const amount = type === "rockets" ? randInt(1, 2) : type === "fuel" ? randInt(40, 90) : type === "shells" ? randInt(6, 14) : randInt(20, 40);
+      const amount = type === "rockets" ? randInt(1, 2) : type === "mines" ? randInt(2, 4) : type === "fuel" ? randInt(40, 90) : type === "shells" ? randInt(6, 14) : randInt(20, 40);
       this.pickups.push(new Pickup(p.x, p.y, "ammo", { type, amount }));
     }
     for (let i = 0; i < randInt(2, 3); i++) {
@@ -198,7 +200,7 @@ export class Game {
     // Stash the current floor's persistent state.
     this.floorCache[this.floorLevel] = {
       world: this.world, bodies: this.bodies, limbs: this.limbs, stains: this.stains,
-      pickups: this.pickups, corpses: this.corpses, gibs: this.gibs, prints: this.prints, scorches: this.scorches,
+      pickups: this.pickups, corpses: this.corpses, gibs: this.gibs, prints: this.prints, scorches: this.scorches, mines: this.mines,
     };
     this.floorLevel = target;
     const cached = this.floorCache[target];
@@ -206,10 +208,10 @@ export class Game {
       this.world = cached.world;
       this.bodies = cached.bodies; this.limbs = cached.limbs; this.stains = cached.stains;
       this.pickups = cached.pickups; this.corpses = cached.corpses; this.gibs = cached.gibs;
-      this.prints = cached.prints || []; this.scorches = cached.scorches || [];
+      this.prints = cached.prints || []; this.scorches = cached.scorches || []; this.mines = cached.mines || [];
     } else {
       this.world = new World(this.settingIndex, target);
-      this.bodies = []; this.limbs = []; this.stains = []; this.pickups = []; this.corpses = []; this.gibs = []; this.prints = []; this.scorches = [];
+      this.bodies = []; this.limbs = []; this.stains = []; this.pickups = []; this.corpses = []; this.gibs = []; this.prints = []; this.scorches = []; this.mines = [];
       this._seedLevelLoot();
     }
     // Arrive at the mapped ladder/manhole, else the floor's default landing.
@@ -374,6 +376,7 @@ export class Game {
     this._resolveCollisions(); // no two bodies share the same space
     this._updateProjectiles(dt);
     this._updateThrown(dt);
+    this._updateMines(dt);
     this._updateBurning(dt);
     this._updateZombieFire(dt);
     this._updateFlies(dt);
@@ -489,7 +492,7 @@ export class Game {
     const w = this.player.weapon;
     let ammoStr;
     if (w.melee) ammoStr = "∞";
-    else if (w.throwable) ammoStr = "×" + (l.ammo[w.ammoType] || 0);
+    else if (w.throwable || w.deploy) ammoStr = "×" + (l.ammo[w.ammoType] || 0);
     else {
       const clip = l.clip[l.current] ?? 0;
       ammoStr = `${clip} / ${l.ammo[w.ammoType] ?? 0}` + (w.unit ? " " + w.unit : "");
@@ -601,6 +604,7 @@ export class Game {
 
     if (w.melee) { this._meleeSwing(w, variant); return; }
     if (w.throwable) { this._throw(w); return; }
+    if (w.deploy) { this._deployMine(w); return; }
 
     if (!p.unlimitedAmmo) p.loadout.clip[p.loadout.current]--;
     if (w.flame) { this._flame(w); return; }
@@ -811,6 +815,78 @@ export class Game {
       }
     }
     this.thrown = this.thrown.filter((t) => !t.dead);
+  }
+
+  // ------------------------------------------------------- Land mines
+  // Drop a mine at the player's feet; it arms after a beat, then detonates when
+  // a zombie steps on it. (It won't trigger on the player who laid it.)
+  _deployMine(w) {
+    const p = this.player;
+    if (!p.unlimitedAmmo) p.loadout.ammo[w.ammoType] = (p.loadout.ammo[w.ammoType] || 0) - 1;
+    this.mines.push({ x: p.x, y: p.y, armT: 0.8, r: 15, blink: 0, w });
+    if (this.mines.length > 24) this.mines.shift();
+    this._announce("Mine armed", "step back");
+    sfx.play("click");
+  }
+
+  _updateMines(dt) {
+    for (const m of this.mines) {
+      if (m.dead) continue;
+      if (m.armT > 0) { m.armT -= dt; continue; } // arming — inert for a moment
+      m.blink += dt;
+      for (const z of this.zombies) {
+        if (z.dead) continue;
+        if (dist(m.x, m.y, z.x, z.y) < m.r + z.r) { this._mineBlast(m); m.dead = true; break; }
+      }
+    }
+    this.mines = this.mines.filter((m) => !m.dead);
+  }
+
+  // A mine goes off: a hard blast (hurls everything), plus a shower of dirt and
+  // shrapnel debris and a big spray of blood and gore flung about.
+  _mineBlast(m) {
+    const w = m.w;
+    this._explode(m.x, m.y, { explosive: w.explosive, damage: w.damage, sever: w.sever });
+    // Dirt clods + metal shrapnel kicked out of the ground.
+    for (let i = 0; i < 26; i++) {
+      const a = rand(0, TAU), s = rand(80, 340);
+      this.particles.push(new Particle(m.x, m.y, {
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s - 30, life: rand(0.4, 1.2),
+        color: pick(["#4a4038", "#2c2620", "#6b5a42", "#8a8f95", "#3a3d40", "#5a4632"]), size: randInt(2, 4), drag: 0.86, gravity: 200,
+      }));
+    }
+    // A heavy blood spray, plus bouncing blood droplets that spatter the walls.
+    for (let i = 0; i < 40; i++) {
+      const a = rand(0, TAU), s = rand(70, 320);
+      this.particles.push(new Particle(m.x, m.y, {
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.5, 1.4),
+        color: pick(["#a01818", "#7a1010", "#8a2a1a", "#611", "#c02828"]), size: randInt(2, 4), drag: 0.82, stain: true,
+      }));
+    }
+    for (let i = 0; i < 12; i++) {
+      const a = rand(0, TAU), s = rand(140, 380);
+      this.gibs.push({ x: m.x, y: m.y - 3, vx: Math.cos(a) * s, vy: Math.sin(a) * s, z: rand(1, 6), vz: rand(40, 130), angle: 0, spin: 0, part: "blood", limbColor: "#7a1010", bounce: true });
+    }
+    // Any zombie right on top is torn apart outright.
+    for (const z of this.zombies) if (!z.dead && dist(m.x, m.y, z.x, z.y) < w.explosive * 0.7) this._flingZombieGibs(z);
+    this.stains.push({ x: m.x, y: m.y, r: rand(7, 12), life: rand(12, 20), color: "#4a0c0c" });
+    this.shake += 10;
+    this.hooks.vibrate?.(60);
+  }
+
+  _drawMines(ctx) {
+    for (const m of this.mines) {
+      // A squat metal disc pressed into the ground with a pressure plate.
+      ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.beginPath(); ctx.ellipse(m.x, m.y + 1.5, 6, 3.5, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = "#3a3d33"; ctx.beginPath(); ctx.arc(m.x, m.y, 5.5, 0, TAU); ctx.fill();
+      ctx.fillStyle = "#4c5044"; ctx.beginPath(); ctx.arc(m.x, m.y, 4, 0, TAU); ctx.fill();
+      ctx.fillStyle = "#2a2c24"; ctx.beginPath(); ctx.arc(m.x, m.y, 2, 0, TAU); ctx.fill(); // plunger
+      // A red LED: solid-dim while arming, blinking once armed.
+      const armed = m.armT <= 0;
+      const on = armed ? (Math.floor(m.blink * 6) % 2 === 0) : true;
+      ctx.fillStyle = armed ? (on ? "#ff3020" : "#5a1410") : "#7a5a10";
+      ctx.fillRect(Math.round(m.x - 0.8), Math.round(m.y - 0.8), 1.6, 1.6);
+    }
   }
 
   // The nearest burning flare on the ground (a lure the horde flocks toward).
@@ -1709,15 +1785,18 @@ export class Game {
     switch (pk.kind) {
       case "weapon": {
         const id = pk.data;
+        // Clip-less deploy/throwable weapons (mines) come with a few charges.
+        const grant = WEAPONS[id].clip || (WEAPONS[id].deploy || WEAPONS[id].throwable ? 3 : 0);
         if (!l.owned[id]) {
           l.owned[id] = true;
           if (WEAPONS[id].clip) l.clip[id] = WEAPONS[id].clip;
+          else if (WEAPONS[id].ammoType && grant) l.ammo[WEAPONS[id].ammoType] = (l.ammo[WEAPONS[id].ammoType] || 0) + grant;
           l.current = id;
           this._announce("Picked up " + WEAPONS[id].name, "equipped");
         } else {
           // Already owned: give ammo instead.
           const t = WEAPONS[id].ammoType;
-          if (t) { l.ammo[t] = (l.ammo[t] || 0) + WEAPONS[id].clip; this._announce("+" + WEAPONS[id].clip + " " + t); }
+          if (t && grant) { l.ammo[t] = (l.ammo[t] || 0) + grant; this._announce("+" + grant + " " + t); }
         }
         break;
       }
@@ -1871,6 +1950,7 @@ export class Game {
     this._drawScorch(ctx);
     this._drawPrints(ctx);
     this._drawStains(ctx);
+    this._drawMines(ctx);
     this._drawBodies(ctx);
     this._drawLimbs(ctx);
     this._drawFurniture(ctx);

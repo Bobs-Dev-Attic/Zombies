@@ -7,6 +7,11 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.28.0] — 2026-07-17
+### Minefield
+- **Super Stamina** — a new Fun Options toggle (`cheats.superStamina` → `player.superStamina`, applied in `_applyCheats`): stamina is pinned to max and you never exhaust, so you can sprint indefinitely.
+- **Land mines** — a new deployable weapon (`kind: "mine"`, `deploy: true`, `mines` ammo). Firing it **drops a mine at your feet** (`_deployMine`); it **arms after ~0.8 s** (a red LED blinks once live) and detonates when a **zombie steps within its trigger radius** (`_updateMines`) — it won't trip on the player who laid it. Detonation (`_mineBlast`) fires a full `_explode` (hurls zombies/furniture/player, breaks windows & doors, scorches the ground) plus an extra shower of **dirt & shrapnel debris**, a heavy **blood spray with wall-spattering droplets**, and it **tears apart any zombie right on top** (flinging limbs, guts and bones). Mines render as a metal pressure-plate disc, persist per floor, and are seeded in the world loot pool + `mines` ammo pickups (and All Weapons).
+
 ## [0.27.3] — 2026-07-17
 ### Steady Stream
 - **Coherent fire stream** — the flamethrower now fires a **tight jet** straight down the aim (spread cut 0.3 → 0.1 rad; `_flame` launches particles nearly parallel with only slight jitter and a small perpendicular width) instead of a scattered fanning cone. Measured flame-particle deviation is now ~2–4° off-aim.

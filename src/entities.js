@@ -39,6 +39,7 @@ export class Player {
     this.bloodyFeet = 0;         // px-budget of bloody footprints left to track
     this.damageTakenMul = 1;     // cheat: <1 makes you take less damage
     this.unlimitedAmmo = false;  // cheat: guns/throwables never run dry
+    this.superStamina = false;   // cheat: never tire, always sprint
   }
 
   triggerRecoil(w, variant) {
@@ -92,18 +93,22 @@ export class Player {
     // Sprinting tires you faster the more hurt you are and the more gear you
     // haul (a helmet and body armour each add a little weight).
     const l = this.loadout;
-    let drainMul = 1 + (1 - this.health / this.maxHealth) * 0.5;
-    if (l && (l.helmet || 0) > 0) drainMul += 0.12;
-    if (l && (l.armor || 0) > 0) drainMul += 0.2;
-    if (sprinting && !this.exhausted && this.stamina > 0) {
-      this.stamina = clamp(this.stamina - 24 * dt * rate * drainMul, 0, this.maxStamina);
-      if (this.stamina <= 0) this.exhausted = true;
-    } else if (!wantMove) {
-      this.stamina = clamp(this.stamina + 26 * dt * rate, 0, this.maxStamina);
+    if (this.superStamina) {
+      this.stamina = this.maxStamina; this.exhausted = false; // cheat: endless wind
     } else {
-      this.stamina = clamp(this.stamina + 12 * dt * rate, 0, this.maxStamina);
+      let drainMul = 1 + (1 - this.health / this.maxHealth) * 0.5;
+      if (l && (l.helmet || 0) > 0) drainMul += 0.12;
+      if (l && (l.armor || 0) > 0) drainMul += 0.2;
+      if (sprinting && !this.exhausted && this.stamina > 0) {
+        this.stamina = clamp(this.stamina - 24 * dt * rate * drainMul, 0, this.maxStamina);
+        if (this.stamina <= 0) this.exhausted = true;
+      } else if (!wantMove) {
+        this.stamina = clamp(this.stamina + 26 * dt * rate, 0, this.maxStamina);
+      } else {
+        this.stamina = clamp(this.stamina + 12 * dt * rate, 0, this.maxStamina);
+      }
+      if (this.exhausted && this.stamina > this.maxStamina * 0.25) this.exhausted = false;
     }
-    if (this.exhausted && this.stamina > this.maxStamina * 0.25) this.exhausted = false;
 
     // Expose gait state for the walk/run animation.
     this.moving = wantMove;
@@ -173,7 +178,7 @@ export class Player {
     const w = this.weapon;
     if (w.melee) return true;
     if (this.unlimitedAmmo) return true;
-    if (w.throwable) return (this.loadout.ammo[w.ammoType] || 0) > 0;
+    if (w.throwable || w.deploy) return (this.loadout.ammo[w.ammoType] || 0) > 0;
     const clip = this.loadout.clip[this.loadout.current] ?? 0;
     return clip > 0;
   }
