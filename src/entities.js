@@ -301,7 +301,13 @@ export class Zombie {
     this.jumpH = 0;
     this.leapVX = 0; this.leapVY = 0;
     this.leapCd = rand(t.leapEager ? 1.2 : 2.5, t.leapEager ? 3 : 5);
+
+    // Clawing up out of the ground (buried undead): can't act until surfaced.
+    this.emergeT = 0;
+    this.emergeDur = 0;
   }
+
+  startEmerge(secs) { this.emergeDur = secs; this.emergeT = secs; }
 
   _startLeap(player) {
     const d = dist(this.x, this.y, player.x, player.y);
@@ -367,6 +373,13 @@ export class Zombie {
 
   update(dt, player, world, nav, spawnProjectile, lure) {
     if (this.hurtFlash > 0) this.hurtFlash -= dt;
+    // Still clawing up out of the earth — scrabble in place, can't move or bite.
+    if (this.emergeT > 0) {
+      this.emergeT -= dt;
+      this.frame += dt * 6;   // arms clawing at the dirt
+      this.vx = 0; this.vy = 0;
+      return;
+    }
     if (this.attackCd > 0) this.attackCd -= dt;
     this.gaitT += dt;
     // A flare on the ground draws the horde toward it instead of the player.

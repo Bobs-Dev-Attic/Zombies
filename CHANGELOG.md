@@ -7,6 +7,13 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.35.0] — 2026-07-17
+### Open Ground
+- **Roomier Woods** — Blackpine Woods is bigger (66×62) and its pines are scattered far more sparsely (~34% → ~11% of the floor, with a one-tile anti-fuse gap) so it reads as open woodland, never a maze. The floor is greened up with **bushes and shrubs** (new low, shoot-over `shrub` furniture) and a heavy scatter of **grass/fern tufts** (new `grass` decor kind).
+- **Zombies from the ground** — a new emerge mechanic (`Zombie.startEmerge` + an `emergeT` gate in `update`; clip-and-rise draw with a turned-earth mound in `_drawZombiesBehind`/`_drawEmergeMound`, plus a `_dirtBurst` of clods). In the Woods ~60% of the horde now **claws up out of the earth** where it spawns rather than shambling in — it can't move or bite until it has surfaced.
+- **New environment — Ashford Airport** (`id: "airport"`, `isAirport`, `_airport()` generator), selectable from the start picker: a wide 72×56 airfield with a big marked **runway** (dashed centreline, edge stripes, threshold piano-keys), grass infield, a **taxiway** with a yellow lead-line onto a concrete **apron**, a long glass-fronted **terminal** (gates + doors + seating/loot), two open **hangars**, parked **airliners** (new `plane` furniture with a top-down airliner sprite), ground vehicles, windsocks, and a chain-link perimeter fence. New `AIRPORT_TERRAIN` palette + `isAirport` handling across `floorPair`, `_decorate`, runway/apron floor markings, and fence/hangar/terminal wall rendering.
+- Planned next: cruise ship, hotel, prison.
+
 ## [0.34.0] — 2026-07-17
 ### Off the Wall
 - **Wall penetration** — powerful single-slug guns can now punch a bullet clean through a solid wall, but only *some* rounds make it: a per-shot `wallPen` chance (Hunting Rifle 0.6, .357 Magnum 0.5, Battle Rifle 0.35, Assault Rifle 0.12) rolls each shot; when it wins, the bullet shoves out the far side (up to ~one tile — thicker walls still stop it) and carries on with slightly reduced damage. Handled in `_updateProjectiles` against hard tiles only (`WALL`/`PROP`/`FENCE`), so glass and doors still shatter/splinter as before.
