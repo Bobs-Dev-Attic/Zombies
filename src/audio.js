@@ -21,7 +21,46 @@ export class SFX {
   }
 
   resume() { this._ensure(); if (this.ctx && this.ctx.state === "suspended") this.ctx.resume(); }
-  setEnabled(on) { this.enabled = on; this._ensure(); if (this.master) this.master.gain.value = on ? 0.35 : 0; }
+  setEnabled(on) { this.enabled = on; this._ensure(); if (this.master) this.master.gain.value = on ? 0.35 : 0; if (!on) this.stopFlame(); }
+
+  // Continuous flamethrower roar — an engine-thrust loop that spools up while
+  // the trigger is held and spools down when released (not a repeated gunshot).
+  startFlame() {
+    if (!this.enabled) return;
+    this._ensure(); if (!this.ctx || this._flame) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    // Looping broadband noise = the roar body.
+    const n = Math.floor(ctx.sampleRate * 1.0);
+    const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+    const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 900; lp.Q.value = 0.8;
+    const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 160;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.09); // spool up
+    // Low sawtooth thrust rumble under the noise.
+    const osc = ctx.createOscillator(); osc.type = "sawtooth"; osc.frequency.value = 68;
+    const og = ctx.createGain(); og.gain.setValueAtTime(0.0001, t); og.gain.exponentialRampToValueAtTime(0.13, t + 0.09);
+    // A wavering LFO on the roar so it flickers like real flame.
+    const lfo = ctx.createOscillator(); lfo.type = "sine"; lfo.frequency.value = 13;
+    const lfoG = ctx.createGain(); lfoG.gain.value = 0.14;
+    src.connect(lp).connect(hp).connect(g).connect(this.master);
+    osc.connect(og).connect(this.master);
+    lfo.connect(lfoG).connect(g.gain);
+    src.start(); osc.start(); lfo.start();
+    this._flame = { src, osc, lfo, g, og };
+  }
+
+  stopFlame() {
+    const f = this._flame; if (!f || !this.ctx) return;
+    this._flame = null;
+    const t = this.ctx.currentTime;
+    try {
+      f.g.gain.cancelScheduledValues(t); f.g.gain.setValueAtTime(Math.max(0.0001, f.g.gain.value), t); f.g.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+      f.og.gain.cancelScheduledValues(t); f.og.gain.setValueAtTime(Math.max(0.0001, f.og.gain.value), t); f.og.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+      f.src.stop(t + 0.18); f.osc.stop(t + 0.18); f.lfo.stop(t + 0.18);
+    } catch (_) {}
+  }
 
   // A pitched blip: an oscillator with an optional frequency glide and a quick
   // attack / exponential decay.
@@ -64,7 +103,6 @@ export class SFX {
     const t = this.ctx.currentTime;
     // Throttle ambient/voice sounds so overlapping enemies don't blare.
     if ((name === "groan" || name === "hiss" || name === "caw" || name === "screech") && this._last[name] && t - this._last[name] < 0.2) return;
-    if (name === "flame" && this._last[name] && t - this._last[name] < 0.09) return;
     this._last[name] = t;
     switch (name) {
       // --- gunshots (weapon.sound strings) ---
@@ -81,7 +119,6 @@ export class SFX {
       // --- world / feedback ---
       case "explode": this._noise(0.6, 0.8, t, "lowpass", 1600, 1, 60); this._tone("sine", 90, 30, 0.5, 0.4, t); break;
       case "gib":    this._noise(0.32, 0.7, t, "lowpass", 900, 1, 120); this._tone("sine", 70, 26, 0.4, 0.34, t); this._noise(0.14, 0.4, t + 0.02, "bandpass", 500, 0.7, 180); break; // wet tearing burst
-      case "flame":  this._noise(0.16, 0.5, t, "lowpass", 700, 0.7, 620); this._noise(0.14, 0.22, t, "bandpass", 2600, 0.9, 2200); this._tone("sawtooth", 95, 74, 0.15, 0.14, t); break; // jet-engine roar: low rumble + hiss + whine
       case "hurt":   this._tone("sawtooth", 300, 110, 0.18, 0.28, t); this._noise(0.1, 0.14, t, "lowpass", 800, 1, null); break;
       case "pickup": this._tone("square", 600, 1000, 0.12, 0.22, t); break;
       case "heal":   this._tone("sine", 520, 900, 0.2, 0.22, t); break;

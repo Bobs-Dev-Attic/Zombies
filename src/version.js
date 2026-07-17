@@ -1,7 +1,16 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.27.2";
+export const VERSION = "0.27.3";
 
 export const CHANGELOG = [
+  {
+    version: "0.27.3",
+    date: "2026-07-17",
+    title: "Steady Stream",
+    changes: [
+      "The Flamethrower now shoots a tight, coherent stream of fire straight down your aim instead of a scattered spray.",
+      "It no longer sounds like a gun — it's a continuous engine-thrust roar that spools up while you hold the trigger and dies down when you let go.",
+    ],
+  },
   {
     version: "0.27.2",
     date: "2026-07-17",

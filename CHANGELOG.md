@@ -7,6 +7,11 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.27.3] — 2026-07-17
+### Steady Stream
+- **Coherent fire stream** — the flamethrower now fires a **tight jet** straight down the aim (spread cut 0.3 → 0.1 rad; `_flame` launches particles nearly parallel with only slight jitter and a small perpendicular width) instead of a scattered fanning cone. Measured flame-particle deviation is now ~2–4° off-aim.
+- **Engine-thrust roar (not a gun)** — replaced the per-shot flame *sound* with a **sustained looping roar** (`SFX.startFlame` / `stopFlame`): looping broadband noise through a lowpass + highpass, a low sawtooth thrust rumble, and a wavering LFO flicker, with smooth spool-up/down envelopes. The game starts the loop while the trigger is held with fuel (and there's no reload), and stops it on release, pause, or death — so continuous fire sounds like a jet, not repeated gunshots.
+
 ## [0.27.2] — 2026-07-17
 ### Bare Bones
 - **Bones** are now among the body parts a zombie can shed — a new `bone` gib (ivory shaft with knobby ends, rendered in `drawGroundLimb`). Severing a limb (`_severFX`) has a ~60% chance to also fling a splintered bone, and blowing a zombie apart (`_flingZombieGibs`) scatters 3–5 shattered bones among the guts. Bones ricochet off walls/furniture like the other explosion gibs and settle as ground decals.
