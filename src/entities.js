@@ -35,6 +35,7 @@ export class Player {
     this.swingDur = 0.22;
     this.meleeVariant = "swing"; // swing | stab | lunge (knife)
     this.lungeT = 0;             // forward-dash timer for the two-handed lunge
+    this.pumpT = 0;              // pump-action rack animation (pump shotgun)
   }
 
   triggerRecoil(w, variant) {
@@ -46,6 +47,7 @@ export class Player {
       if (this.meleeVariant === "lunge") this.lungeT = 0.16;
     } else {
       this.recoil = 1;
+      if (w.kind === "shotgun") this.pumpT = 1; // rack the pump after the shot
     }
   }
 
@@ -70,6 +72,7 @@ export class Player {
     if (this.adrenaline > 0) this.adrenaline -= dt;
     if (this.armorFlash > 0) this.armorFlash -= dt;
     if (this.recoil > 0) this.recoil = Math.max(0, this.recoil - dt * 7);
+    if (this.pumpT > 0) this.pumpT = Math.max(0, this.pumpT - dt * 2.6);
     if (this.swingT > 0) this.swingT = Math.max(0, this.swingT - dt);
     if (this.lungeT > 0) {
       this.lungeT = Math.max(0, this.lungeT - dt);
@@ -518,6 +521,7 @@ export class Particle {
     this.drag = opts.drag ?? 0.9;
     this.stain = opts.stain || false; // blood that settles on the ground
     this.kind = opts.kind || "bit";   // 'bit' | 'casing'
+    this.shell = opts.shell || false; // a fat shotgun hull (vs a brass casing)
     this.spin = opts.spin || 0;
     this.angle = opts.angle || 0;
     this.dead = false;

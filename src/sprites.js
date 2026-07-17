@@ -147,21 +147,45 @@ export function drawPlayer(ctx, cx, cy, angle, frame, hurtFlash, weaponKind, pal
   }
   const gx = Math.cos(sweep) * handFwd, gy = Math.sin(sweep) * handFwd;
 
-  // Arms: one or two hands to the grip.
-  if (oneHanded) {
-    limb2(ctx, 1, 2.2, gx, gy, 3, skin);   // weapon hand
-    limb2(ctx, 1, -3, 3, -4.5, 3, skin);   // off hand tucked at the side
+  const isShotgun = !melee && (weaponKind === "shotgun" || weaponKind === "shotgun_semi" || weaponKind === "shotgun_sxs");
+  if (isShotgun) {
+    // Hip-fired shotgun: the butt is tucked at the right hip and the barrel
+    // angles across to the aim line, so from above the gun sits off to one side.
+    // It kicks back on recoil and, for the pump gun, the fore-end racks a shell.
+    const recoil = action.recoil || 0;
+    const pumpP = action.pump || 0;                       // 1 just fired -> 0
+    const hipX = 2.0 - recoil * 3.2, hipY = 3.4;          // grip at the hip, driven back on recoil
+    const barAng = -0.26 - recoil * 0.14;                 // barrel toward centre; muzzle rises on recoil
+    const slide = weaponKind === "shotgun" ? Math.sin((1 - pumpP) * Math.PI) * 3.2 : 0; // pump rack
+    const cA = Math.cos(barAng), sA = Math.sin(barAng);
+    // Support hand rides the fore-end (moves with the pump slide).
+    const foreD = 6 - slide;
+    const foreHX = hipX + cA * foreD - sA * 0.8;
+    const foreHY = hipY + sA * foreD + cA * 0.8;
+    limb2(ctx, 1, 3.0, hipX, hipY, 3, skin);              // rear / trigger hand at the hip
+    limb2(ctx, 1, -1.2, foreHX, foreHY, 3, skin);         // support hand on the fore-end
+    ctx.save();
+    ctx.translate(hipX, hipY);
+    ctx.rotate(barAng);
+    drawShotgunLocal(ctx, weaponKind, slide, recoil);
+    ctx.restore();
   } else {
-    limb2(ctx, 1, -3.2, gx, gy, 3, skin);
-    limb2(ctx, 1, 3.2, gx, gy, 3, skin);
-  }
+    // Arms: one or two hands to the grip.
+    if (oneHanded) {
+      limb2(ctx, 1, 2.2, gx, gy, 3, skin);   // weapon hand
+      limb2(ctx, 1, -3, 3, -4.5, 3, skin);   // off hand tucked at the side
+    } else {
+      limb2(ctx, 1, -3.2, gx, gy, 3, skin);
+      limb2(ctx, 1, 3.2, gx, gy, 3, skin);
+    }
 
-  // Weapon at the grip, aligned to facing (plus any melee sweep).
-  ctx.save();
-  ctx.translate(gx, gy);
-  ctx.rotate(sweep);
-  drawWeaponLocal(ctx, weaponKind);
-  ctx.restore();
+    // Weapon at the grip, aligned to facing (plus any melee sweep).
+    ctx.save();
+    ctx.translate(gx, gy);
+    ctx.rotate(sweep);
+    drawWeaponLocal(ctx, weaponKind);
+    ctx.restore();
+  }
 
   // Head (faces forward = +x): skin, ears, hair over the crown, brow, eyes and
   // a nose tip — or a helmet shell over the top when one is equipped.
@@ -209,6 +233,35 @@ function drawWeaponLocal(ctx, kind) {
     case "smg": R(1, 2, 3, 3, "#1a1a1f"); R(0, 0, 9, 3, "#2a2a2f"); break;
     case "bazooka": R(-3, 0, 3, 3, "#2a331d"); R(-2, 0, 18, 5, "#3d4a2a"); break;
     default: R(0, 0, 6, 3, "#2c2f33");
+  }
+}
+
+// Hip-fired shotgun, drawn from the grip (0,0) extending forward (+x). `slide`
+// racks the pump fore-end back; `recoil` (0..1) pops a spent shell at the port.
+function drawShotgunLocal(ctx, kind, slide, recoil) {
+  const R = (ox, oy, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(ox, oy - h / 2, w, h); };
+  // Stock tucked back at the hip.
+  R(-6, 0.6, 6, 3.2, "#4a3826");
+  R(-6, 0.6, 1.6, 3.2, "#3a2c1d");
+  // Receiver / grip.
+  R(-1.5, 0, 4, 3.4, "#26262b");
+  if (kind === "shotgun_sxs") {
+    R(1, -1.3, 13, 1.7, "#4a4038"); R(1, 1.3, 13, 1.7, "#4a4038"); // twin barrels
+    R(13, 0, 1.6, 3.4, "#2a2622");                                 // muzzles
+  } else if (kind === "shotgun_semi") {
+    R(1, -0.3, 12, 2.4, "#3a2f28"); R(1, 1.7, 10, 1.4, "#20242a"); // barrel + mag tube
+    R(12.6, -0.3, 1.6, 2.4, "#20242a");                           // muzzle
+  } else {
+    R(1, -0.3, 12, 2.4, "#3a2f28"); R(1, 1.7, 11, 1.4, "#20242a"); // barrel + mag tube
+    R(12.6, -0.3, 1.6, 2.4, "#20242a");                           // muzzle
+    const fx = 5 - slide;                                          // sliding pump fore-end
+    R(fx, 1.2, 4, 2.8, "#171a1f");
+    R(fx, 1.2, 4, 0.9, "#2c3138");
+  }
+  // A fat red hull flipping out of the top ejection port as it fires / racks.
+  if (recoil > 0.35 || slide > 1.4) {
+    R(2, -2.4, 2.4, 1.6, "#b3352b");
+    R(2, -2.4, 0.9, 1.6, "#c9a24a");
   }
 }
 
