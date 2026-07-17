@@ -150,7 +150,52 @@ export function drawPlayer(ctx, cx, cy, angle, frame, hurtFlash, weaponKind, pal
 
   const isBazooka = !melee && weaponKind === "bazooka";
   const isShotgun = !melee && (weaponKind === "shotgun" || weaponKind === "shotgun_semi" || weaponKind === "shotgun_sxs");
-  if (isBazooka) {
+  const isFlamer = !melee && weaponKind === "flamethrower";
+  const isRifle = !melee && weaponKind === "rifle"; // bolt-action hunting rifle
+  if (isFlamer) {
+    // Hip-fired flamethrower: the fuel tank rides low at the hip and the nozzle
+    // wand angles across to the aim line, gripped in both hands — like the
+    // shotgun, but belching fire instead of shot.
+    const recoil = action.recoil || 0;
+    const hipX = 1.8 - recoil * 1.0, hipY = 3.2;   // wand grip at the hip; a light shove as it belches
+    const barAng = -0.24;                          // wand angles in toward the aim line
+    const cA = Math.cos(barAng), sA = Math.sin(barAng);
+    const foreD = 7;
+    const foreHX = hipX + cA * foreD, foreHY = hipY + sA * foreD + 0.4;
+    limb2(ctx, 1, 3.0, hipX, hipY, 3, skin);       // rear hand on the wand grip at the hip
+    limb2(ctx, 1, -1.2, foreHX, foreHY, 3, skin);  // front hand steadies the wand
+    ctx.save();
+    ctx.translate(hipX, hipY);
+    ctx.rotate(barAng);
+    drawFlamerLocal(ctx);
+    ctx.restore();
+  } else if (isRifle) {
+    // Shouldered bolt-action hunting rifle: the butt is pulled tight into the
+    // shoulder and the barrel runs straight down the sightline, held with both
+    // hands. It rides back hard on recoil; then the trigger hand comes off the
+    // grip to work the bolt — lift, draw to the rear, shove home — before
+    // returning to fire again.
+    const recoil = action.recoil || 0;
+    const bolt = action.bolt || 0;                 // 1 just fired -> 0
+    const cyc = bolt > 0 ? 1 - bolt : -1;          // 0..1 across the bolt cycle
+    const shX = 1.4 - recoil * 3.6, shY = 1.7;     // butt at the shoulder; kicks straight back
+    // Front support hand well forward under the forestock.
+    limb2(ctx, 1, -2.8, shX + 10, shY - 1.2, 3, skin);
+    // Trigger hand at the grip — or up on the bolt knob mid-cycle.
+    let rhX = shX + 3.4, rhY = shY + 1.4, boltBack = 0, boltLift = 0;
+    if (cyc >= 0) {
+      const s1 = Math.sin(cyc * Math.PI);          // 0 -> 1 -> 0 rearward sweep
+      boltBack = s1 * 3.2;                          // draw the bolt to the rear
+      boltLift = s1 * 1.6;                          // lifted up out of its notch
+      rhX = shX + 4.4 - boltBack;                   // hand rides the bolt knob
+      rhY = shY + 2.2 + boltLift;
+    }
+    limb2(ctx, 1, 2.8, rhX, rhY, 3, skin);
+    ctx.save();
+    ctx.translate(shX, shY);
+    drawHuntingRifleLocal(ctx, boltBack, boltLift);
+    ctx.restore();
+  } else if (isBazooka) {
     // Shoulder-mounted RPG: the launch tube rests on the right shoulder and runs
     // fore-and-aft along the aim, its rear vent sticking out behind the shoulder.
     const recoil = action.recoil || 0;
@@ -280,6 +325,54 @@ function drawShotgunLocal(ctx, kind, slide, recoil) {
   if (recoil > 0.35 || slide > 1.4) {
     R(2, -2.4, 2.4, 1.6, "#b3352b");
     R(2, -2.4, 0.9, 1.6, "#c9a24a");
+  }
+}
+
+// Hip-fired flamethrower, drawn from the wand grip (0,0) with the fuel tank
+// slung back at the hip (-x) and the nozzle wand running forward (+x).
+function drawFlamerLocal(ctx) {
+  const R = (ox, oy, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(ox, oy - h / 2, w, h); };
+  // Squat fuel tank behind the grip, at the hip.
+  R(-8, 1.4, 5.5, 6.5, "#7a2a1a");
+  R(-8, 1.4, 5.5, 1.8, "#a03a24");            // top highlight
+  R(-8, -1.4, 1.6, 6.5, "#5a1e12");           // shaded back edge
+  R(-3.6, -0.2, 2, 3.2, "#3a3a3e");           // regulator / neck valve
+  // Hose slinging down from the tank to the wand.
+  R(-3.2, 2.4, 4, 1.3, "#26262a");
+  // Nozzle wand forward to the muzzle.
+  R(-1.5, 0, 11, 2.4, "#3a3a3e");
+  R(-1.5, -1.0, 11, 0.7, "#4a4a4e");          // wand top glint
+  R(9, 0, 3.4, 3.4, "#26262a");               // nozzle bell
+  ctx.fillStyle = "#1a1a1e"; ctx.fillRect(12, -1, 2, 2); // bore
+  ctx.fillStyle = "#ff8a3a"; ctx.fillRect(12.4, -0.6, 1.2, 1.2); // pilot flame glow
+}
+
+// Bolt-action hunting rifle, drawn from the shoulder origin (0,0) with the
+// stock running back (-x) into the shoulder and the barrel forward (+x).
+// `boltBack`/`boltLift` slide & raise the bolt handle while it's being cycled.
+function drawHuntingRifleLocal(ctx, boltBack, boltLift) {
+  const R = (ox, oy, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(ox, oy - h / 2, w, h); };
+  // Wooden stock into the shoulder, with a comb rising to the receiver.
+  R(-6, 0.5, 6.5, 3, "#5a3f26");
+  R(-6, 0.5, 1.6, 3, "#442e1a");                 // butt plate
+  R(-1.5, -0.4, 3, 2.2, "#6a4a2c");              // wrist/comb of the stock
+  // Receiver + long blued barrel straight down the aim line.
+  R(0.5, 0, 4, 3, "#20241f");                     // receiver
+  R(4, -0.2, 13, 1.8, "#26411f");                 // barrel (deep hunting green)
+  R(4, -0.9, 13, 0.6, "#375a2c");                 // barrel top glint
+  R(16.5, -0.2, 2, 1.2, "#161a15");               // muzzle crown
+  // Scope mounted over the receiver.
+  R(3.5, -2.1, 7, 1.1, "#2a2a26");                // scope rail/mounts
+  R(4.5, -2.7, 4.5, 1.5, "#12140e");              // scope tube
+  ctx.fillStyle = "#8fd0ff"; ctx.fillRect(8.6, -2.7, 0.9, 1.4); // glinting objective lens
+  // Bolt handle out the right side of the receiver; draws back & lifts on cycle.
+  const bx = 1.6 - boltBack, by = 2.0 + boltLift;
+  R(bx, by - 0.1, 2.4, 1.1, "#8a8f96");           // bolt arm
+  ctx.fillStyle = "#c2c7cd"; ctx.beginPath(); ctx.arc(bx + 2.4, by, 1.1, 0, TAU); ctx.fill(); // knob
+  // Spent brass flicking out of the port as the bolt is drawn back.
+  if (boltBack > 1.4) {
+    R(1.5, -2.1, 1.8, 1.1, "#c9a24a");
+    R(1.5, -2.1, 0.7, 1.1, "#e6c877");
   }
 }
 

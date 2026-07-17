@@ -344,6 +344,8 @@ export class Game {
     this.player.angle = angleLerp(this.player.angle, desired, clamp(dt * 18, 0, 1));
 
     this.player.update(dt, inp, this.world);
+    // Bolt-action eject: the spent case flips out as the bolt is drawn to the rear.
+    if (this._boltEject > 0) { this._boltEject -= dt; if (this._boltEject <= 0) { this._boltEject = 0; this._ejectCasing(this.player); } }
     this._updateFootprints();
     this.world.update(dt);
     this._waterT = (this._waterT || 0) + dt; // drives the flowing-water ripples
@@ -387,6 +389,7 @@ export class Game {
     for (const bm of this.beams) bm.life -= dt;
     this.beams = this.beams.filter((bm) => bm.life > 0);
     for (const p of this.particles) p.update(dt);
+    this._updateFlames(dt);
     for (const s of this.stains) s.life -= dt * 0.15;
     for (const fp of this.prints) fp.life -= dt * 0.14;
     for (const pk of this.pickups) pk.update(dt);
@@ -628,6 +631,7 @@ export class Game {
     // Feedback: muzzle smoke, casing, shake.
     this.shake += w.explosive ? 8 : w.pellets > 1 ? 4 : 2;
     if (w.kind === "bazooka") this._backblast(p); // rear exhaust jet out the launcher tube
+    else if (w.kind === "rifle") this._boltEject = 0.2; // brass flips clear only when the bolt is worked
     else this._ejectCasing(p);
     this._muzzleSmoke(p);
     sfx.play(w.sound || "pop");
@@ -1749,10 +1753,13 @@ export class Game {
     // billow up and die.
     for (let i = 0; i < 6; i++) {
       const jit = rand(-0.07, 0.07), off = rand(-2.2, 2.2), a = p.angle + jit, sp = rand(360, 560);
-      this.particles.push(new Particle(ox + perpX * off, oy + perpY * off, {
+      const fp = new Particle(ox + perpX * off, oy + perpY * off, {
         vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(0.34, 0.8),
         color: pick(["#ffd24a", "#ff9030", "#ff5a2a", "#ffce54", "#c0341a"]), size: randInt(3, 6), drag: 0.955, gravity: -18,
-      }));
+        kind: "flame",
+      });
+      fp.flameHits = 4; // the living flame can sear a few zombies before it burns out
+      this.particles.push(fp);
     }
     if (chance(0.8)) this.particles.push(new Particle(ox + c * rand(60, 150), oy + s * rand(60, 150), {
       vx: rand(-16, 16), vy: rand(-44, -16), life: rand(1.0, 2.0), color: pick(["rgba(40,40,40,0.5)", "rgba(60,58,56,0.45)"]), size: randInt(4, 9), drag: 0.94, gravity: -8,
@@ -1774,6 +1781,39 @@ export class Game {
       if (da <= half) this._igniteFurniture(f);
     }
     this.shake += 0.3;
+  }
+
+  // The flame stream is a physical thing: each burning particle splashes off
+  // walls & furniture (so fire pools and licks along cover instead of passing
+  // through) and sets alight any zombie it actually washes over — including the
+  // low crawlers a high, arcing stream would otherwise sail clean over.
+  _updateFlames(dt) {
+    const w = this.world;
+    for (const p of this.particles) {
+      if (p.kind !== "flame" || p.dead) continue;
+      // Bounce off any solid the particle has entered, using its last-good spot.
+      if (p._px !== undefined && w.solidAt(p.x, p.y)) {
+        const hitX = w.solidAt(p.x, p._py); // ran into a wall on the x axis
+        const hitY = w.solidAt(p._px, p.y); // ran into a wall on the y axis
+        if (hitX) p.vx = -p.vx * 0.45;
+        if (hitY) p.vy = -p.vy * 0.45;
+        if (!hitX && !hitY) { p.vx *= -0.45; p.vy *= -0.45; } // clipped a corner
+        p.x = p._px; p.y = p._py;               // shove back out of the solid
+        p.vx += rand(-45, 45); p.vy += rand(-45, 45); // splash & spread along the surface
+        p.life = Math.min(p.maxLife, p.life + 0.05);  // fire clings to cover a moment longer
+      }
+      // Sear whatever the flame is touching (ignite only — burning does the damage).
+      if (p.flameHits > 0) {
+        for (const z of this.zombies) {
+          if (z.dead || z.burning > 1.5) continue;
+          if (dist(p.x, p.y, z.x, z.y) <= z.r + p.size * 0.5 + 2) {
+            this._igniteZombie(z, 4.5);
+            if (--p.flameHits <= 0) break;
+          }
+        }
+      }
+      p._px = p.x; p._py = p.y;
+    }
   }
 
   _igniteZombie(z, secs) {
@@ -2675,7 +2715,7 @@ export class Game {
     const action = {
       recoil: p.recoil, swingT: p.swingT, swingDur: p.swingDur, melee: p.weapon.melee,
       variant: p.meleeVariant, moving: p.moving, run: p.running, vx: p.vx, vy: p.vy,
-      stamina: p.stamina / p.maxStamina, idleT: p.idleT, pump: p.pumpT,
+      stamina: p.stamina / p.maxStamina, idleT: p.idleT, pump: p.pumpT, bolt: p.boltT,
       helmet: (p.loadout.helmet || 0) > 0, armor: (p.loadout.armor || 0) > 0,
     };
     drawPlayer(ctx, p.x, p.y, p.angle, p.walkFrame, p.hurtFlash > 0, p.weapon.kind, PLAYER_PAL, action);

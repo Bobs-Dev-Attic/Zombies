@@ -7,6 +7,13 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.31.0] — 2026-07-17
+### Bolt & Blaze
+- **Bolt-action rifle handling** — the Hunting Rifle (`kind: "rifle"`) now has a dedicated shouldered pose in `drawPlayer` (`drawHuntingRifleLocal`): the butt is pulled into the shoulder, the scoped barrel runs straight down the sightline, and it rides back on recoil. After each shot a new `boltT` timer (set in `triggerRecoil`, decays deliberately) drives a bolt-cycle animation — the trigger hand comes off the grip to lift, draw the bolt to the rear and shove it home, and the spent case is ejected mid-cycle (`_boltEject` delay) rather than instantly.
+- **Hip-fired flamethrower** — the Flamethrower (`kind: "flamethrower"`) now uses a hip-fired pose like the shotguns (`drawFlamerLocal`): the fuel tank rides low at the hip and the nozzle wand angles across to the aim line, gripped in both hands.
+- **Physical fire** — flame particles are now tagged `kind: "flame"` and processed by `_updateFlames`: each one bounces off walls and furniture (`world.solidAt`, reflected per-axis and shoved back out), so the stream splashes and pools against cover instead of passing through it.
+- **Torching crawlers** — the living flame now ignites any zombie it actually washes over — including low `prone`/`dragger` crawlers the high, arcing stream would otherwise sail clean over (each particle can sear a few zombies via `flameHits`).
+
 ## [0.30.0] — 2026-07-17
 ### Crawl & Splatter
 - **Dragger zombie** — a new `dragger` type (`bornProne: true`, `hp: 70`, slow `speed: 26`, high `knockResist: 0.5`, `dmg: 14`): a heavy legless torso that hauls itself deliberately across the ground on its arms, tanky and hard to shove. Distinct from the fast lunging `prone` crawler. Enters the spawn table from wave 2 onward.
