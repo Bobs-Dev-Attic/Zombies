@@ -422,7 +422,16 @@ const ZOMBIE_PAL = {
   crawler: { skin: "#a0c15a", dark: "#6f8a34", cloth: "#4a4238" },
   brute: { skin: "#5c7a2e", dark: "#3d5420", cloth: "#3a3a3a" },
   spitter: { skin: "#9ab84a", dark: "#6a8030", cloth: "#7a6a2a" },
+  // Woodland wildlife — skin is the rot showing through, cloth is the fur/feathers.
+  squirrel: { skin: "#8a9a52", dark: "#5a3a1e", cloth: "#8a5230" },
+  rabbit:   { skin: "#93a35a", dark: "#54504a", cloth: "#8a8276" },
+  raccoon:  { skin: "#8a9a52", dark: "#26262a", cloth: "#6a6e74" },
+  fox:      { skin: "#93a35a", dark: "#8a3a14", cloth: "#c06a24" },
+  bear:     { skin: "#5c7a2e", dark: "#211812", cloth: "#3a2a1c" },
+  bigbird:  { skin: "#8a9a52", dark: "#2a2620", cloth: "#4a4038" },
 };
+// Animals whose fur/feather colour comes from their palette (not random clothing).
+const FUR_ANIMALS = new Set(["squirrel", "rabbit", "raccoon", "fox", "bear", "bigbird"]);
 const STUMP = "#7a1414";
 
 // Nudge a hex colour by a random amount per channel (per-zombie variety).
@@ -440,7 +449,9 @@ const ZHAIR = ["#20160e", "#3a2a18", "#6a5232", "#b0a060", "#8a8a8a", "#a44a20",
 // Build a per-zombie appearance: jittered skin, random clothes and hair style.
 export function makeZombieLook(type) {
   const base = ZOMBIE_PAL[type] || ZOMBIE_PAL.walker;
-  const cloth = Math.random() < 0.7 ? ZCLOTHES[(Math.random() * ZCLOTHES.length) | 0] : jitterHex(base.cloth, 30);
+  // Wildlife keeps its own fur/feather colour; the horde wears grubby scavenged clothes.
+  const cloth = FUR_ANIMALS.has(type) ? jitterHex(base.cloth, 18)
+    : (Math.random() < 0.7 ? ZCLOTHES[(Math.random() * ZCLOTHES.length) | 0] : jitterHex(base.cloth, 30));
   const roll = Math.random();
   return {
     skin: jitterHex(base.skin, 26),
@@ -503,7 +514,7 @@ export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts,
   drawShadow(ctx, cx, cy + (prone ? 3 : 6) * s, vx || 0, vy || 0, (prone ? 8 : 7) * s, 3.0 * s, jumpH / 11);
 
   // A torn scrap of cloth snagged and dragging behind (drawn under the body).
-  if (look.dragCloth && type !== "rat" && type !== "dog") {
+  if (look.dragCloth && type !== "rat" && type !== "dog" && !FUR_ANIMALS.has(type)) {
     const dc = look.dragCloth;
     let ax = cx - cos * (r * 0.5), ay = cyB - sin * (r * 0.5);
     for (let i = 1; i <= 3; i++) {
@@ -555,6 +566,97 @@ export function drawZombie(ctx, cx, cy, angle, frame, type, r, hurtFlash, parts,
     B(8.6, 0, 3, 3, dark); // snout
     B(5, -2.4, 2, 2, dark); B(5, 2.4, 2, 2, dark); // ears
     eye(7.5, -1.2); eye(7.5, 1.2);
+    return;
+  }
+
+  // Zombie squirrel: tiny, twitchy, with a big bushy tail curling up behind.
+  if (type === "squirrel") {
+    const g = Math.sin(frame * 3.2) * strideAmp, fur = cloth, belly = skin;
+    const L = (ox, oy, ww, hh, cc) => px(ctx, cx, cyB, ox * s, oy * s, Math.max(1, Math.round(ww * s)), Math.max(1, Math.round(hh * s)), cos, sin, cc);
+    L(-6, 0, 4, 6, dark); L(-8, -1, 3, 5, fur); L(-7, 0, 2, 3.4, belly);  // bushy tail
+    L(2 + g, -2, 1.2, 1.6, dark); L(2 - g, 2, 1.2, 1.6, dark);            // little legs
+    L(-1 - g, -2, 1.2, 1.6, dark); L(-1 + g, 2, 1.2, 1.6, dark);
+    B(-1, 0, 6, 4, fur); B(0, 0, 2.5, 2.5, belly);
+    B(3.6, 0, 3.4, 3.4, fur);
+    B(2.7, -2, 1.4, 1.8, fur); B(2.7, 2, 1.4, 1.8, fur);                 // tufted ears
+    B(5.4, 0, 1.6, 1.6, belly);                                          // snout
+    eye(4.6, -1); eye(4.6, 1);
+    return;
+  }
+
+  // Zombie rabbit: hoppy, with long ears and a fluffy tail.
+  if (type === "rabbit") {
+    const g = Math.sin(frame * 3) * strideAmp, fur = cloth, belly = skin;
+    const L = (ox, oy, ww, hh, cc) => px(ctx, cx, cyB, ox * s, oy * s, Math.max(1, Math.round(ww * s)), Math.max(1, Math.round(hh * s)), cos, sin, cc);
+    L(-5, 0, 2.6, 2.6, belly);                                           // fluffy tail
+    L(1 + g, -2, 1.4, 2.4, dark); L(1 - g, 2, 1.4, 2.4, dark);           // strong hind legs
+    L(-2, -1.6, 1.2, 1.4, dark); L(-2, 1.6, 1.2, 1.4, dark);
+    B(-1, 0, 7, 4.5, fur); B(0, 0, 3, 3, belly);
+    B(4, 0, 3.4, 3.2, fur);
+    B(4.6, -2.2, 1.3, 4.6, fur); B(4.6, 2.2, 1.3, 4.6, fur);             // long ears
+    B(6, 0, 1.4, 1.4, belly);                                            // nose
+    eye(5, -1); eye(5, 1);
+    return;
+  }
+
+  // Zombie raccoon: bandit mask and a ringed tail.
+  if (type === "raccoon") {
+    const gait = Math.sin(frame * 2.6) * strideAmp, fur = cloth;
+    const L = (ox, oy, ww, hh, cc) => px(ctx, cx, cyB, ox * s, oy * s, Math.max(1, Math.round(ww * s)), Math.max(1, Math.round(hh * s)), cos, sin, cc);
+    L(4 + gait * 1.6, -2.4, 1.8, 3, dark); L(4 - gait * 1.6, 2.4, 1.8, 3, dark);
+    L(-3 - gait * 1.6, -2.4, 1.8, 3, dark); L(-3 + gait * 1.6, 2.4, 1.8, 3, dark);
+    L(-6, 0, 3, 3, fur); L(-7.6, 0, 2.4, 2.6, dark); L(-9, 0, 2, 2.2, fur); // ringed tail
+    B(-1, 0, 9, 5.5, fur); B(0, 0, 4, 4, skin);
+    B(5, 0, 4.4, 4.4, fur);
+    B(4, -2.6, 1.8, 1.8, fur); B(4, 2.6, 1.8, 1.8, fur);                 // ears
+    B(5.6, 0, 2.6, 3.4, dark);                                           // dark bandit mask
+    B(7, 0, 2, 2.4, "#d8d2c4");                                          // pale muzzle
+    eye(5.8, -1.1); eye(5.8, 1.1);
+    return;
+  }
+
+  // Zombie fox: russet hunter with pointed ears, a white-tipped brush and snout.
+  if (type === "fox") {
+    const fur = cloth, gait = Math.sin(frame * 2.6) * strideAmp;
+    const L = (ox, oy, ww, hh, cc) => px(ctx, cx, cyB, ox * s, oy * s, Math.max(1, Math.round(ww * s)), Math.max(1, Math.round(hh * s)), cos, sin, cc);
+    L(5 + gait * 2, -2.4, 1.8, 3.6, dark); L(5 - gait * 2, 2.4, 1.8, 3.6, dark);
+    L(-4 - gait * 2, -2.4, 1.8, 3.6, dark); L(-4 + gait * 2, 2.4, 1.8, 3.6, dark);
+    L(-7, 0, 4, 4, fur); L(-9.4, 0, 3, 3, "#e8e2d4");                    // bushy white-tipped tail
+    B(-1, 0, 11, 5.5, fur); B(0, 0, 5, 4.5, skin);
+    B(6, 0, 4.5, 4.5, fur);
+    B(4.6, -2.6, 2, 2.6, fur); B(4.6, 2.6, 2, 2.6, fur);                 // pointed ears
+    B(8.6, 0, 2.6, 2.4, "#e8e2d4"); B(9.8, 0, 1.4, 1.4, dark);           // white snout + nose
+    eye(7.4, -1.2); eye(7.4, 1.2);
+    return;
+  }
+
+  // Zombie bear: a hulking, dark, apex mound — the woods' answer to the brute.
+  if (type === "bear") {
+    const fur = cloth, gait = Math.sin(frame * 1.8) * strideAmp;
+    const L = (ox, oy, ww, hh, cc) => px(ctx, cx, cyB, ox * s, oy * s, Math.max(1, Math.round(ww * s)), Math.max(1, Math.round(hh * s)), cos, sin, cc);
+    L(4 + gait * 1.4, -4, 3.2, 4.5, dark); L(4 - gait * 1.4, 4, 3.2, 4.5, dark);
+    L(-4 - gait * 1.4, -4, 3.2, 4.5, dark); L(-4 + gait * 1.4, 4, 3.2, 4.5, dark);
+    L(-7, 0, 3, 3, fur);                                                 // stub tail
+    B(-1, 0, 13, 10, fur); B(0, 0, 7, 7, skin); B(1, 2, 3, 3, dark);
+    B(7, 0, 6, 6, fur);
+    B(5.5, -3, 2.4, 2.4, fur); B(5.5, 3, 2.4, 2.4, fur);                 // round ears
+    B(10, 0, 3, 3, dark);                                                // snout
+    eye(8.2, -1.6); eye(8.2, 1.6);
+    return;
+  }
+
+  // Zombie big bird: a ragged flightless fowl with flapping wings and a beak.
+  if (type === "bigbird") {
+    const fea = cloth, gait = Math.sin(frame * 2.4) * strideAmp, flap = Math.abs(gait) * 2;
+    const L = (ox, oy, ww, hh, cc) => px(ctx, cx, cyB, ox * s, oy * s, Math.max(1, Math.round(ww * s)), Math.max(1, Math.round(hh * s)), cos, sin, cc);
+    L(0 + gait * 2, -1.8, 1.4, 4, "#b89030"); L(0 - gait * 2, 1.8, 1.4, 4, "#b89030"); // scaly legs
+    B(-2, -4 - flap, 5, 3, dark); B(-2, 4 + flap, 5, 3, dark);           // ragged flapping wings
+    B(-1, 0, 8, 7, fea); B(0, 0, 4, 4, skin);                            // plump rotting body
+    B(4, 0, 2.5, 2.5, fea);                                              // neck
+    B(6.6, 0, 3.2, 3.2, fea);                                            // head
+    B(6, -1.9, 1.6, 2, "#a02818");                                       // ragged wattle
+    B(9, 0, 3, 1.4, "#e0b040"); B(9.8, 0, 1.6, 1, "#c08a1a");            // beak
+    eye(7, -1.2); eye(7, 1.2);
     return;
   }
 
@@ -661,6 +763,38 @@ export function drawBodyDecal(ctx, x, y, angle, type, r, parts, look) {
     ctx.fillStyle = skin; ctx.beginPath(); ctx.ellipse(1 * s, 0.5 * s, 4.5 * s, 2.6 * s, 0, 0, TAU); ctx.fill(); // rotting shoulders
     ctx.fillStyle = cloth; ctx.beginPath(); ctx.arc(7 * s, 0, 3.4 * s, 0, TAU); ctx.fill();                    // head
     ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(9.6 * s, 0, 1.8 * s, 0, TAU); ctx.fill();                   // snout
+    ctx.restore(); return;
+  }
+
+  // --- Small woodland critter carcass (squirrel / rabbit / raccoon / fox). ---
+  if (type === "squirrel" || type === "rabbit" || type === "raccoon" || type === "fox") {
+    const bushy = type === "squirrel" || type === "fox";
+    ctx.fillStyle = cloth; ctx.beginPath(); ctx.ellipse(0, 0, 7 * s, 4 * s, 0, 0, TAU); ctx.fill();             // body
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.ellipse(1 * s, 0.5 * s, 3.4 * s, 2 * s, 0, 0, TAU); ctx.fill();  // belly rot
+    ctx.fillStyle = dark; for (const [ox, oy] of [[3, -3.5], [3.5, 3.5], [-3, -3.5], [-2.5, 3.5]]) ctx.fillRect((ox - 0.9) * s, (oy - 2) * s, 1.8 * s, 4 * s); // splayed legs
+    ctx.fillStyle = cloth; ctx.beginPath(); ctx.arc(6 * s, 0, 3 * s, 0, TAU); ctx.fill();                       // head
+    if (type === "rabbit") { ctx.fillStyle = cloth; ctx.fillRect(6 * s, -3.4 * s, 1.4 * s, 4 * s); ctx.fillRect(6 * s, 1.4 * s, 1.4 * s, 4 * s); } // ears
+    if (bushy) { ctx.fillStyle = cloth; ctx.beginPath(); ctx.arc(-7 * s, 0, 3 * s, 0, TAU); ctx.fill(); }       // brush tail
+    ctx.restore(); return;
+  }
+
+  // --- Bear carcass: a big dark mound, paws splayed. ---
+  if (type === "bear") {
+    ctx.fillStyle = dark; for (const [ox, oy] of [[5, -6], [5.5, 6], [-5, -6], [-4.5, 6]]) ctx.fillRect((ox - 1.4) * s, (oy - 3) * s, 2.8 * s, 6 * s); // splayed paws
+    ctx.fillStyle = cloth; ctx.beginPath(); ctx.ellipse(-0.5 * s, 0, 12 * s, 7 * s, 0, 0, TAU); ctx.fill();     // torso
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.ellipse(1 * s, 0.5 * s, 6 * s, 3.6 * s, 0, 0, TAU); ctx.fill();  // rot
+    ctx.fillStyle = cloth; ctx.beginPath(); ctx.arc(9 * s, 0, 5 * s, 0, TAU); ctx.fill();                       // head
+    ctx.fillStyle = dark; ctx.beginPath(); ctx.arc(12.5 * s, 0, 2.4 * s, 0, TAU); ctx.fill();                   // snout
+    ctx.restore(); return;
+  }
+
+  // --- Big bird carcass: wings splayed, beak forward. ---
+  if (type === "bigbird") {
+    ctx.fillStyle = dark; ctx.beginPath(); ctx.ellipse(-1 * s, -6 * s, 6 * s, 3 * s, 0.3, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.ellipse(-1 * s, 6 * s, 6 * s, 3 * s, -0.3, 0, TAU); ctx.fill(); // wings
+    ctx.fillStyle = cloth; ctx.beginPath(); ctx.ellipse(0, 0, 7 * s, 4.4 * s, 0, 0, TAU); ctx.fill();           // body
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.ellipse(1 * s, 0.5 * s, 3.4 * s, 2 * s, 0, 0, TAU); ctx.fill();  // rot
+    ctx.fillStyle = cloth; ctx.beginPath(); ctx.arc(7 * s, 0, 3 * s, 0, TAU); ctx.fill();                       // head
+    ctx.fillStyle = "#d8a838"; ctx.beginPath(); ctx.moveTo(9 * s, -1.4 * s); ctx.lineTo(12 * s, 0); ctx.lineTo(9 * s, 1.4 * s); ctx.fill(); // beak
     ctx.restore(); return;
   }
 
@@ -776,6 +910,9 @@ const FURN = {
   bench:  { body: "#6b4a28", top: "#86633c", edge: "#4a3420" },
   bush:   { body: "#2f4a24", top: "#3c5c2e", edge: "#213617" },
   dresser:{ body: "#6a4a2a", top: "#835c38", edge: "#472f18" },
+  boulder:{ body: "#6a6e72", top: "#888c92", edge: "#43474b" },
+  rock:   { body: "#71757a", top: "#8e9298", edge: "#4a4e52" },
+  log:    { body: "#5a3f26", top: "#74542f", edge: "#3a2818" },
 };
 
 // Furniture: intact obstacle, or a broken / overturned pile once destroyed.
@@ -849,6 +986,27 @@ export function drawFurniture(ctx, f) {
     for (const [ox, oy, rr] of [[-3, -2, 3], [3, -1, 3], [0, -1, 3.4]]) { ctx.beginPath(); ctx.arc(ox, oy, rr, 0, TAU); ctx.fill(); }
     ctx.restore();
     return;
+  }
+  if (f.type === "boulder" || f.type === "rock") {
+    // A rounded stone: a shaded base lump, a lit crown, a pocket of shadow and
+    // a couple of cracks.
+    ctx.fillStyle = c.edge; ctx.beginPath(); ctx.ellipse(0, 1, f.hw, f.hh * 0.92, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = c.body; ctx.beginPath(); ctx.ellipse(-0.4, 0, f.hw * 0.92, f.hh * 0.82, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = c.top; ctx.beginPath(); ctx.ellipse(-f.hw * 0.28, -f.hh * 0.32, f.hw * 0.5, f.hh * 0.4, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0,0.22)"; ctx.beginPath(); ctx.ellipse(f.hw * 0.32, f.hh * 0.32, f.hw * 0.42, f.hh * 0.36, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-f.hw * 0.3, -f.hh * 0.1); ctx.lineTo(f.hw * 0.2, f.hh * 0.5); ctx.stroke();
+    ctx.restore(); return;
+  }
+  if (f.type === "log") {
+    // A fallen log: a long timber cylinder with end-grain rings.
+    const vert = f.hh >= f.hw; if (!vert) ctx.rotate(Math.PI / 2);
+    const hw = vert ? f.hw : f.hh, hh = vert ? f.hh : f.hw;
+    ctx.fillStyle = c.edge; ctx.fillRect(-hw, -hh, hw * 2, hh * 2);
+    ctx.fillStyle = c.body; ctx.fillRect(-hw + 1, -hh, hw * 2 - 2, hh * 2);
+    ctx.fillStyle = c.top; ctx.fillRect(-hw + 1, -hh, hw * 0.7, hh * 2);       // lit length
+    ctx.fillStyle = "#8a6a3e"; ctx.beginPath(); ctx.arc(0, -hh + 1.5, hw * 0.7, 0, TAU); ctx.fill(); // end grain
+    ctx.strokeStyle = c.edge; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0, -hh + 1.5, hw * 0.4, 0, TAU); ctx.stroke();
+    ctx.restore(); return;
   }
   if (f.type === "dresser") {
     ctx.fillStyle = c.edge; ctx.fillRect(-f.hw, -f.hh, f.hw * 2, f.hh * 2);

@@ -66,6 +66,16 @@ export const CITY_TERRAIN = {
   9: ["#5a5c60", "#606268"], // crosswalk / lobby tile
 };
 
+// Blackpine Woods terrain colours (checker pairs), keyed by floorTint value.
+export const FOREST_TERRAIN = {
+  0: ["#1f2e1a", "#243620"], // mossy forest floor
+  1: ["#1f2e1a", "#243620"], // grass / clearing
+  2: ["#3a2e1c", "#43361f"], // dirt trail
+  3: ["#1a333c", "#204049"], // river / stream water (deep)
+  4: ["#33373c", "#3a3e44"], // cave stone floor
+  5: ["#2a3a2c", "#314331"], // muddy grassy bank
+};
+
 // Sewer tunnel terrain — murky water over concrete.
 export const SEWER_TERRAIN = {
   0: ["#1c2a26", "#213330"], // shallow channel water
@@ -80,10 +90,11 @@ export class World {
     this.isHouse = this.setting.id === "house";
     this.isStreets = this.setting.id === "streets";
     this.isCity = this.setting.id === "city";
+    this.isForest = this.setting.id === "forest";
     this.isSewers = this.isStreets && floorLevel === 1; // sewer maze beneath the streets
     this.floorLevel = floorLevel; // 0 = ground/street, 1 = upstairs/sewers
-    this.cols = this.isHouse ? 40 : this.isStreets ? 48 : this.isCity ? 54 : randInt(40, 52);
-    this.rows = this.isHouse ? 38 : this.isStreets ? 46 : this.isCity ? 52 : randInt(40, 52);
+    this.cols = this.isHouse ? 40 : this.isStreets ? 48 : this.isCity ? 54 : this.isForest ? 54 : randInt(40, 52);
+    this.rows = this.isHouse ? 38 : this.isStreets ? 46 : this.isCity ? 52 : this.isForest ? 52 : randInt(40, 52);
     this.grid = new Uint8Array(this.cols * this.rows);
     this.explored = new Uint8Array(this.cols * this.rows); // fog-of-war memory
     this.floorTint = new Uint8Array(this.cols * this.rows); // per-tile room colour id
@@ -105,6 +116,7 @@ export class World {
     if (this.isHouse) { if (floorLevel === 1) this._houseUpper(); else this._houseGround(); }
     else if (this.isStreets) { if (floorLevel === 1) this._sewers(); else this._streets(); }
     else if (this.isCity) this._city();
+    else if (this.isForest) this._forest();
     else this._generate();
     this._decorate();
   }
@@ -120,6 +132,7 @@ export class World {
     if (this.isSewers) { this.ambient = 0.52; grime = area * 0.05; debris = area * 0.03; trash = area * 0.02; garbage = area * 0.006; }
     else if (this.isHouse) { this.ambient = 0.30; grime = area * 0.035; debris = area * 0.02; trash = area * 0.014; garbage = area * 0.003; }
     else if (this.isCity) { this.ambient = 0.14; grime = area * 0.03; debris = area * 0.028; trash = area * 0.024; garbage = area * 0.007; } // downtown: littered, dusk-lit
+    else if (this.isForest) { this.ambient = 0.34; grime = area * 0.02; debris = area * 0.03; trash = area * 0.004; garbage = area * 0.001; } // woods: shady canopy, leaf litter
     else { this.ambient = 0.06; grime = area * 0.02; debris = area * 0.02; trash = area * 0.016; garbage = area * 0.004; } // streets: near-daylight
     const push = (kind, extra) => { const p = cellFloor(); if (p) this.decor.push({ x: p.x + R(-12, 12), y: p.y + R(-12, 12), kind, seed: (Math.random() * 1e9) | 0, rot: R(-Math.PI, Math.PI), ...extra }); };
     for (let i = 0; i < grime; i++) push("grime", { r: R(6, 16), tone: pick(["#171a12", "#1c160f", "#141414", "#181c1e"]) });
@@ -138,9 +151,9 @@ export class World {
 
   // Floor checker-pair for a tile, tinted by terrain (house rooms / streets / sewers).
   floorPair(cx, cy) {
-    if (!this.isHouse && !this.isStreets && !this.isCity) return null;
+    if (!this.isHouse && !this.isStreets && !this.isCity && !this.isForest) return null;
     const id = this.floorTint[this.idx(cx, cy)];
-    const pal = this.isSewers ? SEWER_TERRAIN : this.isHouse ? ROOM_FLOOR : this.isCity ? CITY_TERRAIN : STREET_TERRAIN;
+    const pal = this.isSewers ? SEWER_TERRAIN : this.isHouse ? ROOM_FLOOR : this.isCity ? CITY_TERRAIN : this.isForest ? FOREST_TERRAIN : STREET_TERRAIN;
     return pal[id] || pal[0];
   }
 
@@ -195,7 +208,7 @@ export class World {
   }
 
   // Low furniture you can shoot over (still blocks movement).
-  _isLowFurniture(type) { return type === "table" || type === "chair" || type === "couch" || type === "bench" || type === "bed"; }
+  _isLowFurniture(type) { return type === "table" || type === "chair" || type === "couch" || type === "bench" || type === "bed" || type === "rock" || type === "log"; }
 
   idx(cx, cy) { return cy * this.cols + cx; }
   inBounds(cx, cy) { return cx >= 0 && cy >= 0 && cx < this.cols && cy < this.rows; }
@@ -659,6 +672,143 @@ export class World {
     if (!isSpawn && x1 - x0 >= 5 && y1 - y0 >= 5) { this._set(cxm, cym, T.PROP); putF(cxm - 1, cym, "barrel", 8, 8, 48); putF(cxm + 1, cym, "barrel", 8, 8, 48); }
     this.rooms.push({ name: "plaza", cx: cxm, cy: cym });
     if (isSpawn) this._citySpawn = { x: (cxm + 0.5) * TILE, y: (cym + 0.5) * TILE };
+  }
+
+  // Blackpine Woods: a dense forest of pines and clearings split by a winding
+  // river, with log cabins, a rocky cave, scattered boulders — and risen
+  // woodland wildlife stalking it all.
+  _forest() {
+    const cols = this.cols, rows = this.rows;
+    this.grid.fill(T.FLOOR);
+    this.floorTint.fill(1); // mossy forest floor
+    this.furniture = [];
+    this.rooms = [];
+    // Dense treeline border.
+    for (let x = 0; x < cols; x++) { this._set(x, 0, T.WALL); this._set(x, rows - 1, T.WALL); }
+    for (let y = 0; y < rows; y++) { this._set(0, y, T.WALL); this._set(cols - 1, y, T.WALL); }
+
+    // Cells kept clear of trees (clearings, trails, water, structure fronts).
+    const clearSet = new Set();
+    const reserve = (cx, cy) => { if (this.inBounds(cx, cy)) clearSet.add(cy * cols + cx); };
+    const reserved = (cx, cy) => clearSet.has(cy * cols + cx);
+    const clearing = (cxm, cym, rr) => {
+      for (let y = cym - rr; y <= cym + rr; y++) for (let x = cxm - rr; x <= cxm + rr; x++)
+        if (Math.hypot(x - cxm, y - cym) <= rr + 0.4) reserve(x, y);
+    };
+
+    // A river winding top -> bottom (waded through, but drawn as a flowing
+    // channel with muddy banks), plus a tributary from the left.
+    const riverX = [];
+    let rx = randInt(22, 30);
+    for (let y = 1; y < rows - 1; y++) {
+      rx = clamp(rx + randInt(-1, 1), 7, cols - 9);
+      riverX[y] = rx;
+      for (let d = -1; d <= 1; d++) { this._tint(rx + d, y, 3); reserve(rx + d, y); }   // channel
+      this._tint(rx - 2, y, 5); this._tint(rx + 2, y, 5); reserve(rx - 2, y); reserve(rx + 2, y); // banks
+    }
+    const joinY = randInt(20, 32);
+    for (let tx = 4; tx < riverX[joinY] - 1; tx++) {
+      this._tint(tx, joinY, 3); reserve(tx, joinY);
+      this._tint(tx, joinY - 1, 5); this._tint(tx, joinY + 1, 5); reserve(tx, joinY - 1); reserve(tx, joinY + 1);
+    }
+    // Log foot-bridges across the river (decorative — you can wade anywhere).
+    for (const by of [randInt(6, 14), randInt(30, 42)]) this._furn((riverX[by] + 0.5) * TILE, (by + 0.5) * TILE, "log", 4, 20, 400);
+
+    // Clearings: the spawn glade plus a few open glades for combat.
+    const spawnCx = clamp(riverX[8] - 9, 5, 12), spawnCy = 8;
+    clearing(spawnCx, spawnCy, 4);
+    const glades = [[cols - 10, 11], [12, rows - 13], [cols - 13, 15], [Math.floor(cols / 2), Math.floor(rows / 2)]];
+    for (const [gx, gy] of glades) clearing(gx, gy, randInt(3, 4));
+
+    // A dirt trail winding from the spawn glade down to the exit trailhead.
+    const exCx = clamp(riverX[rows - 2] + 5, 6, cols - 6);
+    this._forestTrail(spawnCx, spawnCy, exCx, rows - 2, reserve);
+
+    // Scatter dense pine woods on the open floor (clearings/trails/water/sites stay clear).
+    for (let y = 2; y < rows - 2; y++) for (let x = 2; x < cols - 2; x++) {
+      if (this.tileAt(x, y) !== T.FLOOR || reserved(x, y)) continue;
+      if (this.floorTint[this.idx(x, y)] !== 1) continue;
+      if (chance(0.34)) this._set(x, y, T.PROP); // a pine
+    }
+
+    // Two log cabins tucked in glades, and a rocky cave in a far corner.
+    this._forestCabin(glades[0][0] - 2, glades[0][1] - 2);
+    this._forestCabin(glades[1][0] - 2, glades[1][1] - 1);
+    this._forestCave(cols - 8, rows - 8);
+
+    // Boulders & rocks strewn about.
+    let placed = 0;
+    for (let i = 0; i < 80 && placed < 26; i++) {
+      const x = randInt(2, cols - 3), y = randInt(2, rows - 3);
+      if (this.tileAt(x, y) !== T.FLOOR || this.floorTint[this.idx(x, y)] === 3) continue;
+      const big = chance(0.5);
+      this._furn((x + 0.5) * TILE, (y + 0.5) * TILE, big ? "boulder" : "rock", big ? rand(9, 13) : rand(5, 7), big ? rand(8, 11) : rand(4, 6), big ? 500 : 120);
+      placed++;
+    }
+
+    // Spawn in the glade; the trail exits off the bottom.
+    this.spawnPoint = { x: (spawnCx + 0.5) * TILE, y: (spawnCy + 0.5) * TILE };
+    this._set(exCx, rows - 1, T.EXIT); this._tint(exCx, rows - 1, 2);
+    this._set(exCx - 1, rows - 1, T.FLOOR); this._tint(exCx - 1, rows - 1, 2);
+    this._set(exCx + 1, rows - 1, T.FLOOR); this._tint(exCx + 1, rows - 1, 2);
+    this.exit = { x: (exCx + 0.5) * TILE, y: (rows - 1 + 0.5) * TILE };
+    this.exitFacing = "down";
+    this.rooms.push({ name: "clearing", cx: spawnCx, cy: spawnCy });
+  }
+
+  // A winding dirt trail from (x0,y0) to (x1,y1): tints the path and clears the
+  // trees along it (water crossings are left as fords).
+  _forestTrail(x0, y0, x1, y1, reserve) {
+    let x = x0, y = y0, guard = 0;
+    while ((y < y1 || Math.abs(x - x1) > 1) && guard++ < 600) {
+      for (let d = 0; d <= 1; d++) {
+        const tx = x + d;
+        for (let dy = 0; dy <= 1; dy++) {
+          const ty = y + dy - 0;
+          if (this.tileAt(tx, ty) === T.PROP) this._set(tx, ty, T.FLOOR);
+          const id = this.inBounds(tx, ty) ? this.idx(tx, ty) : -1;
+          if (id >= 0 && this.tileAt(tx, ty) === T.FLOOR && this.floorTint[id] !== 3 && this.floorTint[id] !== 5) this._tint(tx, ty, 2);
+          reserve(tx, ty);
+        }
+      }
+      if (y < y1 && chance(0.72)) y++;
+      else x += Math.sign(x1 - x) || (chance(0.5) ? 1 : -1);
+      x = clamp(x, 2, this.cols - 3); y = clamp(y, 2, this.rows - 2);
+    }
+  }
+
+  // A small log cabin with a front door, a back window and a dirt floor.
+  _forestCabin(x0, y0) {
+    const w = 5, h = 4, x1 = x0 + w - 1, y1 = y0 + h - 1;
+    if (x0 < 2 || y0 < 2 || x1 > this.cols - 3 || y1 > this.rows - 3) return;
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const edge = x === x0 || x === x1 || y === y0 || y === y1;
+      if (edge) { this._set(x, y, T.WALL); this._tint(x, y, 10); }
+      else { this._set(x, y, T.FLOOR); this._tint(x, y, 2); }
+    }
+    const dxg = x0 + 2;
+    this._doorway(dxg, y1);            // front door
+    this._set(x0 + 2, y0, T.WINDOW);   // back window
+    for (let dy = 1; dy <= 2; dy++) if (this.tileAt(dxg, y1 + dy) === T.PROP) this._set(dxg, y1 + dy, T.FLOOR); // clear the porch
+    this._furn((x0 + 1.5) * TILE, (y0 + 1.5) * TILE, "dresser", 12, 8, 80);
+    this.rooms.push({ name: "cabin", cx: x0 + 2, cy: y0 + 2 });
+  }
+
+  // A rocky cave: a ring of stone wall around a dark stone-floored nook, with a
+  // mouth opening framed by boulders.
+  _forestCave(cx, cy) {
+    const rr = 4;
+    for (let y = cy - rr; y <= cy + rr; y++) for (let x = cx - rr; x <= cx + rr; x++) {
+      if (!this.inBounds(x, y) || x === 0 || y === 0 || x === this.cols - 1 || y === this.rows - 1) continue;
+      const d = Math.hypot(x - cx, y - cy);
+      if (d <= rr - 1.5) { this._set(x, y, T.FLOOR); this._tint(x, y, 4); }   // stone floor
+      else if (d <= rr) { this._set(x, y, T.WALL); this._tint(x, y, 13); }    // rock wall ring
+    }
+    // Mouth opening toward the map interior (-x), framed with boulders.
+    for (let dy = -1; dy <= 1; dy++) { this._set(cx - rr, cy + dy, T.FLOOR); this._tint(cx - rr, cy + dy, 4); if (this.tileAt(cx - rr - 1, cy + dy) === T.PROP) this._set(cx - rr - 1, cy + dy, T.FLOOR); }
+    this._furn((cx - rr - 0.5) * TILE, (cy - 2.5) * TILE, "boulder", 11, 10, 500);
+    this._furn((cx - rr - 0.5) * TILE, (cy + 2.5) * TILE, "boulder", 11, 10, 500);
+    this.rooms.push({ name: "cave", cx, cy });
   }
 
   // The sewers: a maze of 2-wide tunnels carved through concrete, with ladders

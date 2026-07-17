@@ -9,7 +9,7 @@ import { DeathBlood } from "./deathblood.js";
 import { sfx } from "./audio.js";
 
 const PLAYER_PAL = { skin: "#d9a066", hair: "#3a2a1a", shirt: "#3b5a8c", vest: "#2c3e52", pants: "#2a2a33" };
-const ZOMBIE_LIMB = { walker: "#72a83a", runner: "#8fb84a", crawler: "#a0c15a", brute: "#5c7a2e", spitter: "#9ab84a", leaper: "#8fb84a", prone: "#a0c15a", dog: "#8a9a52", rat: "#7a8a44" };
+const ZOMBIE_LIMB = { walker: "#72a83a", runner: "#8fb84a", crawler: "#a0c15a", brute: "#5c7a2e", spitter: "#9ab84a", leaper: "#8fb84a", prone: "#a0c15a", dog: "#8a9a52", rat: "#7a8a44", squirrel: "#8a5230", rabbit: "#8a8276", raccoon: "#6a6e74", fox: "#c06a24", bear: "#3a2a1c", bigbird: "#4a4038" };
 const MIN_BUFFER = 220; // logical px on the short screen axis
 
 export class Game {
@@ -297,16 +297,27 @@ export class Game {
     if (!p) return;
     // Weighted type table that shifts toward tougher foes over time.
     const w = this.wave;
-    const table = [["walker", 5]];
-    table.push(["prone", w >= 2 ? 4 : 2]); // fast lunging crawlers from wave 1
-    if (w >= 2) table.push(["dragger", 3]); // slow, hulking torsos hauling themselves along
-    if (w >= 2) table.push(["runner", 3]);
-    if (w >= 2) table.push(["crawler", 3]);
-    if (w >= 3) table.push(["leaper", 2]); // pouncers
-    if (w >= 4) table.push(["spitter", 2]);
-    if (w >= 5) table.push(["brute", 1 + Math.floor(w / 5)]);
-    if (this.world.isSewers) table.push(["rat", 7 + w]);                              // swarms underground
-    else if ((this.world.isStreets || this.world.isCity) && w >= 2) table.push(["dog", 2 + Math.floor(w / 4)]); // stray packs outside
+    let table;
+    if (this.world.isForest) {
+      // Blackpine Woods: a bestiary of risen wildlife, with the odd lost hiker.
+      table = [["squirrel", 4], ["rabbit", 4], ["walker", 2]];
+      if (w >= 2) table.push(["raccoon", 3]);
+      if (w >= 2) table.push(["fox", 3]);
+      if (w >= 3) table.push(["runner", 2]);                             // feral hikers
+      if (w >= 3) table.push(["bigbird", 2 + Math.floor(w / 4)]);        // pecking fowl
+      if (w >= 4) table.push(["bear", 1 + Math.floor(w / 5)]);           // apex maulers
+    } else {
+      table = [["walker", 5]];
+      table.push(["prone", w >= 2 ? 4 : 2]); // fast lunging crawlers from wave 1
+      if (w >= 2) table.push(["dragger", 3]); // slow, hulking torsos hauling themselves along
+      if (w >= 2) table.push(["runner", 3]);
+      if (w >= 2) table.push(["crawler", 3]);
+      if (w >= 3) table.push(["leaper", 2]); // pouncers
+      if (w >= 4) table.push(["spitter", 2]);
+      if (w >= 5) table.push(["brute", 1 + Math.floor(w / 5)]);
+      if (this.world.isSewers) table.push(["rat", 7 + w]);                              // swarms underground
+      else if ((this.world.isStreets || this.world.isCity) && w >= 2) table.push(["dog", 2 + Math.floor(w / 4)]); // stray packs outside
+    }
     const total = table.reduce((s, t) => s + t[1], 0);
     let r = rand(0, total), type = "walker";
     for (const [k, wgt] of table) { if ((r -= wgt) <= 0) { type = k; break; } }
@@ -1430,7 +1441,7 @@ export class Game {
   // outdoors, scatter into the air when you come near, and can be shot down.
   // They never attack the player.
   _updateBirds(dt) {
-    const outdoors = (this.world.isStreets || this.world.isCity) && !this.world.isSewers;
+    const outdoors = (this.world.isStreets || this.world.isCity || this.world.isForest) && !this.world.isSewers;
     // Fresh carcasses to feed on (settled bodies, not still-collapsing corpses).
     const carrion = this.bodies;
     // Occasionally spawn a bird gliding toward a carcass, up to a small flock.
@@ -2249,6 +2260,28 @@ export class Game {
               if (w.tileAt(cx, cy - 1) !== T.WALL) { ctx.fillStyle = ridge; ctx.fillRect(x, y, TILE, 4); }       // sunlit ridge
               if (w.tileAt(cx, cy + 1) !== T.WALL) { ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.fillRect(x, y + TILE - 4, TILE, 4); } // eave shadow
             }
+          } else if (w.isForest) {
+            const rid = w.floorTint[w.idx(cx, cy)];
+            const border = cx === 0 || cy === 0 || cx === w.cols - 1 || cy === w.rows - 1;
+            if (rid === 10 && !border) {
+              // Log-cabin wall: stacked timber courses with a lit ridge and eave shade.
+              ctx.fillStyle = "#4a331f"; ctx.fillRect(x, y, TILE, TILE);
+              ctx.fillStyle = "rgba(0,0,0,0.22)"; for (let sy = 3; sy < TILE; sy += 6) ctx.fillRect(x, y + sy, TILE, 1.6); // log seams
+              if (w.tileAt(cx, cy - 1) !== T.WALL) { ctx.fillStyle = "#6a4a2a"; ctx.fillRect(x, y, TILE, 4); }
+              if (w.tileAt(cx, cy + 1) !== T.WALL) { ctx.fillStyle = "rgba(0,0,0,0.34)"; ctx.fillRect(x, y + TILE - 4, TILE, 4); }
+            } else if (rid === 13 && !border) {
+              // Cave rock: craggy grey stone.
+              ctx.fillStyle = "#3c4045"; ctx.fillRect(x, y, TILE, TILE);
+              ctx.fillStyle = "#4a4e54"; ctx.fillRect(x + 2, y + 2, TILE - 5, TILE - 7);
+              if (w.tileAt(cx, cy - 1) !== T.WALL) { ctx.fillStyle = "#565b62"; ctx.fillRect(x, y, TILE, 4); }
+              ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fillRect(x, y + TILE - 3, TILE, 3);
+            } else {
+              // Dense pine treeline enclosing the woods.
+              ctx.fillStyle = "#14200f"; ctx.fillRect(x, y, TILE, TILE);
+              ctx.fillStyle = "#1d3016"; ctx.fillRect(x + 1, y + 1, TILE - 3, TILE - 5);
+              ctx.fillStyle = "#274020"; for (const [ox, oy, rr] of [[8, 9, 6], [22, 8, 6], [15, 20, 7]]) { ctx.beginPath(); ctx.arc(x + ox, y + oy, rr, 0, TAU); ctx.fill(); }
+              ctx.fillStyle = "rgba(0,0,0,0.32)"; ctx.fillRect(x, y + TILE - 3, TILE, 3);
+            }
           } else {
             // Solid, darker body for deep wall; lit cap only where a wall face is exposed to floor above.
             const exposed = w.tileAt(cx, cy - 1) !== T.WALL;
@@ -2336,6 +2369,20 @@ export class Game {
             else if (rid === 9) { ctx.fillStyle = "rgba(230,232,235,0.5)"; for (let sx = 3; sx < TILE - 3; sx += 7) ctx.fillRect(x + sx, y + 3, 3.5, TILE - 6); } // zebra crosswalk / lobby tile
             else if (rid === 4 && !((cx + cy) & 1)) { ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fillRect(x, y + TILE - 1, TILE, 1); ctx.fillRect(x + TILE - 1, y, 1, TILE); } // paver joints
           }
+          if (w.isForest && t === T.FLOOR) {
+            const rid = w.floorTint[w.idx(cx, cy)];
+            if (rid === 3) {
+              // River water: scrolling ripples with glinting highlights.
+              ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fillRect(x, y, TILE, TILE);
+              const flow = (this._waterT || 0) * 9;
+              ctx.fillStyle = "rgba(150,200,210,0.10)";
+              for (let k = 0; k < 4; k++) { const yy = y + ((k * 8 + flow) % TILE); ctx.fillRect(x + 1, yy, TILE - 2, 1.4); }
+            } else if (rid === 1 || rid === 0) {
+              // Leaf litter & moss flecks on the forest floor.
+              const hh = ((cx * 73856093) ^ (cy * 19349663)) >>> 0;
+              if (hh % 3 === 0) { ctx.fillStyle = "rgba(90,70,30,0.5)"; ctx.fillRect(x + (hh % 20) + 4, y + ((hh >> 5) % 20) + 4, 2, 2); }
+            }
+          }
           if (w.isSewers && t === T.FLOOR) {
             // Flowing water: scrolling ripple lines; deep channels are darker.
             const deep = w.floorTint[w.idx(cx, cy)] === 2;
@@ -2368,7 +2415,17 @@ export class Game {
             ctx.lineWidth = 1;
           }
           if (t === T.PROP) {
-            if (w.isStreets) {
+            if (w.isForest) {
+              // A conifer: ground shadow, a dark trunk and stacked pine tiers.
+              const cxp = x + TILE / 2, cyp = y + TILE / 2, hh = ((cx * 92821) ^ (cy * 68917)) >>> 0;
+              ctx.fillStyle = "rgba(0,0,0,0.28)"; ctx.beginPath(); ctx.ellipse(cxp, cyp + 10, 8, 3.5, 0, 0, TAU); ctx.fill();
+              ctx.fillStyle = "#3a2816"; ctx.fillRect(cxp - 1.5, cyp + 4, 3, 8);
+              const g = (hh & 1) ? "#20361b" : "#25401f", g2 = (hh & 1) ? "#2e4a26" : "#345229";
+              for (const [oy, rw] of [[6, 10], [1, 8], [-4, 6], [-9, 4]]) { // conical tiers
+                ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(cxp - rw, cyp + oy); ctx.lineTo(cxp + rw, cyp + oy); ctx.lineTo(cxp, cyp + oy - 7); ctx.closePath(); ctx.fill();
+              }
+              ctx.fillStyle = g2; for (const [ox, oy] of [[-2, -2], [2, 2], [0, -6]]) { ctx.beginPath(); ctx.arc(cxp + ox, cyp + oy, 2.2, 0, TAU); ctx.fill(); } // sunlit sprigs
+            } else if (w.isStreets) {
               // A leafy tree: ground shadow, trunk, and a layered round canopy.
               const cxp = x + TILE / 2, cyp = y + TILE / 2;
               ctx.fillStyle = "rgba(0,0,0,0.22)"; ctx.beginPath(); ctx.ellipse(cxp, cyp + 9, 9, 4, 0, 0, TAU); ctx.fill();

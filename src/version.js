@@ -1,7 +1,17 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.32.0";
+export const VERSION = "0.33.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.33.0",
+    date: "2026-07-17",
+    title: "Into the Woods",
+    changes: [
+      "New environment: Blackpine Woods — pick it on the menu to start in a dense pine forest of shady groves and clearings, split by a winding river with log foot-bridges, dotted with log cabins, a rocky cave, and scattered boulders and rocks.",
+      "The woods crawl with risen wildlife: twitchy squirrels and hopping rabbits, masked raccoons, quick pouncing foxes, ragged pecking big birds, and hulking bears — the apex maul of the forest.",
+      "That completes the two new environments — Downtown and the Woods now both join The House and The Streets in the start picker.",
+    ],
+  },
   {
     version: "0.32.0",
     date: "2026-07-17",

@@ -229,6 +229,19 @@ export const ZOMBIE_TYPES = {
   dog:     { hp: 26,  speed: 78, r: 6,  dmg: 8,  pattern: "direct",      knockResist: 0.05, score: 18, color: "runner",  gore: 0.7, shamble: 0.14, lurch: 0.12, quad: true },
   // Zombie rat: tiny, fast, weak — swarms the sewers in scurrying packs.
   rat:     { hp: 12,  speed: 96, r: 4,  dmg: 4,  pattern: "direct",      knockResist: 0,    score: 8,  color: "crawler", gore: 0.4, shamble: 0.1,  lurch: 0.08, quad: true },
+  // --- Blackpine Woods wildlife: risen zombie animals that stalk the forest. ---
+  // Squirrel: tiny, twitchy, bushy-tailed — swarms in erratic little rushes.
+  squirrel:{ hp: 10,  speed: 108, r: 4,  dmg: 3,  pattern: "wanderChase", knockResist: 0,    score: 8,  color: "crawler", gore: 0.4, shamble: 0.14, lurch: 0.1,  quad: true },
+  // Rabbit: fast and hoppy, lunging at you in little pounces.
+  rabbit:  { hp: 14,  speed: 100, r: 4,  dmg: 4,  pattern: "direct",      knockResist: 0,    score: 10, color: "runner",  gore: 0.4, shamble: 0.12, lurch: 0.1,  quad: true, leap: true, leapEager: true },
+  // Raccoon: a bandit-masked scrapper, tougher than it looks.
+  raccoon: { hp: 26,  speed: 70,  r: 5,  dmg: 7,  pattern: "direct",      knockResist: 0.06, score: 16, color: "crawler", gore: 0.6, shamble: 0.16, lurch: 0.14, quad: true },
+  // Fox: a quick russet hunter that pounces from the treeline.
+  fox:     { hp: 30,  speed: 92,  r: 6,  dmg: 9,  pattern: "direct",      knockResist: 0.08, score: 22, color: "runner",  gore: 0.7, shamble: 0.16, lurch: 0.12, quad: true, leap: true },
+  // Bear: the hulking apex of the woods — slow, immovable, devastating up close.
+  bear:    { hp: 220, speed: 32,  r: 13, dmg: 26, pattern: "direct",      knockResist: 0.82, score: 50, color: "brute",   gore: 2.2, shamble: 0.24, lurch: 0.4,  quad: true },
+  // Big bird: a ragged flightless carrion-fowl that darts in with pecking lunges.
+  bigbird: { hp: 42,  speed: 66,  r: 8,  dmg: 11, pattern: "direct",      knockResist: 0.12, score: 24, color: "runner",  gore: 0.9, shamble: 0.2,  lurch: 0.16, leap: true, leapEager: true },
 };
 
 export class Zombie {

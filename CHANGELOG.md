@@ -7,6 +7,12 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.33.0] — 2026-07-17
+### Into the Woods
+- **New environment — Blackpine Woods** (`id: "forest"`, `isForest`, `_forest()` generator), selectable from the start picker: a dense pine forest of shady groves (`T.PROP` conifers scattered at ~34% density) and reserved clearings, split by a **winding river** with muddy banks and a tributary (waded through; drawn as a flowing channel) crossed by **log foot-bridges**, with a **dirt trail** from the spawn glade to the exit, two **log cabins** (door + window + loot) and a **rocky cave** (stone-floored nook ringed by rock walls, framed with boulders). `FOREST_TERRAIN` palette + `isForest` handling across `floorPair`, `_decorate` (shady canopy), and new floor / conifer / treeline-cabin-cave-wall rendering.
+- **Woodland bestiary** — six new risen-wildlife zombie types (`ZOMBIE_TYPES` + `drawZombie`/`drawBodyDecal` sprite & carcass branches + `ZOMBIE_PAL`/`ZOMBIE_LIMB` fur palettes): **squirrel** (tiny, bushy-tailed swarmer), **rabbit** (hoppy pouncer), **raccoon** (masked scrapper), **fox** (quick russet pouncer), **bear** (hulking apex maul), and **big bird** (ragged pecking fowl). They fill the forest spawn table (with the odd lost hiker); makeZombieLook now keeps animal fur/feather colours instead of scavenged clothing.
+- New **boulder**, **rock** and **log** furniture (rounded-stone & timber renderers) used to litter the woods.
+
 ## [0.32.0] — 2026-07-17
 ### Downtown
 - **Start-environment picker** — the menu now has a “Choose your start” row (`#env-pick`) letting the player begin in **The House**, **The Streets** or the new **Downtown**; `beginGame` resolves the chosen `SETTINGS` id to an index and passes it to `game.start()`, and the pick is remembered in `localStorage` (`z_startEnv`).
