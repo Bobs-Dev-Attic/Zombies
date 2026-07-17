@@ -1,7 +1,15 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.28.0";
+export const VERSION = "0.28.1";
 
 export const CHANGELOG = [
+  {
+    version: "0.28.1",
+    date: "2026-07-17",
+    title: "Quiet Placement",
+    changes: [
+      "Laying a land mine no longer shows a muzzle flash — you set it down, you don't fire it.",
+    ],
+  },
   {
     version: "0.28.0",
     date: "2026-07-17",

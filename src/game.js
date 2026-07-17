@@ -822,6 +822,7 @@ export class Game {
   // a zombie steps on it. (It won't trigger on the player who laid it.)
   _deployMine(w) {
     const p = this.player;
+    p.muzzle = 0; // you set it down — no muzzle flash
     if (!p.unlimitedAmmo) p.loadout.ammo[w.ammoType] = (p.loadout.ammo[w.ammoType] || 0) - 1;
     this.mines.push({ x: p.x, y: p.y, armT: 0.8, r: 15, blink: 0, w });
     if (this.mines.length > 24) this.mines.shift();

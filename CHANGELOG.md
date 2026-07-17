@@ -7,6 +7,10 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.28.1] — 2026-07-17
+### Quiet Placement
+- **No muzzle flash on mines** — deploying a land mine (`_deployMine`) now clears `player.muzzle`, so laying one down no longer draws a gun muzzle-flash. (`_tryFire` arms the flash for every weapon; deploy weapons now suppress it, like the flamethrower does.)
+
 ## [0.28.0] — 2026-07-17
 ### Minefield
 - **Super Stamina** — a new Fun Options toggle (`cheats.superStamina` → `player.superStamina`, applied in `_applyCheats`): stamina is pinned to max and you never exhaust, so you can sprint indefinitely.
