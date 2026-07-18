@@ -7,6 +7,10 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.35.2] — 2026-07-18
+### Twenty-Two
+- **The Machine Gun is a .22** — renamed *.22 Machine Gun* and retuned to fire the light rimfire round: `damage 17 → 13`, `knockback 30 → 20`, `sever 0.05 → 0.03`, and it now **ricochets** (`ricochet: 2`) off hard walls just like the .22 pistol. New tinnier `rattle22` report (the Assault Rifle keeps its heavier `rattle`).
+
 ## [0.35.1] — 2026-07-17
 ### From the Hip
 - **Waist-fired rifles** — the Assault Rifle (`rifle_auto`) and Battle Rifle (`rifle_semi`) now join the Machine Gun in the hip-fired pose. The old `isSmg` branch is generalised to `isWaistGun`, and `drawSmgLocal` becomes `drawWaistGunLocal(ctx, kind, recoil)` with per-weapon silhouettes (compact SMG, wood-stocked battle rifle, black polymer assault rifle) — the longer rifles reach the support hand further forward on the fore-end.

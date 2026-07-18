@@ -48,9 +48,10 @@ export const WEAPONS = {
   },
 
   smg: {
-    name: "Machine Gun", tag: "SMG", kind: "smg", damage: 17, fireRate: 12, pellets: 1,
+    // A .22 bullet-hose: weak, light rounds that spray fast and ricochet off walls.
+    name: ".22 Machine Gun", tag: "SMG", kind: "smg", damage: 13, fireRate: 12, pellets: 1,
     spread: 0.11, range: 240, speed: 560, clip: 34, ammoType: "rounds",
-    reload: 1.6, knockback: 30, auto: true, sever: 0.05, hs: 0.05, sound: "rattle",
+    reload: 1.6, knockback: 20, auto: true, sever: 0.03, hs: 0.05, sound: "rattle22", ricochet: 2,
   },
 
   // --- Shotguns: pump, semi-auto, and a hard-hitting side-by-side.
