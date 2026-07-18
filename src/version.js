@@ -1,7 +1,16 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.35.2";
+export const VERSION = "0.36.0";
 
 export const CHANGELOG = [
+  {
+    version: "0.36.0",
+    date: "2026-07-18",
+    title: "Ghost Flight",
+    changes: [
+      "At the Airport, a huge airliner now sits stranded down the runway — and it's packed with the dead: a whole horde spills out around it from the moment you arrive.",
+      "The Airport exit now opens into an aircraft hangar at the foot of the runway — run down past the plane and into the hangar to escape.",
+    ],
+  },
   {
     version: "0.35.2",
     date: "2026-07-18",

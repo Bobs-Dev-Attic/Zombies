@@ -895,15 +895,34 @@ export class World {
     this._set(rwX1 + 7, 6, T.PROP);
     this._set(rwX1 + 16, rows - 8, T.PROP);
 
-    // Spawn on the open apron; the runway is the way out (off the bottom).
+    // A big airliner stranded on the runway — and it's crawling with the dead
+    // (the game seeds a horde around it on start via world.zombiePlane).
+    const planeX = (rwM1 + 0.5) * TILE, planeY = Math.floor(rows * 0.38) * TILE;
+    this._furn(planeX, planeY, "plane", 17, 60, 1600, 0); // tall dims -> drawn nose-down the runway
+    this.zombiePlane = { x: planeX, y: planeY, hw: 17, hh: 60 };
+
+    // The runway leads down into an aircraft hangar — that's the way out.
+    this._airportExitHangar(rwX0, rows - 10, rwX1, rows - 2);
+
+    // Spawn on the open apron.
     this.spawnPoint = { x: 21 * TILE + 16, y: midR * TILE + 16 };
-    const exCx = rwM1;
-    this._set(exCx, rows - 1, T.EXIT); this._tint(exCx, rows - 1, 2);
-    this._set(exCx - 1, rows - 1, T.FLOOR); this._tint(exCx - 1, rows - 1, 2);
-    this._set(exCx + 1, rows - 1, T.FLOOR); this._tint(exCx + 1, rows - 1, 2);
-    this.exit = { x: (exCx + 0.5) * TILE, y: (rows - 1 + 0.5) * TILE };
-    this.exitFacing = "down";
     this.rooms.push({ name: "apron", cx: 20, cy: midR });
+  }
+
+  // The exit hangar at the foot of the runway: a big steel shed, open toward the
+  // runway, with the EXIT deep inside — so escaping means running into a hangar.
+  _airportExitHangar(x0, y0, x1, y1) {
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const wall = x === x0 || x === x1 || y === y1; // sides + back; top open toward the runway
+      if (wall) { this._set(x, y, T.WALL); this._tint(x, y, 12); }
+      else { this._set(x, y, T.FLOOR); this._tint(x, y, 3); }
+    }
+    for (let x = x0 + 1; x <= x1 - 1; x++) { this._set(x, y0, T.FLOOR); this._tint(x, y0, 3); } // open mouth
+    const exCx = Math.floor((x0 + x1) / 2), exCy = y1 - 1;
+    this._set(exCx, exCy, T.EXIT); this._tint(exCx, exCy, 3);
+    this.exit = { x: (exCx + 0.5) * TILE, y: (exCy + 0.5) * TILE };
+    this.exitFacing = "down";
+    this.rooms.push({ name: "exit-hangar", cx: exCx, cy: Math.floor((y0 + y1) / 2) });
   }
 
   // The terminal: a long hall with a glass gate frontage and doors onto the

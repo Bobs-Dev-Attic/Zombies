@@ -7,6 +7,11 @@ keep both in sync when you cut a release.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the
 project uses [Semantic Versioning](https://semver.org/).
 
+## [0.36.0] — 2026-07-18
+### Ghost Flight
+- **Zombie-packed runway airliner** — Ashford Airport now strands a large airliner down the middle of the runway (a tall `plane` furniture; the plane sprite is now vert-aware so a tall AABB draws nose-along the runway). `world.zombiePlane` records it, and `_seedLevelLoot` calls a new `_seedPlaneHorde` that seeds ~20 zombies clustered around the fuselage on arrival (on walkable ground, never inside the plane or on the player).
+- **Exit into a hangar** — the Airport exit no longer runs off the bottom edge; a new `_airportExitHangar` builds a steel shed at the foot of the runway (open mouth toward the runway) with the `EXIT` tile deep inside, so escaping means running down past the plane and into the hangar.
+
 ## [0.35.2] — 2026-07-18
 ### Twenty-Two
 - **The Machine Gun is a .22** — renamed *.22 Machine Gun* and retuned to fire the light rimfire round: `damage 17 → 13`, `knockback 30 → 20`, `sever 0.05 → 0.03`, and it now **ricochets** (`ricochet: 2`) off hard walls just like the .22 pistol. New tinnier `rattle22` report (the Assault Rifle keeps its heavier `rattle`).
