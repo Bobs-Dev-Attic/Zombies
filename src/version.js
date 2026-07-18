@@ -1,7 +1,15 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.35.1";
+export const VERSION = "0.35.2";
 
 export const CHANGELOG = [
+  {
+    version: "0.35.2",
+    date: "2026-07-18",
+    title: "Twenty-Two",
+    changes: [
+      "The Machine Gun is now a .22 — its light rounds ricochet off walls like the .22 pistol, hit softer with less knockback, and crack with a tinnier report.",
+    ],
+  },
   {
     version: "0.35.1",
     date: "2026-07-17",

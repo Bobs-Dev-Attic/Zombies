@@ -111,6 +111,7 @@ export class SFX {
       case "crack":  this._noise(0.12, 0.5, t, "highpass", 2400, 1, null); this._tone("square", 400, 120, 0.08, 0.16, t); break;
       case "laser":  this._tone("sawtooth", 1700, 320, 0.12, 0.18, t); this._tone("square", 900, 200, 0.1, 0.09, t); this._noise(0.06, 0.14, t, "highpass", 3200, 1, null); break; // pew: zappy downward chirp
       case "rattle": this._noise(0.05, 0.32, t, "bandpass", 1800, 1.2, 900); break; // per-round
+      case "rattle22": this._noise(0.035, 0.22, t, "bandpass", 2700, 1.5, 1500); this._tone("triangle", 520, 200, 0.03, 0.08, t); break; // tinnier .22 crack
       case "launch": this._noise(0.4, 0.5, t, "lowpass", 900, 1, 200);     this._tone("sawtooth", 180, 60, 0.35, 0.22, t); break;
       // --- melee ---
       case "swipe":  this._noise(0.12, 0.24, t, "bandpass", 1200, 0.8, 2600); break;
