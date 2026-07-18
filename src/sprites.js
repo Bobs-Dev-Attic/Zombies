@@ -152,21 +152,25 @@ export function drawPlayer(ctx, cx, cy, angle, frame, hurtFlash, weaponKind, pal
   const isShotgun = !melee && (weaponKind === "shotgun" || weaponKind === "shotgun_semi" || weaponKind === "shotgun_sxs");
   const isFlamer = !melee && weaponKind === "flamethrower";
   const isRifle = !melee && weaponKind === "rifle"; // bolt-action hunting rifle
-  const isSmg = !melee && weaponKind === "smg";     // waist-fired machine gun
-  if (isSmg) {
-    // Waist-fired machine gun: gripped at the hip with the compact body angling
-    // across to the aim line, rattling back as it chatters.
+  // Waist-fired autos: the machine gun, the battle rifle and the assault rifle.
+  const isWaistGun = !melee && (weaponKind === "smg" || weaponKind === "rifle_semi" || weaponKind === "rifle_auto");
+  if (isWaistGun) {
+    // Fired from the hip with the body angling across to the aim line, kicking
+    // back as it chatters. The rifles are longer, so the support hand reaches
+    // further forward on the fore-end.
     const recoil = action.recoil || 0;
-    const hipX = 2.0 - recoil * 2.4, hipY = 3.2;
+    const long = weaponKind !== "smg";
+    const hipX = 2.0 - recoil * (long ? 3.0 : 2.4), hipY = 3.2;
     const barAng = -0.22 - recoil * 0.05;          // muzzle climbs a touch on recoil
     const cA = Math.cos(barAng), sA = Math.sin(barAng);
-    const foreHX = hipX + cA * 7, foreHY = hipY + sA * 7 + 0.2;
+    const foreD = long ? 10 : 7;
+    const foreHX = hipX + cA * foreD, foreHY = hipY + sA * foreD + 0.2;
     limb2(ctx, 1, 3.0, hipX, hipY, 3, skin);       // trigger hand at the hip
-    limb2(ctx, 1, -1.2, foreHX, foreHY, 3, skin);  // support hand forward on the grip
+    limb2(ctx, 1, -1.2, foreHX, foreHY, 3, skin);  // support hand forward on the fore-end
     ctx.save();
     ctx.translate(hipX, hipY);
     ctx.rotate(barAng);
-    drawSmgLocal(ctx, recoil);
+    drawWaistGunLocal(ctx, weaponKind, recoil);
     ctx.restore();
   } else if (isFlamer) {
     // Hip-fired flamethrower: the fuel tank rides low at the hip and the nozzle
@@ -344,22 +348,41 @@ function drawShotgunLocal(ctx, kind, slide, recoil) {
   }
 }
 
-// Waist-fired machine gun, drawn from the hip grip (0,0) with the compact body
-// running forward (+x). `recoil` (0..1) flicks a spent case out the ejection port.
-function drawSmgLocal(ctx, recoil) {
+// A hip-fired auto/rifle, drawn from the grip (0,0) running forward (+x).
+// `recoil` (0..1) flicks a spent case out the ejection port. `kind` picks the
+// silhouette: the compact SMG, the wood-stocked battle rifle, or the black
+// polymer assault rifle.
+function drawWaistGunLocal(ctx, kind, recoil) {
   const R = (ox, oy, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(ox, oy - h / 2, w, h); };
-  // Folding wire stock tucked back at the hip.
-  R(-6, 0.4, 5, 2.4, "#2a2a2e");
-  R(-6, 0.4, 1.4, 2.4, "#1a1a1e");
-  // Receiver + short barrel + muzzle.
-  R(-1.5, 0, 5, 3.2, "#26262b");
-  R(1, -1.8, 5, 1, "#33373d");     // top rail / sight
-  R(3, 0, 8, 2, "#20242a");        // barrel
-  R(10.5, 0, 2, 2.4, "#15181c");   // muzzle
-  // Stubby box magazine hanging down under the receiver.
-  R(0.5, 2.2, 3.2, 4, "#141418");
-  R(0.5, 2.2, 3.2, 1, "#2c2c32");
-  // Spent brass flicking out the top as it rattles.
+  if (kind === "rifle_semi") {
+    // Battle rifle: wood stock, long barrel, box magazine.
+    R(-6.5, 0.4, 5, 2.8, "#4a3a26"); R(-6.5, 0.4, 1.5, 2.8, "#3a2c1d"); // wood stock + butt plate
+    R(-1.5, 0, 5, 3.2, "#2a2620");                                      // receiver
+    R(2, -1.9, 6, 1, "#3a4a2a");                                        // top rail / sight
+    R(3, 0, 12, 2, "#3a4a2a");                                          // long barrel
+    R(14.5, 0, 2.6, 1.8, "#20242a");                                    // muzzle
+    R(1, 2.4, 3, 4.6, "#141414"); R(1, 2.4, 3, 1, "#2c2c32");           // box magazine
+    if (recoil > 0.4) { R(1.6, -2.4, 1.6, 1, "#e0b83a"); }
+    return;
+  }
+  if (kind === "rifle_auto") {
+    // Assault rifle: black polymer body, curved mag, rail, flash hider.
+    R(-6, 0.4, 5, 2.6, "#1a1a1e"); R(-6, 0.4, 1.4, 2.6, "#0f0f12");     // collapsible stock
+    R(-1.5, 0, 5.5, 3.2, "#232327");                                    // receiver
+    R(2.2, -2.0, 7, 1, "#33373d");                                      // top rail
+    R(3.5, 0, 10, 1.8, "#1c2022");                                      // barrel / handguard
+    R(12.5, 0, 2.6, 2, "#0d0d0d");                                      // flash hider
+    ctx.fillStyle = "#111114"; ctx.beginPath(); ctx.moveTo(1, 1.6); ctx.quadraticCurveTo(2.4, 5.6, 4.4, 6.6); ctx.lineTo(5.6, 6.6); ctx.quadraticCurveTo(3.6, 4.6, 3, 1.6); ctx.closePath(); ctx.fill(); // curved magazine
+    if (recoil > 0.4) { R(1.6, -2.4, 1.4, 1, "#e0b83a"); }
+    return;
+  }
+  // Machine gun (SMG): compact, folding stock, stubby box mag.
+  R(-6, 0.4, 5, 2.4, "#2a2a2e"); R(-6, 0.4, 1.4, 2.4, "#1a1a1e");       // folding wire stock
+  R(-1.5, 0, 5, 3.2, "#26262b");                                        // receiver
+  R(1, -1.8, 5, 1, "#33373d");                                          // top rail / sight
+  R(3, 0, 8, 2, "#20242a");                                             // barrel
+  R(10.5, 0, 2, 2.4, "#15181c");                                        // muzzle
+  R(0.5, 2.2, 3.2, 4, "#141418"); R(0.5, 2.2, 3.2, 1, "#2c2c32");       // stubby box magazine
   if (recoil > 0.4) { R(1.4, -2.4, 1.6, 1, "#e0b83a"); R(1.4, -2.4, 0.6, 1, "#8a6a1a"); }
 }
 

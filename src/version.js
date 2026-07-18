@@ -1,7 +1,15 @@
 // Central version + changelog source. Update this on every release.
-export const VERSION = "0.35.0";
+export const VERSION = "0.35.1";
 
 export const CHANGELOG = [
+  {
+    version: "0.35.1",
+    date: "2026-07-17",
+    title: "From the Hip",
+    changes: [
+      "The Assault Rifle and Battle Rifle are now fired from the waist too — held at the hip and angled across to your aim like the Machine Gun and shotguns.",
+    ],
+  },
   {
     version: "0.35.0",
     date: "2026-07-17",
