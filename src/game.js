@@ -97,6 +97,23 @@ export class Game {
     requestAnimationFrame(this._loop);
   }
 
+  // A horde crammed into the airliner on the runway, spilling out around it.
+  _seedPlaneHorde() {
+    const zp = this.world.zombiePlane;
+    let placed = 0, tries = 0;
+    while (placed < 20 && tries++ < 500) {
+      const x = zp.x + rand(-zp.hw - 30, zp.hw + 30);
+      const y = zp.y + rand(-zp.hh - 8, zp.hh + 8);
+      const cx = Math.floor(x / TILE), cy = Math.floor(y / TILE);
+      if (this.world.tileAt(cx, cy) !== T.FLOOR) continue;   // on walkable ground
+      if (this.world.furnitureAt(x, y)) continue;            // not inside the fuselage
+      if (dist(x, y, this.player.x, this.player.y) < 90) continue;
+      const type = pick(["walker", "walker", "runner", "crawler", "prone", "spitter"]);
+      this.zombies.push(new Zombie(x, y, type, 1));
+      placed++;
+    }
+  }
+
   // ------------------------------------------------------- Cheats / mutators
   // Build the starting loadout, honouring the "all weapons" / "swords" mutators.
   _buildLoadout() {
@@ -148,6 +165,8 @@ export class Game {
   }
 
   _seedLevelLoot() {
+    // A packed airliner stranded on the airport runway spills a static horde.
+    if (this.world.zombiePlane) this._seedPlaneHorde();
     // The house hand-places its loot (key, axe, room rewards) via world.loot.
     if (this.world.loot) { this._seedHouseLoot(); return; }
     // Scatter weapon crates, ammo, and medkits across the map.

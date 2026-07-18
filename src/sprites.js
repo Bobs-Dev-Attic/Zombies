@@ -1034,8 +1034,10 @@ export function drawFurniture(ctx, f) {
   }
   if (f.type === "plane") {
     // A top-down airliner: nose toward +x. Swept wings & tailplane, engine pods,
-    // a fin, cockpit glass and a cabin window line.
-    const L = f.hw, W = f.hh;
+    // a fin, cockpit glass and a cabin window line. Tall AABBs (parked down a
+    // runway) rotate so the fuselage runs along the long axis.
+    const vert = f.hh > f.hw; if (vert) ctx.rotate(-Math.PI / 2);
+    const L = vert ? f.hh : f.hw, W = vert ? f.hw : f.hh;
     ctx.fillStyle = c.edge; // swept wings
     ctx.beginPath(); ctx.moveTo(2, -W * 0.6); ctx.lineTo(-L * 0.5, -W * 2.6); ctx.lineTo(-L * 0.78, -W * 2.6); ctx.lineTo(-4, W * 0.1); ctx.closePath(); ctx.fill();
     ctx.beginPath(); ctx.moveTo(2, W * 0.6); ctx.lineTo(-L * 0.5, W * 2.6); ctx.lineTo(-L * 0.78, W * 2.6); ctx.lineTo(-4, -W * 0.1); ctx.closePath(); ctx.fill();
